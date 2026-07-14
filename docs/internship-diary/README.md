@@ -13,7 +13,7 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 ## Kullanım
 
 1. Yeni bir gün için `template.md` dosyasını kopyalayın
-2. Dosya adını `gun-XX.md` formatında verin (örnek: `gun-01.md`)
+2. Dosya adını `day-XX.md` formatında verin (örnek: `day-01.md`)
 3. Şablondaki tüm bölümleri doldurun
 4. Tamamlanan günlük dosyasını bu dizine ekleyin
 
@@ -22,7 +22,7 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | Dosya | Açıklama |
 |-------|----------|
 | `template.md` | Günlük şablonu |
-| `gun-01.md` | Gün 1 kaydı (oluşturulacak) |
+| `day-01.md` | Gün 1 kaydı |
 | ... | ... |
 
 ## Format
