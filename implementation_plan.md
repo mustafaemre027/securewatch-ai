@@ -2,7 +2,7 @@
 
 ## Genel Bakış
 
-SecureWatch AI, ağ trafiği analizi ve saldırı tespiti için makine öğrenmesi yöntemleri kullanan web tabanlı bir karar destek platformudur. Bu belge, MVP teslimi için gereken tüm aşamaları ve kilometre taşlarını tanımlar.
+SecureWatch AI, ağ trafiği analizi ve saldırı tespiti için makine öğrenmesi yöntemleri kullanan web tabanlı bir karar destek platformudur. Bu belge, proje ekibine yönelik **geliştirici rehberi** olarak hazırlanmıştır; MVP teslimi için gereken tüm aşamaları, kilometre taşlarını, teknik kararları ve takım içi standartları tanımlar.
 
 ## Aşama Yapısı
 
@@ -341,3 +341,58 @@ Bir görev yalnızca şu koşullarda tamamlanmış kabul edilir:
 - [ ] Pull Request açılmıştır
 - [ ] Project durumu Review yapılmıştır
 - [ ] İncelemeci değerlendirmesine hazırdır
+
+---
+
+## Kullanıcı Rolleri
+
+| Rol | Yetkiler |
+|-----|----------|
+| **Yönetici (Admin)** | Kullanıcı yönetimi, tüm analiz ve olayları görüntüleme, model bilgileri, audit log, olay atama |
+| **Güvenlik Analisti (Analyst)** | Trafik verisi yükleme, analiz başlatma, tespit sonuçlarını inceleme, olay yönetimi, not ekleme |
+
+---
+
+## Veri Seti
+
+Ana veri seti olarak **UNSW-NB15** kullanılmaktadır.
+
+- Kaynak: [UNSW-NB15 Dataset](https://research.unsw.edu.au/projects/unsw-nb15-dataset)
+- Eğitim ve test CSV dosyaları: `UNSW_NB15_training-set.csv`, `UNSW_NB15_testing-set.csv`
+- Ham veri seti Git repository'sine eklenmemiştir. Veri setini indirme ve hazırlama adımları `data/` dizininde belgelenmiştir.
+
+---
+
+## Görsel ve Mockup Entegrasyonu
+
+### Kapsam
+
+Bu bölüm, projenin görsel varlıklarının (marka, mockup, ekran görüntüsü) nasıl yönetileceğini ve geliştirme sürecine nasıl entegre edileceğini tanımlar.
+
+### Dizin Yapısı
+
+Tüm görsel varlıklar `docs/assets/` dizini altında tutulur:
+
+```
+docs/assets/
+├── README.md          # Kullanım kuralları
+├── brand/             # Logo, uygulama ikonu, renk paleti ve marka varlıkları
+├── mockups/           # UI/UX ekran tasarımları
+└── screenshots/       # Tamamlanan uygulama ekran görüntüleri
+```
+
+### Kurallar
+
+- **Dosya adlandırma:** Tüm görsel dosya adlarında kebab-case kullanılmalıdır (ör. `dashboard-layout-v2.png`).
+- **İlişkilendirme:** Mockup ve ekran görüntüleri, ilgili oldukları Issue veya Pull Request numarasıyla bağlantılı olmalıdır.
+- **Öncelik:** UI geliştirmeye başlamadan önce ilgili ekranın mockup'ı hazırlanmalı ve ekip içinde gözden geçirilmelidir.
+- **Zamanlama:** Uygulama ekran görüntüleri, ilgili özellik tamamlandıktan sonra `docs/assets/screenshots/` altına eklenir.
+
+### Aşama İlişkisi
+
+Bu süreç doğrudan **Aşama 5 – Frontend ve Kullanıcı Deneyimi (Gün 13–16)** ile ilişkilidir:
+
+- Gün 13 öncesinde ilgili ekranların mockup'ları hazırlanmış ve onaylanmış olmalıdır.
+- Gün 13–16 boyunca frontend geliştirme, onaylanan mockup'lara sadık kalınarak ilerletilir.
+- Gün 17 – Faz 6 Dashboard ve Raporlama sonrasında ekran görüntüleri alınarak `docs/assets/screenshots/` dizinine eklenir.
+- Final teslim (Gün 20) öncesinde tüm ekran görüntüleri güncellenmiş olmalıdır.
