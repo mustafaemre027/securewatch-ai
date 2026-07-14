@@ -24,7 +24,7 @@
 
 ### 1. GitHub Project Board ve Backlog Yönetimi (#11)
 
-- 9 EPIC issue oluşturuldu (#1-#9), her biri projenin 8 fazını kapsıyor.
+- 9 EPIC issue oluşturuldu (#1–#9); bu EPIC’ler Faz 0–8 arasındaki 9 proje fazını temsil ediyor.
 - - 22 sub-issue oluşturuldu (#11–#32); 20 geliştirme gününün tamamına karşılık gelecek şekilde planlandı.
 - Tüm sub-issue'lar ilgili EPIC gövdelerinde checklist olarak listelendi ve bağlantılar kuruldu.
 - Her sub-issue; amaç, açıklama, alt görevler, kabul kriterleri, doğrulama yöntemi, bağımlılıklar, faz, planlanan gün, öncelik, beklenen çıktı ve görsel beklentisi alanlarını içerecek şekilde yapılandırıldı.
