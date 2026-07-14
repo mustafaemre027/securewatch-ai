@@ -7,14 +7,15 @@ SecureWatch AI projesine katkıda bulunmak için aşağıdaki standartları taki
 1. Kodlamaya başlamadan önce mutlaka Issue oluşturun.
 2. Mevcut Issue'ları kontrol edin, aynı konuda Issue varsa yorum ekleyin.
 3. Issue şablonlarını kullanın (`.github/ISSUE_TEMPLATE/`).
-4. Uygun label'ları ekleyin (bug, enhancement, documentation, vs.)
+4. Uygun label'ları ekleyin (`type:*`, `area:*`, `priority:*` formatında; örn. `type:bug`, `area:backend`, `priority:high`)
 
 ## Branch Stratejisi
 
 - `main` branch'i üretim hazır kod içerir.
 - Doğrudan `main` branch'ine push yapmayın.
 - Her Issue için ayrı bir branch oluşturun.
-- Branch adı formatı: `type/issue-number-short-description`
+- Branch adı formatı: `type/issue-number-short-description` (örn. `docs/12-project-readme`)
+- Branch adında Issue numarası mutlaka bulunmalıdır; bu sayede branch'in hangi Issue'ya ait olduğu açıkça takip edilebilir.
 
 | Prefix | Kullanım |
 |--------|----------|
@@ -63,6 +64,8 @@ Kurallar:
 5. İncelemeci(ler) atayın
 6. Gelen düzeltme taleplerini aynı PR üzerinden yeni commitlerle uygulayın
 7. PR incelemeci tarafından onaylanmadan merge etmeyin
+8. PR'ı kendiniz merge etmeyin; danışman onayı beklenmelidir
+9. İnceleme tamamlandıktan sonra danışman merge işlemini gerçekleştirir
 
 ## Kod Standartları
 
