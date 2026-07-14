@@ -52,6 +52,8 @@
 | `c08606a` | chore(github): add issue and pull request templates |
 | `9546651` | docs: add github-workflow.md with branch strategy, label taxonomy and project board workflow |
 | `610d9eb` | docs: add internship-diary directory with README and daily entry template |
+| `643b314` | docs: align roadmap with master plan |
+| `45ee803` | docs: clarify project status and contribution workflow |
 
 ---
 
@@ -90,8 +92,8 @@
 
 ## Sonraki Adımlar
 
-- [ ] Gün 1 staj günlüğü kaydının commit'lenmesi ve PR'a push edilmesi
-- [ ] PR #10'un merge edilmesi (Gün 2'ye geçmeden önce)
+- [x] Gün 1 staj günlüğü kaydının commit'lenmesi ve PR'a push edilmesi
+- [ ] PR #10'un merge edilmesi (danışman onayı ile, Gün 2'ye geçmeden önce)
 - [ ] `priority:medium` ve `priority:low` label'larının oluşturulması
 - [ ] Gün 2 çalışmalarına başlanması
 
@@ -100,7 +102,7 @@
 ## Referanslar
 
 - Branch: `docs/01-project-management-and-documentation`
-- Commit'ler: `08b5b2c`, `251b120`, `845a76e`, `c08606a`, `9546651`, `610d9eb`
+- Commit'ler: `08b5b2c`, `251b120`, `845a76e`, `c08606a`, `9546651`, `610d9eb`, `643b314`, `45ee803`
 - PR: [#10](https://github.com/mustafaemre027/securewatch-ai/pull/10)
 - EPIC Issue: [#1](https://github.com/mustafaemre027/securewatch-ai/issues/1)
 - Sub-Issue'lar: [#11](https://github.com/mustafaemre027/securewatch-ai/issues/11), [#12](https://github.com/mustafaemre027/securewatch-ai/issues/12)
