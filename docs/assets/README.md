@@ -35,4 +35,4 @@ docs/assets/
 
 - Bu dizin yalnızca görsel varlıklar içindir; kod veya dokümantasyon dosyaları buraya eklenmemelidir.
 - Şimdilik gerçek logo, mockup veya ekran görüntüsü üretilmemiştir. İlgili aşamalarda eklenecektir.
-- Tüm görsel varlıklar, projenin [implementation_plan.md](../implementation_plan.md) dosyasında tanımlanan aşama ve kilometre taşlarıyla ilişkilendirilmelidir.
+- Tüm görsel varlıklar, projenin [implementation_plan.md](../../implementation_plan.md) dosyasında tanımlanan aşama ve kilometre taşlarıyla ilişkilendirilmelidir.
