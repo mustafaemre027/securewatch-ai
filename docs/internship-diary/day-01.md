@@ -8,9 +8,8 @@
 - **Çalışılan Sub-Issue'lar:**
   - [#11](https://github.com/mustafaemre027/securewatch-ai/issues/11) — [Faz-0] Gün 1: GitHub Project Board ve Backlog Yönetimi
   - [#12](https://github.com/mustafaemre027/securewatch-ai/issues/12) — [Faz-0] Gün 1: Dokümantasyon ve Şablonlar
-- **Branch:** `docs/01-project-management-and-documentation`
-- **PR:** [#10](https://github.com/mustafaemre027/securewatch-ai/pull/10) — Phase 0: Project management and documentation
-
+- **Branch:** `docs/01-project-management-and-documentation-v2`
+- **PR:** - **PR:** [#34](https://github.com/mustafaemre027/securewatch-ai/pull/34) — Phase 0: Project management and documentation (resubmission)
 ---
 
 ## Hedef
@@ -26,7 +25,7 @@
 ### 1. GitHub Project Board ve Backlog Yönetimi (#11)
 
 - 9 EPIC issue oluşturuldu (#1-#9), her biri projenin 8 fazını kapsıyor.
-- 21 sub-issue oluşturuldu (#11-#31), 20 geliştirme gününün tamamına karşılık gelecek şekilde planlandı.
+- - 22 sub-issue oluşturuldu (#11–#32); 20 geliştirme gününün tamamına karşılık gelecek şekilde planlandı.
 - Tüm sub-issue'lar ilgili EPIC gövdelerinde checklist olarak listelendi ve bağlantılar kuruldu.
 - Her sub-issue; amaç, açıklama, alt görevler, kabul kriterleri, doğrulama yöntemi, bağımlılıklar, faz, planlanan gün, öncelik, beklenen çıktı ve görsel beklentisi alanlarını içerecek şekilde yapılandırıldı.
 - 12 adet özel label oluşturuldu: **type:** feature, bug, documentation, refactor, test, chore (6 adet); **area:** backend, frontend, docs, ml (4 adet); **priority:** critical, high (2 adet).
@@ -45,15 +44,17 @@
 ### İlgili Commit'ler
 
 | Commit | Açıklama |
-|--------|---------|
-| `08b5b2c` | docs: add project overview with Turkish documentation |
-| `251b120` | docs: add 20-day implementation roadmap with provisional risk thresholds |
-| `845a76e` | docs: add contribution workflow |
-| `c08606a` | chore(github): add issue and pull request templates |
-| `9546651` | docs: add github-workflow.md with branch strategy, label taxonomy and project board workflow |
-| `610d9eb` | docs: add internship-diary directory with README and daily entry template |
-| `643b314` | docs: align roadmap with master plan |
-| `45ee803` | docs: clarify project status and contribution workflow |
+|--------|----------|
+| `cd77b67` | docs: add project overview with Turkish documentation |
+| `1da499e` | docs: add 20-day implementation roadmap with provisional risk thresholds |
+| `e24608c` | docs: add contribution workflow |
+| `0a39f82` | chore(github): add issue and pull request templates |
+| `c6f5c5e` | docs: add github-workflow.md with branch strategy, label taxonomy and project board workflow |
+| `1671878` | docs: add internship-diary directory with README and daily entry template |
+| `8a06942` | docs(diary): add day 01 internship log |
+| `0c0e54a` | docs: align roadmap with master plan |
+| `80bb2d0` | docs: clarify project status and contribution workflow |
+| `7936fb9` | docs(diary): update day 01 documentation corrections |
 
 ---
 
