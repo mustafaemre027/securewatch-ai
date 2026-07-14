@@ -33,7 +33,7 @@ Bu proje üretim ortamında kullanılabilecek gerçek zamanlı bir IDS/IPS deği
 | **Veritabanı** | PostgreSQL |
 | **Makine Öğrenmesi** | Pandas, NumPy, scikit-learn, Joblib |
 | **Test** | Pytest, HTTPX, Vitest, React Testing Library |
-| **DevOps** | Docker, Docker Compose, GitHub Actions |
+| **DevOps** | Docker, Docker Compose, GitHub Actions (planlandı) |
 
 ## Veri Seti
 
@@ -73,6 +73,8 @@ securewatch-ai/
 
 ## Kurulum
 
+> **Not:** Aşağıdaki kurulum adımları planlanmıştır; henüz çalıştırılmamış ve doğrulanmamıştır. Backend ve frontend henüz geliştirilmediği için çalıştırılamaz.
+
 ### Gereksinimler
 
 - Python 3.10+
@@ -80,7 +82,7 @@ securewatch-ai/
 - PostgreSQL 15+
 - Docker (opsiyonel)
 
-### Backend Kurulumu
+### Backend Kurulumu (planlandı / henüz doğrulanmadı)
 
 ```bash
 cd backend
@@ -93,7 +95,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-### Frontend Kurulumu
+### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
 
 ```bash
 cd frontend
@@ -101,13 +103,13 @@ npm install
 npm run dev
 ```
 
-### Docker ile Kurulum
+### Docker ile Kurulum (planlandı / henüz doğrulanmadı)
 
 ```bash
 docker-compose up --build
 ```
 
-## Test
+## Test (planlandı / henüz doğrulanmadı)
 
 ```bash
 # Backend testleri
@@ -126,25 +128,36 @@ cd frontend && npm test
 
 ## Proje Durumu
 
-| Aşama | Durum |
-|-------|-------|
-| Aşama 0 – Proje Yönetimi ve Dokümantasyon | Devam Ediyor |
-| Aşama 1 – Veri Analizi ve Sistem Mimarisi | Planlandı |
-| Aşama 2 – Backend, Veritabanı ve Yetkilendirme | Planlandı |
-| Aşama 3 – Veri İşleme ve Makine Öğrenmesi | Planlandı |
-| Aşama 4 – Analiz, Tespit ve Olay Yönetimi | Planlandı |
-| Aşama 5 – Frontend ve Kullanıcı Deneyimi | Planlandı |
-| Aşama 6 – Dashboard ve Raporlama | Planlandı |
-| Aşama 7 – Test, Güvenlik ve Entegrasyon | Planlandı |
-| Aşama 8 – Docker, Dokümantasyon ve Final Teslimi | Planlandı |
+| Faz | Durum |
+|-----|-------|
+| Faz 0 – Proje Yönetimi ve Dokümantasyon | Review |
+| Faz 1 – Veri Analizi ve Sistem Mimarisi | Planlandı |
+| Faz 2 – Backend, Veritabanı ve Yetkilendirme | Planlandı |
+| Faz 3 – Veri İşleme ve Makine Öğrenmesi | Planlandı |
+| Faz 4 – Analiz, Tespit ve Olay Yönetimi | Planlandı |
+| Faz 5 – Frontend ve Kullanıcı Deneyimi | Planlandı |
+| Faz 6 – Dashboard ve Raporlama | Planlandı |
+| Faz 7 – Test, Güvenlik ve Entegrasyon | Planlandı |
+| Faz 8 – Docker, Dokümantasyon ve Final Teslimi | Planlandı |
 
 ## Güvenlik ve Etik Sınırlar
 
 - Bu proje yalnızca eğitim ve analiz amaçlıdır
 - Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz
-- Test verileri gerçek ağ trafiği içermez
+- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik UNSW-NB15 veri seti kullanılır
 - Kullanıcı şifreleri hashlenerek saklanır
 - JWT secret ve veritabanı bilgileri `.env` üzerinden okunur
+
+## Planned Features
+
+Aşağıdaki özellikler planlanmış olup henüz geliştirilmemiştir:
+
+- JWT tabanlı kullanıcı kimlik doğrulama ve RBAC
+- CSV dosya yükleme ve doğrulama
+- ML destekli saldırı tespiti (Random Forest, Logistic Regression)
+- Risk skorlaması ve olay yönetimi
+- Dashboard ve raporlama arayüzü
+- Docker konteynerizasyonu
 
 ## Lisans
 
