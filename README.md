@@ -75,6 +75,7 @@ docker-compose up --build
 
 ## Lisans ve Güvenlik Notu
 
+- Projenin lisansı henüz belirlenmemiştir.
 - Bu proje yalnızca eğitim ve analiz amaçlıdır
 - Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz
 - Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik UNSW-NB15 veri seti kullanılır
