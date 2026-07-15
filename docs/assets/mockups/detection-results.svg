@@ -1,0 +1,193 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="1440" height="900" fill="#0A0E1A"/>
+  
+  <!-- UI Mockup Warning Banner -->
+  <rect width="1440" height="35" fill="#E53E3E"/>
+  <text x="720" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">
+    UI MOCKUP — UYGULAMA EKRANI DEĞİLDİR (GÖRSEL TASLAK)
+  </text>
+  
+  <!-- Navigation Bar -->
+  <g transform="translate(0, 35)">
+    <rect width="1440" height="60" fill="#0B132B" stroke="#1C2541" stroke-width="1"/>
+    <!-- Logo Symbol -->
+    <path d="M 40,15 Q 50,18 60,15 Q 60,35 50,45 Q 40,35 40,15 Z" stroke="#5BC0BE" stroke-width="2" fill="none"/>
+    <circle cx="50" cy="27" r="3" fill="#6FFFE9"/>
+    <!-- Logo Text -->
+    <text x="75" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF">SecureWatch <tspan fill="#6FFFE9">AI</tspan></text>
+    
+    <!-- Menu -->
+    <text x="260" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Dashboard</text>
+    <text x="380" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Veri Yükleme</text>
+    
+    <!-- Active Menu: Tespit Sonuçları -->
+    <text x="510" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" fill="#6FFFE9">Tespit Sonuçları</text>
+    <line x1="510" y1="52" x2="620" y2="52" stroke="#6FFFE9" stroke-width="3"/>
+    
+    <text x="660" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Olay Yönetimi</text>
+    
+    <!-- User Info -->
+    <rect x="1180" y="15" width="220" height="30" rx="15" fill="#1C2541"/>
+    <circle cx="1195" cy="30" r="8" fill="#5BC0BE"/>
+    <text x="1212" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF">Güvenlik Analisti</text>
+    <text x="1312" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#A0AEC0">analyst@sw.ai</text>
+  </g>
+  
+  <!-- Page Header -->
+  <g transform="translate(100, 130)">
+    <text x="0" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF">Tespit Sonuçları</text>
+    <text x="0" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#A0AEC0">
+      Yapay zekâ modeli tarafından analiz edilen ağ kayıtlarının risk derecelendirmesi ve sınıflandırılması.
+    </text>
+  </g>
+  
+  <!-- Filters Bar (Y: 210, H: 60) -->
+  <g transform="translate(100, 210)">
+    <rect width="1240" height="60" rx="8" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+    
+    <!-- Filter Label -->
+    <text x="20" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#A0AEC0">Risk Seviyesi Filtrele:</text>
+    
+    <!-- Button: CRITICAL -->
+    <rect x="160" y="15" width="100" height="30" rx="6" fill="#E53E3E"/>
+    <text x="210" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CRITICAL</text>
+    
+    <!-- Button: HIGH -->
+    <rect x="270" y="15" width="100" height="30" rx="6" fill="#DD6B20"/>
+    <text x="320" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">HIGH</text>
+    
+    <!-- Button: MEDIUM -->
+    <rect x="380" y="15" width="100" height="30" rx="6" fill="#D69E2E"/>
+    <text x="430" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MEDIUM</text>
+    
+    <!-- Button: LOW (Pasif) -->
+    <rect x="490" y="15" width="100" height="30" rx="6" fill="#1C2541" stroke="#3A506B" stroke-width="1"/>
+    <text x="540" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#A0AEC0" text-anchor="middle">LOW</text>
+    
+    <!-- Search / Text Input (Right) -->
+    <rect x="940" y="15" width="280" height="30" rx="6" fill="#0A0E1A" stroke="#1C2541" stroke-width="1"/>
+    <text x="955" y="34" font-family="system-ui, sans-serif" font-size="12" fill="#3A506B">IP Adresi veya Protokol Ara...</text>
+  </g>
+  
+  <!-- Data Table (Y: 290) -->
+  <g transform="translate(100, 290)">
+    <!-- Table Container -->
+    <rect width="1240" height="460" rx="8" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+    
+    <!-- Table Header -->
+    <rect x="0" y="0" width="1240" height="50" rx="8" fill="#1C2541"/>
+    <text x="30" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">KAYIT ID</text>
+    <text x="130" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">PROTOKOL</text>
+    <text x="240" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">KAYNAK IP</text>
+    <text x="410" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">HEDEF IP</text>
+    <text x="580" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">TAHMİN</text>
+    <text x="720" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">MODEL GÜVENİ</text>
+    <text x="880" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">RİSK SEVİYESİ</text>
+    <text x="1060" y="31" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">AKSİYON</text>
+    
+    <!-- Row 1 -->
+    <g transform="translate(0, 50)">
+      <line x1="0" y1="60" x2="1240" y2="60" stroke="#1C2541" stroke-width="1"/>
+      <text x="30" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">#12401</text>
+      <text x="130" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">TCP</text>
+      <text x="240" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">192.168.1.50</text>
+      <text x="410" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">10.0.0.8</text>
+      <text x="580" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#E53E3E">ŞÜPHELİ (Saldırı)</text>
+      <text x="720" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">%94.2</text>
+      
+      <!-- Risk Label Critical -->
+      <rect x="880" y="18" width="90" height="24" rx="4" fill="#E53E3E"/>
+      <text x="925" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CRITICAL</text>
+      
+      <!-- Action button -->
+      <rect x="1060" y="16" width="130" height="28" rx="6" fill="#6FFFE9"/>
+      <text x="1125" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0A0E1A" text-anchor="middle">Olaya Dönüştür</text>
+    </g>
+    
+    <!-- Row 2 -->
+    <g transform="translate(0, 110)">
+      <line x1="0" y1="60" x2="1240" y2="60" stroke="#1C2541" stroke-width="1"/>
+      <text x="30" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">#12402</text>
+      <text x="130" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">UDP</text>
+      <text x="240" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">192.168.1.12</text>
+      <text x="410" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">8.8.8.8</text>
+      <text x="580" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#38A169">NORMAL</text>
+      <text x="720" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">%98.1</text>
+      
+      <!-- Risk Label Low -->
+      <rect x="880" y="18" width="90" height="24" rx="4" fill="#3A506B"/>
+      <text x="925" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">LOW</text>
+      
+      <!-- Action text link -->
+      <text x="1060" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">İncele</text>
+    </g>
+    
+    <!-- Row 3 -->
+    <g transform="translate(0, 170)">
+      <line x1="0" y1="60" x2="1240" y2="60" stroke="#1C2541" stroke-width="1"/>
+      <text x="30" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">#12403</text>
+      <text x="130" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">TCP</text>
+      <text x="240" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">172.16.0.4</text>
+      <text x="410" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">192.168.1.100</text>
+      <text x="580" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#E53E3E">ŞÜPHELİ (Saldırı)</text>
+      <text x="720" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">%87.5</text>
+      
+      <!-- Risk Label High -->
+      <rect x="880" y="18" width="90" height="24" rx="4" fill="#DD6B20"/>
+      <text x="925" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">HIGH</text>
+      
+      <!-- Action button -->
+      <rect x="1060" y="16" width="130" height="28" rx="6" fill="#6FFFE9"/>
+      <text x="1125" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0A0E1A" text-anchor="middle">Olaya Dönüştür</text>
+    </g>
+    
+    <!-- Row 4 -->
+    <g transform="translate(0, 230)">
+      <line x1="0" y1="60" x2="1240" y2="60" stroke="#1C2541" stroke-width="1"/>
+      <text x="30" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">#12404</text>
+      <text x="130" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">TCP</text>
+      <text x="240" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">192.168.1.55</text>
+      <text x="410" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">23.45.67.89</text>
+      <text x="580" y="35" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#E53E3E">ŞÜPHELİ (Saldırı)</text>
+      <text x="720" y="35" font-family="system-ui, sans-serif" font-size="13" fill="#FFFFFF">%62.1</text>
+      
+      <!-- Risk Label Medium -->
+      <rect x="880" y="18" width="90" height="24" rx="4" fill="#D69E2E"/>
+      <text x="925" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MEDIUM</text>
+      
+      <!-- Action button -->
+      <rect x="1060" y="16" width="130" height="28" rx="6" fill="#6FFFE9"/>
+      <text x="1125" y="34" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#0A0E1A" text-anchor="middle">Olaya Dönüştür</text>
+    </g>
+    
+    <!-- Table Footer / Pagination -->
+    <g transform="translate(0, 400)">
+      <rect width="1240" height="60" rx="8" fill="#1C2541"/>
+      <text x="30" y="35" font-family="system-ui, sans-serif" font-size="12" fill="#A0AEC0">Toplam 12.450 kayıttan 1-4 arası gösteriliyor</text>
+      
+      <!-- Pagination controls -->
+      <g transform="translate(900, 15)">
+        <rect width="30" height="30" rx="4" fill="#0A0E1A" stroke="#3A506B" stroke-width="1"/>
+        <text x="15" y="19" font-family="system-ui, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">◀</text>
+        
+        <rect x="40" y="0" width="30" height="30" rx="4" fill="#5BC0BE"/>
+        <text x="55" y="19" font-family="system-ui, sans-serif" font-size="12" fill="#0A0E1A" font-weight="bold" text-anchor="middle">1</text>
+        
+        <rect x="80" y="0" width="30" height="30" rx="4" fill="#0A0E1A" stroke="#1C2541" stroke-width="1"/>
+        <text x="95" y="19" font-family="system-ui, sans-serif" font-size="12" fill="#A0AEC0" text-anchor="middle">2</text>
+        
+        <rect x="120" y="0" width="30" height="30" rx="4" fill="#0A0E1A" stroke="#1C2541" stroke-width="1"/>
+        <text x="135" y="19" font-family="system-ui, sans-serif" font-size="12" fill="#A0AEC0" text-anchor="middle">3</text>
+        
+        <rect x="160" y="0" width="30" height="30" rx="4" fill="#0A0E1A" stroke="#3A506B" stroke-width="1"/>
+        <text x="175" y="19" font-family="system-ui, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">▶</text>
+      </g>
+    </g>
+  </g>
+  
+  <!-- System Status Footer -->
+  <text x="720" y="870" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#3A506B" text-anchor="middle">
+    SecureWatch AI v0.1.0-prototype | Akademik UNSW-NB15 Karar Destek Prototipi
+  </text>
+</svg>

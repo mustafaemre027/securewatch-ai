@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="1440" height="900" fill="#0A0E1A"/>
+  
+  <!-- UI Mockup Warning Banner -->
+  <rect width="1440" height="35" fill="#E53E3E"/>
+  <text x="720" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">
+    UI MOCKUP — UYGULAMA EKRANI DEĞİLDİR (GÖRSEL TASLAK)
+  </text>
+  
+  <!-- Navigation Bar -->
+  <g transform="translate(0, 35)">
+    <rect width="1440" height="60" fill="#0B132B" stroke="#1C2541" stroke-width="1"/>
+    <!-- Logo Symbol -->
+    <path d="M 40,15 Q 50,18 60,15 Q 60,35 50,45 Q 40,35 40,15 Z" stroke="#5BC0BE" stroke-width="2" fill="none"/>
+    <circle cx="50" cy="27" r="3" fill="#6FFFE9"/>
+    <!-- Logo Text -->
+    <text x="75" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF">SecureWatch <tspan fill="#6FFFE9">AI</tspan></text>
+    
+    <!-- Active Menu: Dashboard -->
+    <text x="260" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" fill="#6FFFE9">Dashboard</text>
+    <line x1="260" y1="52" x2="330" y2="52" stroke="#6FFFE9" stroke-width="3"/>
+    
+    <text x="380" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Veri Yükleme</text>
+    <text x="510" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Tespit Sonuçları</text>
+    <text x="660" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Olay Yönetimi</text>
+    
+    <!-- User Info -->
+    <rect x="1180" y="15" width="220" height="30" rx="15" fill="#1C2541"/>
+    <circle cx="1195" cy="30" r="8" fill="#5BC0BE"/>
+    <text x="1212" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF">Güvenlik Analisti</text>
+    <text x="1312" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#A0AEC0">analyst@sw.ai</text>
+  </g>
+  
+  <!-- Page Header -->
+  <g transform="translate(100, 130)">
+    <text x="0" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF">Karar Destek Dashboard</text>
+    <text x="0" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#A0AEC0">
+      Sistemde kayıtlı analiz sonuçlarının ve makine öğrenmesi model başarılarının genel görünümü.
+    </text>
+  </g>
+  
+  <!-- Summary Cards Row (Y: 210, Height: 120) -->
+  <g transform="translate(100, 210)">
+    <!-- Card 1: Toplam Kayıt -->
+    <g transform="translate(0, 0)">
+      <rect width="280" height="120" rx="10" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">Toplam Analiz Edilen Trafik</text>
+      <text x="20" y="75" font-family="system-ui, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF">124.500</text>
+      <text x="20" y="100" font-family="system-ui, sans-serif" font-size="11" fill="#38A169">▲ %12 (Son 7 güne göre)</text>
+    </g>
+    
+    <!-- Card 2: Şüpheli Kayıt -->
+    <g transform="translate(310, 0)">
+      <rect width="280" height="120" rx="10" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">Şüpheli Tespit Sayısı</text>
+      <text x="20" y="75" font-family="system-ui, sans-serif" font-size="28" font-weight="800" fill="#6FFFE9">12.405</text>
+      <text x="20" y="100" font-family="system-ui, sans-serif" font-size="11" fill="#A0AEC0">Toplam trafiğin %9.96'sı</text>
+    </g>
+    
+    <!-- Card 3: Yüksek Risk Olayı -->
+    <g transform="translate(620, 0)">
+      <rect width="280" height="120" rx="10" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">Aktif Güvenlik Olayı</text>
+      <text x="20" y="75" font-family="system-ui, sans-serif" font-size="28" font-weight="800" fill="#E53E3E">34</text>
+      <text x="20" y="100" font-family="system-ui, sans-serif" font-size="11" fill="#E53E3E">12 Kritik Seviye Olay</text>
+    </g>
+    
+    <!-- Card 4: Model Başarımı -->
+    <g transform="translate(930, 0)">
+      <rect width="280" height="120" rx="10" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="20" y="35" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">Model Başarımı (F1-Skor)</text>
+      <text x="20" y="75" font-family="system-ui, sans-serif" font-size="28" font-weight="800" fill="#5BC0BE">%98.4</text>
+      <text x="20" y="100" font-family="system-ui, sans-serif" font-size="11" fill="#A0AEC0">Model: Random Forest Classifier</text>
+    </g>
+  </g>
+  
+  <!-- Charts Row (Y: 360, Height: 440) -->
+  <g transform="translate(100, 360)">
+    <!-- Chart Box 1: Normal/Saldırı Dağılımı (Pasta Grafik) -->
+    <g transform="translate(0, 0)">
+      <rect width="590" height="440" rx="12" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="30" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">Trafik Sınıf Dağılımı</text>
+      
+      <!-- Render Pie Chart Graphic -->
+      <g transform="translate(200, 220)">
+        <!-- Green Arc (Normal) -->
+        <circle cx="0" cy="0" r="100" fill="none" stroke="#3A506B" stroke-width="40"/>
+        <!-- Teal Arc (Saldırı) -->
+        <path d="M 0,-100 A 100,100 0 0,1 95,30 L 76,24 A 80,80 0 0,0 0,-80 Z" fill="#6FFFE9"/>
+        <!-- Inner Label -->
+        <circle cx="0" cy="0" r="60" fill="#0B132B"/>
+        <text x="0" y="5" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">%90.0</text>
+        <text x="0" y="22" font-family="system-ui, sans-serif" font-size="10" fill="#A0AEC0" text-anchor="middle">Normal</text>
+      </g>
+      
+      <!-- Legend -->
+      <g transform="translate(420, 180)">
+        <rect width="16" height="16" rx="4" fill="#3A506B"/>
+        <text x="25" y="13" font-family="system-ui, sans-serif" font-size="12" fill="#A0AEC0">Normal (112.095)</text>
+        
+        <rect y="30" width="16" height="16" rx="4" fill="#6FFFE9"/>
+        <text x="25" y="43" font-family="system-ui, sans-serif" font-size="12" fill="#A0AEC0">Şüpheli (12.405)</text>
+      </g>
+    </g>
+    
+    <!-- Chart Box 2: Saldırı Eğilimleri (Çizgi Grafik) -->
+    <g transform="translate(620, 0)">
+      <rect width="590" height="440" rx="12" fill="#0B132B" stroke="#1C2541" stroke-width="1.5"/>
+      <text x="30" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">Zamana Göre Tespit Eğilimleri (Saatlik)</text>
+      
+      <!-- Line Chart Graphic Grid -->
+      <g transform="translate(60, 90)">
+        <!-- Horizontal Grid Lines -->
+        <line x1="0" y1="50" x2="480" y2="50" stroke="#1C2541" stroke-width="1"/>
+        <line x1="0" y1="130" x2="480" y2="130" stroke="#1C2541" stroke-width="1"/>
+        <line x1="0" y1="210" x2="480" y2="210" stroke="#1C2541" stroke-width="1"/>
+        <line x1="0" y1="290" x2="480" y2="290" stroke="#1C2541" stroke-width="1.5"/> <!-- Axis Line -->
+        
+        <!-- Y-Axis Labels -->
+        <text x="-15" y="54" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="end">150</text>
+        <text x="-15" y="134" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="end">100</text>
+        <text x="-15" y="214" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="end">50</text>
+        <text x="-15" y="294" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="end">0</text>
+        
+        <!-- X-Axis Labels -->
+        <text x="40" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">08:00</text>
+        <text x="120" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">10:00</text>
+        <text x="200" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">12:00</text>
+        <text x="280" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">14:00</text>
+        <text x="360" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">16:00</text>
+        <text x="440" y="315" font-family="system-ui, sans-serif" font-size="11" fill="#3A506B" text-anchor="middle">18:00</text>
+        
+        <!-- Line Path (Saldırı Trendi) -->
+        <path d="M 40,240 L 120,200 L 200,80 L 280,180 L 360,110 L 440,50" fill="none" stroke="#5BC0BE" stroke-width="3"/>
+        
+        <!-- Data Dots -->
+        <circle cx="40" cy="240" r="4" fill="#5BC0BE"/>
+        <circle cx="120" cy="200" r="4" fill="#5BC0BE"/>
+        <circle cx="200" cy="80" r="4" fill="#5BC0BE"/>
+        <circle cx="280" cy="180" r="4" fill="#5BC0BE"/>
+        <circle cx="360" cy="110" r="4" fill="#5BC0BE"/>
+        <circle cx="440" cy="50" r="4" fill="#5BC0BE"/>
+      </g>
+    </g>
+  </g>
+  
+  <!-- System Status Footer -->
+  <text x="720" y="870" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#3A506B" text-anchor="middle">
+    SecureWatch AI v0.1.0-prototype | Akademik UNSW-NB15 Karar Destek Prototipi
+  </text>
+</svg>

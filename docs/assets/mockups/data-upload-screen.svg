@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="1440" height="900" fill="#0A0E1A"/>
+  
+  <!-- UI Mockup Warning Banner -->
+  <rect width="1440" height="35" fill="#E53E3E"/>
+  <text x="720" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">
+    UI MOCKUP — UYGULAMA EKRANI DEĞİLDİR (GÖRSEL TASLAK)
+  </text>
+  
+  <!-- Navigation Bar (Y: 35 to 95) -->
+  <g transform="translate(0, 35)">
+    <rect width="1440" height="60" fill="#0B132B" stroke="#1C2541" stroke-width="1"/>
+    <!-- Logo Symbol -->
+    <path d="M 40,15 Q 50,18 60,15 Q 60,35 50,45 Q 40,35 40,15 Z" stroke="#5BC0BE" stroke-width="2" fill="none"/>
+    <circle cx="50" cy="27" r="3" fill="#6FFFE9"/>
+    <!-- Logo Text -->
+    <text x="75" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF">SecureWatch <tspan fill="#6FFFE9">AI</tspan></text>
+    
+    <!-- Menu -->
+    <text x="260" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Dashboard</text>
+    
+    <!-- Active Menu: Veri Yükleme -->
+    <text x="380" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" fill="#6FFFE9">Veri Yükleme</text>
+    <line x1="380" y1="52" x2="465" y2="52" stroke="#6FFFE9" stroke-width="3"/>
+    
+    <text x="510" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Tespit Sonuçları</text>
+    <text x="660" y="38" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#A0AEC0">Olay Yönetimi</text>
+    
+    <!-- User Info (Right) -->
+    <rect x="1180" y="15" width="220" height="30" rx="15" fill="#1C2541"/>
+    <circle cx="1195" cy="30" r="8" fill="#5BC0BE"/>
+    <text x="1212" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#FFFFFF">Güvenlik Analisti</text>
+    <text x="1312" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#A0AEC0">analyst@sw.ai</text>
+  </g>
+  
+  <!-- Page Header -->
+  <g transform="translate(100, 140)">
+    <text x="0" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF">Ağ Trafiği Veri Yükleme</text>
+    <text x="0" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#A0AEC0">
+      Karar destek modelinin analiz etmesi için UNSW-NB15 veri seti formatında bir CSV dosyası yükleyin.
+    </text>
+  </g>
+  
+  <!-- Main Content Layout (Grid split) -->
+  <!-- Left Side: Dropzone -->
+  <g transform="translate(100, 230)">
+    <rect width="600" height="350" rx="12" fill="#0B132B" stroke="#3A506B" stroke-width="2" stroke-dasharray="8 8"/>
+    
+    <!-- Cloud/Upload Icon -->
+    <g transform="translate(265, 90)">
+      <path d="M 20,45 A 15,15 0 0,1 30,15 A 20,20 0 0,1 70,20 A 15,15 0 0,1 80,45 Z" fill="#1C2541"/>
+      <path d="M 50,60 L 50,35 M 40,45 L 50,35 L 60,45" stroke="#5BC0BE" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    
+    <text x="300" y="190" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">
+      Trafik CSV dosyasını buraya sürükleyin
+    </text>
+    <text x="300" y="215" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#A0AEC0" text-anchor="middle">
+      veya göz atmak için bilgisayarınızdan seçin
+    </text>
+    
+    <!-- Upload limits details -->
+    <rect x="180" y="250" width="240" height="30" rx="15" fill="#0A0E1A"/>
+    <text x="300" y="269" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#3A506B" text-anchor="middle">
+      Maksimum dosya boyutu: 50MB | Sadece .csv uzantısı
+    </text>
+  </g>
+  
+  <!-- Right Side: File Details and Schema Validation -->
+  <g transform="translate(740, 230)">
+    <rect width="600" height="350" rx="12" fill="#0B132B" stroke="#1C2541" stroke-width="2"/>
+    
+    <text x="30" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">Yüklenen Dosya Bilgileri</text>
+    
+    <!-- File Info Box -->
+    <rect x="30" y="60" width="540" height="70" rx="8" fill="#0A0E1A" stroke="#1C2541" stroke-width="1"/>
+    <!-- File Icon -->
+    <rect x="50" y="77" width="24" height="35" rx="3" fill="#3A506B"/>
+    <text x="62" y="98" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#6FFFE9" text-anchor="middle">CSV</text>
+    
+    <text x="90" y="90" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="#FFFFFF">unsw_test_traffic_sample.csv</text>
+    <text x="90" y="110" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#A0AEC0">Boyut: 4.8 MB | Satır Sayısı: 12,450</text>
+    
+    <!-- Validation Status -->
+    <text x="30" y="170" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="#FFFFFF">Şema Doğrulama Durumu</text>
+    
+    <!-- Checkmarks list -->
+    <g transform="translate(30, 190)">
+      <!-- Item 1 -->
+      <circle cx="15" cy="15" r="10" fill="#38A169"/>
+      <path d="M 11,15 L 14,18 L 19,12" stroke="#FFFFFF" stroke-width="2" fill="none"/>
+      <text x="35" y="19" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">Dosya Yapısı ve Kodlama (UTF-8) Doğrulandı</text>
+      
+      <!-- Item 2 -->
+      <circle cx="15" cy="45" r="10" fill="#38A169"/>
+      <path d="M 11,45 L 14,48 L 19,42" stroke="#FFFFFF" stroke-width="2" fill="none"/>
+      <text x="35" y="49" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">Sütun Eşleşmesi: 45 / 45 Özellik Algılandı</text>
+      
+      <!-- Item 3 -->
+      <circle cx="15" cy="75" r="10" fill="#38A169"/>
+      <path d="M 11,75 L 14,78 L 19,72" stroke="#FFFFFF" stroke-width="2" fill="none"/>
+      <text x="35" y="79" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#FFFFFF">Veri Tipleri Uygunluğu Denetlendi</text>
+    </g>
+    
+    <!-- Action Button inside Info Box -->
+    <rect x="30" y="290" width="540" height="45" rx="8" fill="#6FFFE9"/>
+    <text x="300" y="318" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="#0A0E1A" text-anchor="middle">
+      Doğrulanmış Analizi Başlat ve Karar Desteği Üret
+    </text>
+  </g>
+  
+  <!-- System Status Footer -->
+  <text x="720" y="870" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#3A506B" text-anchor="middle">
+    SecureWatch AI v0.1.0-prototype | Akademik UNSW-NB15 Karar Destek Prototipi
+  </text>
+</svg>
