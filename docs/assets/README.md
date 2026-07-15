@@ -44,7 +44,10 @@ Uygulamanın tasarım aşamasında hedeflenen arayüzlerin 1440x900 çözünürl
 
 ## 3. Gerçek Ekran Görüntüleri (Screenshots)
 
-Bu bölüm, geliştirme tamamlandıktan sonra çalışan uygulamadan alınan ekran görüntülerinin saklanacağı `docs/assets/screenshots/` dizinini temsil eder.
+Bu bölüm, projenin gelişim sürecine ait doğrulamaları ve çalışan uygulamadan alınan gerçek ekran görüntülerini barındırır. Bu dizinde yer alan dosyalar **gerçek ekran görüntüleri (kanıtlar)** olup statik mockup değildir.
+
+*   **Gün 1 Proje Panosu ([github-project-board-day-01.png](screenshots/github-project-board-day-01.png)):** Gün 1 kapsamındaki Project Board durumunu ve iş akışını gösteren gerçek GitHub ekran görüntüsüdür.
+*   **PR #34 İnceleme ve Onay Kanıtı ([pr-34-documentation-review.png](screenshots/pr-34-documentation-review.png)):** PR #34 kapsamındaki dokümantasyon inceleme ve onay sürecini gösteren gerçek GitHub ekran görüntüsüdür.
 
 > [!NOTE]
-> Bu dizinde yer alacak gerçek ekran görüntüleri (örneğin ana kontrol paneli, analiz sonuçları ve olay yönetimi pencereleri), uygulamadaki özellikler **aktif olarak geliştirildikten sonra kullanıcı tarafından** alınarak bu dizine eklenecektir. Şu anda geliştirme aşamasında olunduğu için herhangi bir sahte/temsili ekran görüntüsü eklenmemiştir ve bağlantı verilmemiştir.
+> Çalışan uygulamaya ait ekran görüntüleri (Dashboard, Analiz Sonuçları vb.), uygulamanın ilgili kod bileşenleri geliştirildikten sonra bu dizine eklenecektir. Şu anda geliştirme aşamasında olunduğu için herhangi bir sahte/temsili ekran görüntüsü eklenmemiştir.
