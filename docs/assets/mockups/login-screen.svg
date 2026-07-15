@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="1440" height="900" fill="#0A0E1A"/>
+  
+  <!-- UI Mockup Warning Banner -->
+  <rect width="1440" height="35" fill="#E53E3E"/>
+  <text x="720" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">
+    UI MOCKUP — UYGULAMA EKRANI DEĞİLDİR (GÖRSEL TASLAK)
+  </text>
+  
+  <!-- Center Login Card -->
+  <g transform="translate(520, 200)">
+    <!-- Card Frame -->
+    <rect width="400" height="500" rx="16" fill="#0B132B" stroke="#1C2541" stroke-width="2"/>
+    
+    <!-- Logo Icon (Simplified) -->
+    <g transform="translate(160, 40)">
+      <rect width="80" height="80" rx="12" fill="#0A0E1A"/>
+      <path d="M 25,20 Q 40,24 55,20 Q 55,45 40,65 Q 25,45 25,20 Z" stroke="#5BC0BE" stroke-width="3" fill="none"/>
+      <circle cx="40" cy="42" r="5" fill="#6FFFE9"/>
+      <circle cx="30" cy="32" r="3" fill="#5BC0BE"/>
+      <circle cx="50" cy="32" r="3" fill="#5BC0BE"/>
+      <circle cx="30" cy="52" r="3" fill="#5BC0BE"/>
+      <circle cx="50" cy="52" r="3" fill="#5BC0BE"/>
+      <line x1="30" y1="32" x2="40" y2="42" stroke="#3A506B" stroke-width="1.5"/>
+      <line x1="50" y1="32" x2="40" y2="42" stroke="#3A506B" stroke-width="1.5"/>
+      <line x1="30" y1="52" x2="40" y2="42" stroke="#3A506B" stroke-width="1.5"/>
+      <line x1="50" y1="52" x2="40" y2="42" stroke="#3A506B" stroke-width="1.5"/>
+    </g>
+    
+    <!-- Title -->
+    <text x="200" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="800" fill="#FFFFFF" text-anchor="middle">SecureWatch AI</text>
+    <text x="200" y="185" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#A0AEC0" text-anchor="middle">AĞ TRAFİĞİ KARAR DESTEK SİSTEMİ</text>
+    
+    <!-- Form Labels and Inputs -->
+    <!-- Email Field -->
+    <text x="40" y="225" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">E-posta Adresi</text>
+    <rect x="40" y="235" width="320" height="40" rx="8" fill="#0A0E1A" stroke="#1C2541" stroke-width="1.5"/>
+    <text x="52" y="260" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#3A506B">analyst@securewatch.ai</text>
+    
+    <!-- Password Field -->
+    <text x="40" y="305" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold" fill="#A0AEC0">Şifre</text>
+    <rect x="40" y="315" width="320" height="40" rx="8" fill="#0A0E1A" stroke="#1C2541" stroke-width="1.5"/>
+    <text x="52" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#3A506B">••••••••••••••••</text>
+    
+    <!-- Login Button -->
+    <rect x="40" y="380" width="320" height="45" rx="8" fill="#5BC0BE"/>
+    <text x="200" y="408" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="#0A0E1A" text-anchor="middle">Giriş Yap</text>
+    
+    <!-- Security Warning Footer inside Card -->
+    <rect x="30" y="445" width="340" height="40" rx="6" fill="#1C2541"/>
+    <text x="200" y="460" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#A0AEC0" text-anchor="middle">
+      UYARI: Bu sisteme erişim yalnızca yetkili personel ile
+    </text>
+    <text x="200" y="475" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#A0AEC0" text-anchor="middle">
+      sınırlandırılmıştır. Tüm işlemler loglanmaktadır.
+    </text>
+  </g>
+  
+  <!-- System Status Footer -->
+  <text x="720" y="870" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#3A506B" text-anchor="middle">
+    SecureWatch AI v0.1.0-prototype | Akademik UNSW-NB15 Karar Destek Prototipi
+  </text>
+</svg>
