@@ -11,61 +11,22 @@ Platform, ağ trafiği kayıtlarını normal ve şüpheli olarak sınıflandırm
 
 Eğitim sürecinde test verilerinin eğitim modellerine sızmasını (data leakage) engellemek amacıyla adımlar aşağıdaki sıralamayla uygulanacaktır:
 
-```
-┌────────────────────────────────────────────────────────┐
-│ 1. Sekiz Adet MachineLearningCSV Dosyasının Okunması   │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 2. Sütun Adları ve Etiketlerin Normalizasyonu          │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 3. Sayısal Alanlardaki Infinity Değerlerinin NaN Yapılması│
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 4. Mükerrer Satırların & Fwd Header Length.1'in Silinmesi│
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 5. İkili Sınıf (BENIGN = 0, Diğerleri = 1) Eşlemesi     │
-└───────────────────────────┬────────────────────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 6. Stratified Split (Eğitim %80, Test %20 Ayrımı)       │
-└───────────────────────────┬────────────────────────────┘
-                            │
-            ┌───────────────┴───────────────┐
-            │                               │
- ┌──────────▼──────────┐         ┌──────────▼──────────┐
- │  EĞİTİM VERİ SETİ   │         │    TEST VERİ SETİ   │
- └──────────┬──────────┘         └──────────┬──────────┘
-            │                               │
- ┌──────────▼──────────┐                    │
- │ 7. Imputer & Scaler │                    │
- │    Eğitim Setinde   │                    │
- │       FIT Edilir    │                    │
- └──────────┬──────────┘                    │
-            │                               │
- ┌──────────▼──────────┐         ┌──────────▼──────────┐
- │ 8. Ön İşleme        │         │ 9. Ön İşleme        │
- │    Dönüşümü         │         │    Dönüşümü         │
- │    Eğitim Setine    │         │    Test Setine      │
- │    Uygulanır        │         │    Uygulanır        │
- │   (TRANSFORM)       │         │   (TRANSFORM)       │
- └──────────┬──────────┘         └──────────┬──────────┘
-            │                               │
- ┌──────────▼──────────┐                    │
- │ 10. Modellerin      │                    │
- │     Eğitilmesi      │                    │
- └──────────┬──────────┘                    │
-            │                               │
-            └───────────────┬───────────────┘
-                            │
-┌───────────────────────────▼────────────────────────────┐
-│ 11. Test Seti Üzerinde Metrik Karşılaştırması          │
-└────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[1. Sekiz Adet MachineLearningCSV Dosyasının Okunması] --> B[2. Sütun Adları ve Etiketlerin Normalizasyonu]
+    B --> C[3. Sayısal Alanlardaki Infinity Değerlerinin NaN Yapılması]
+    C --> D[4. Mükerrer Satırların & Fwd Header Length.1'in Silinmesi]
+    D --> E[5. İkili Sınıf BENIGN = 0, Diğerleri = 1 Eşlemesi]
+    E --> F[6. Stratified Split %80 Eğitim, %20 Test]
+    F --> G1[Eğitim Veri Seti]
+    F --> G2[Test Veri Seti]
+    G1 --> H[7. Imputer & Scaler Eğitim Setinde Fit Edilir]
+    H --> I1[8. Ön İşleme Dönüşümü Eğitim Setine Uygulanır - TRANSFORM]
+    G2 --> I2[9. Ön İşleme Dönüşümü Test Setine Uygulanır - TRANSFORM]
+    I1 --> J[10. Modellerin Eğitilmesi]
+    I2 --> K[11. Test Seti Üzerinde Metrik Karşılaştırması]
+    J --> K
+    K --> L[12. Preprocessing + Model Pipeline'ının Joblib ile Kaydedilmesi]
 ```
 
 ### 2.1. Eğitim Adımları Detayları
@@ -91,7 +52,7 @@ Eğitim sürecinde test verilerinin eğitim modellerine sızmasını (data leaka
 
 ### 3.1. Batch Tahmin Yaşam Döngüsü Adımları
 1.  **CSV Yükleme:** Güvenlik Analisti, web arayüzünü kullanarak ağ trafiği verilerini barındıran CSV dosyasını sisteme yükler.
-2.  **Şema Doğrulama:** Backend servisleri dosyanın boyut sınırlarını ve CIC-IDS2017 şemasına (78 özellik) uyumluluğunu doğrular.
+2.  **Şema Doğrulama:** Backend servisleri dosyanın boyut sınırlarını ve CIC-IDS2017 şemasına (78 özellik sütunu zorunlu, Label sütunu ise opsiyonel olacak şekilde) uyumluluğunu doğrular.
 3.  **Kuyruğa Ekleme:** Doğrulama başarılı olursa veritabanında `PENDING` durumunda bir `AnalysisJob` oluşturulur ve istemciye HTTP 202 kabul yanıtı verilir.
 4.  **İşlem Başlatma:** Arka planda çalışan işçi (Background Task) görevi devralarak iş durumunu `PROCESSING` olarak günceller.
 5.  **Ön İşleme ve Tahmin:** Kaydedilmiş olan Joblib pipeline dosyası yüklenir. CSV'deki her bir satır pipeline'dan geçirilerek model tarafından saldırı olasılığı (`attack_probability`) hesaplanır.
@@ -111,12 +72,12 @@ $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
 Aşağıdaki seviyeler geliştirme aşaması için belirlenmiş başlangıç değerleridir:
 
-| Risk Seviyesi (`risk_level`) | Olasılık Aralığı ($p$) | Açıklama |
+| Risk Seviyesi (`risk_level`) | Risk Skoru Aralığı | Açıklama |
 | :--- | :--- | :--- |
-| **`LOW`** (Düşük) | $0.00 \le p \le 0.30$ | Normal trafik, analistin aksiyon alması gerekmez. |
-| **`MEDIUM`** (Orta) | $0.31 \le p \le 0.60$ | Şüpheli akış, analist detayları inceleyebilir. |
-| **`HIGH`** (Yüksek) | $0.61 \le p \le 0.85$ | Yüksek saldırı olasılığı, güvenlik olayına dönüştürülebilir. |
-| **`CRITICAL`** (Kritik) | $0.86 \le p \le 1.00$ | Kritik tehdit tespiti, analist tarafından güvenlik olayına dönüştürülmesi önerilir. |
+| **`LOW`** (Düşük) | 0 – 30 | Normal trafik, analistin aksiyon alması gerekmez. |
+| **`MEDIUM`** (Orta) | 31 – 60 | Şüpheli akış, analist detayları inceleyebilir. |
+| **`HIGH`** (Yüksek) | 61 – 85 | Yüksek saldırı olasılığı, güvenlik olayına dönüştürülebilir. |
+| **`CRITICAL`** (Kritik) | 86 – 100 | Kritik tehdit tespiti, analist tarafından güvenlik olayına dönüştürülmesi önerilir. |
 
 > [!WARNING]
 > Bu eşik değerleri geçicidir. **Kesin eşik sınırları, Gün 10'da gerçekleştirilecek olan precision-recall dengesi, False Positive Rate (FPR) toleransı ve iş gereksinimleri değerlendirmesi sonrasında belirlenecektir.**
