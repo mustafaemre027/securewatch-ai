@@ -47,7 +47,7 @@
 
 | Sorun | Çözüm |
 | :--- | :--- |
-| 2.8 milyon satırlık verinin tek seferde pandas ile okunması belleğin tükenmesine ve sistemin donmasına yol açtı. | Verinin `chunksize=100000` parametresi kullanılarak parçalı okunması sağlandı ve duplicate satır takibi bellek dostu hashing yöntemiyle yapıldı. |
+| 2.8 milyon satırlık verinin tek seferde pandas ile okunması yüksek bellek tüketimi riski oluşturdu. | Verinin `chunksize=100000` parametresi kullanılarak parçalı okunması sağlandı; bu yöntem tam DataFrame'in bellekte tutulma ihtiyacını azaltmıştır. |
 | Orijinal veri setindeki bazı `Label` değerlerinde görünmeyen boşluklar ve geçersiz karakter kodlamaları (anomaliler) mevcuttu. | Regex tabanlı normalizasyon ile `BENIGN` ve saldırı etiketleri temizlendi, çok sınıflı dağılım netleştirildi. |
 
 ---
