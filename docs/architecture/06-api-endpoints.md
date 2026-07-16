@@ -64,7 +64,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "role": "ANALYST"
     }
     ```
-*   **Başarılı Yanıt (21 Created):**
+*   **Başarılı Yanıt (201 Created):**
     ```json
     {
       "id": 3,
