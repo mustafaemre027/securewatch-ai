@@ -26,7 +26,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **POST `/api/v1/auth/login`**
 *   **Açıklama:** Kullanıcı adı ve parola ile giriş yaparak JWT token üretir.
-*   **Rol:** ALL (Kimlik doğrulaması gerekmez)
+*   **Rol:** PUBLIC (Giriş/kimlik doğrulaması gerektirmez)
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
@@ -80,12 +80,12 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 ### 3.3. Ağ Trafiği ve Analiz Yönetimi (Analysis Management)
 
 #### **POST `/api/v1/analysis/upload`**
-*   **Açıklama:** Ağ trafiği CSV dosyasını sunucuya yükler ve batch analiz sürecini başlatır.
+*   **Açıklama:** Ağ trafiği inference CSV dosyasını sunucuya yükler ve batch tahmin (inference) sürecini başlatır.
 *   **Rol:** ANALYST
 *   **İstek Tipi:** `multipart/form-data`
 *   **İstek Parametreleri:**
-    - `file`: CSV dosyası (MIME: `text/csv`, maksimum 50MB)
-*   **Başarılı Yanıt (22 Accepted):**
+    - `file`: CSV dosyası (MIME: `text/csv`, dosya boyutu sistem ayarlarındaki upload limitine uygun olmalıdır)
+*   **Başarılı Yanıt (202 Accepted):**
     ```json
     {
       "job_id": 45,
@@ -99,7 +99,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **GET `/api/v1/analysis`**
 *   **Açıklama:** Geçmiş analiz işlerini (`AnalysisJob`) listeler.
-*   **Rol:** ALL
+*   **Rol:** ALL (Yöneticiler tüm işleri, Analistler yalnızca kendi başlattıkları işleri listeleyebilir)
 *   **Sorgu Parametreleri (Query Params):**
     - `status` (opsiyonel): `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`
     - `skip` (varsayılan: 0)
@@ -120,7 +120,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **GET `/api/v1/analysis/{job_id}/results`**
 *   **Açıklama:** Belirli bir analiz işine ait tahmin ve risk seviyesi sonuçlarını listeler.
-*   **Rol:** ALL
+*   **Rol:** ALL (Yöneticiler tüm analiz sonuçlarına erişebilir. Analistler yalnızca kendi yetkili oldukları/oluşturdukları analiz işlerinin sonuçlarını listeleyebilir).
 *   **Sorgu Parametreleri (Query Params):**
     - `risk_level` (opsiyonel): `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
     - `predicted_label` (opsiyonel): `0` veya `1`
@@ -138,13 +138,14 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
           "attack_probability": 0.942,
           "risk_score": 94,
           "risk_level": "CRITICAL",
-          "ground_truth_label": "DDOS",
+          "ground_truth_label": "ATTACK",
           "model_version": "v1.0.0",
           "created_at": "2026-07-16T15:33:00Z"
         }
       ]
     }
     ```
+    > **Not:** `ground_truth_label` değeri yalnızca etiketli değerlendirme dosyaları yüklenmişse dolu olarak döner; normal inference dosyalarında `null` olacaktır.
 
 ---
 
@@ -157,12 +158,12 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
     ```json
     {
       "detection_result_id": 1024501,
-      "title": "Port 80 HTTP DDoS Algılandı",
-      "description": "Model %94 olasılıkla HTTP DDoS saldırısı tespit etmiştir. Hedef Port: 80, Kayıt Sırası: 12450.",
+      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir. Hedef Port: 80, Kayıt Sırası: 12450.",
       "severity": "CRITICAL"
     }
     ```
-*   **Başarılı Yanıt (21 Created):**
+*   **Başarılı Yanıt (201 Created):**
     ```json
     {
       "id": 12,
@@ -170,8 +171,8 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "assigned_analyst_id": null,
       "status": "OPEN",
       "severity": "CRITICAL",
-      "title": "Port 80 HTTP DDoS Algılandı",
-      "description": "Model %94 olasılıkla HTTP DDoS saldırısı tespit etmiştir...",
+      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir...",
       "created_at": "2026-07-16T15:35:00Z",
       "updated_at": "2026-07-16T15:35:00Z"
     }
@@ -179,7 +180,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **PATCH `/api/v1/incidents/{incident_id}`**
 *   **Açıklama:** Olayın durumunu (`status`) günceller veya olay ataması (`assigned_analyst_id`) yapar.
-*   **Rol:** ALL (Analist kendi atamalarını ve olayı kapatma statülerini günceller. Admin ise başka analistlere atama yapabilir).
+*   **Rol:** ALL (Analistler yalnızca kendilerine atanmış veya kendi üstlendikleri olayların durumunu güncelleyebilir. Yöneticiler tüm olaylarda atama ve durum güncellemelerini yapabilir).
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
@@ -206,14 +207,14 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **POST `/api/v1/incidents/{incident_id}/comments`**
 *   **Açıklama:** Olayın altına analiz yorumu ekler.
-*   **Rol:** ALL
+*   **Rol:** ALL (Analistler yalnızca kendilerine atanmış veya kendi üstlendikleri olaylara yorum ekleyebilir)
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
-      "comment_text": "Kayıt detayındaki TCP bayrakları incelendi. Gerçek bir DDoS atağı olduğu doğrulandı. Port kapatma talebi iletildi."
+      "comment_text": "Kayıt detayındaki TCP bayrakları incelendi. Yüksek riskli şüpheli trafik akışı doğrulandı."
     }
     ```
-*   **Başarılı Yanıt (21 Created):**
+*   **Başarılı Yanıt (201 Created):**
     ```json
     {
       "id": 89,
@@ -247,10 +248,15 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "active_incidents_count": 8
     }
     ```
+    > **Not:** Dashboard verilerindeki sayılar ve metrikler ham veri setinin orijinal etiket sayımları değil, sistemde tamamlanan batch tahmin işlerinin sonuçlarından hesaplanan örnek ve temsilî değerlerdir.
 
 #### **GET `/api/v1/audit-logs`**
 *   **Açıklama:** Sistemdeki idari ve güvenlik işlemlerine dair denetim loglarını listeler.
 *   **Rol:** ADMIN
+*   **Sorgu Parametreleri (Query Params):**
+    - `user_id` (opsiyonel): Belirli bir kullanıcıya ait loglar.
+    - `action_type` (opsiyonel): Belirli bir eylem türüne (örn. 'FILE_UPLOAD') ait loglar.
+    - `start_date` / `end_date` (opsiyonel): Belirli bir zaman aralığı (ISO 8601).
 *   **Başarılı Yanıt (200 OK):**
     ```json
     [
@@ -258,11 +264,123 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
         "id": 501,
         "user_id": 2,
         "action_type": "FILE_UPLOAD",
-        "description": "User analyst_emre uploaded file: Friday-WorkingHours-Afternoon-DDos.csv (SHA-256: e3b0c4...)",
+        "description": "User analyst_emre uploaded file: Friday-WorkingHours-Afternoon-Suspicious.csv (SHA-256: e3b0c4...)",
         "ip_address": "192.168.1.50",
         "created_at": "2026-07-16T15:31:00Z"
       }
     ]
+    ```
+
+---
+
+### 3.6. Ek Temel API Endpoint Taslakları
+
+#### **GET `/api/v1/users`**
+*   **Açıklama:** Sistemde kayıtlı olan tüm kullanıcıları listeler.
+*   **Rol:** ADMIN
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    [
+      {
+        "id": 1,
+        "username": "admin_mustafa",
+        "email": "mustafa@securewatch.ai",
+        "role": "ADMIN",
+        "created_at": "2026-07-16T11:00:00Z"
+      }
+    ]
+    ```
+
+#### **GET `/api/v1/analysis/{job_id}`**
+*   **Açıklama:** Belirli bir analiz işinin (`AnalysisJob`) detaylı durum ve meta bilgilerini getirir.
+*   **Rol:** ALL (Analistler yalnızca kendi başlattıkları analiz işlerini görüntüleyebilir).
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    {
+      "id": 45,
+      "user_id": 2,
+      "file_name": "Friday-WorkingHours-Afternoon-Suspicious.csv",
+      "file_hash": "e3b0c44298fc...",
+      "file_size": 25487622,
+      "status": "COMPLETED",
+      "error_message": null,
+      "created_at": "2026-07-16T15:31:00Z",
+      "completed_at": "2026-07-16T15:33:12Z"
+    }
+    ```
+
+#### **GET `/api/v1/detections/{detection_id}`**
+*   **Açıklama:** Belirli bir tespit sonucunun (`DetectionResult`) detaylı öznitelik snapshot (JSONB) verilerini getirir.
+*   **Rol:** ALL
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    {
+      "id": 1024501,
+      "analysis_job_id": 45,
+      "source_row_number": 12450,
+      "destination_port": 80,
+      "predicted_label": "1",
+      "attack_probability": 0.942,
+      "risk_score": 94,
+      "risk_level": "CRITICAL",
+      "ground_truth_label": "ATTACK",
+      "feature_snapshot_json": {
+        "Flow Duration": 112450,
+        "Total Fwd Packets": 4,
+        "Total Backward Packets": 3
+      },
+      "model_version": "v1.0.0",
+      "created_at": "2026-07-16T15:33:00Z"
+    }
+    ```
+
+#### **GET `/api/v1/incidents`**
+*   **Açıklama:** Güvenlik olaylarını listeler ve filtreler.
+*   **Rol:** ALL
+*   **Sorgu Parametreleri (Query Params):**
+    - `status` (opsiyonel): `OPEN`, `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE`
+    - `assigned_analyst_id` (opsiyonel): Belirli bir analiste atanan olaylar
+    - `severity` (opsiyonel): `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    [
+      {
+        "id": 12,
+        "detection_result_id": 1024501,
+        "assigned_analyst_id": 2,
+        "status": "IN_PROGRESS",
+        "severity": "CRITICAL",
+        "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+        "created_at": "2026-07-16T15:35:00Z",
+        "updated_at": "2026-07-16T15:38:00Z"
+      }
+    ]
+    ```
+
+#### **GET `/api/v1/incidents/{incident_id}`**
+*   **Açıklama:** Belirli bir güvenlik olayının (`Incident`) yorumları ile birlikte detaylarını getirir.
+*   **Rol:** ALL
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    {
+      "id": 12,
+      "detection_result_id": 1024501,
+      "assigned_analyst_id": 2,
+      "status": "IN_PROGRESS",
+      "severity": "CRITICAL",
+      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir...",
+      "created_at": "2026-07-16T15:35:00Z",
+      "updated_at": "2026-07-16T15:38:00Z",
+      "comments": [
+        {
+          "id": 89,
+          "user_id": 2,
+          "comment_text": "Kayıt detayındaki TCP bayrakları incelendi...",
+          "created_at": "2026-07-16T15:40:00Z"
+        }
+      ]
+    }
     ```
 
 ---
