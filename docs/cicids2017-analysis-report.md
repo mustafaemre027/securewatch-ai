@@ -1,7 +1,7 @@
 # CIC-IDS2017 Veri Seti Analiz Raporu
 
 ## 1. Amaç
-Bu raporun amacı, SecureWatch AI projesinin Gün 2 çalışmaları kapsamında UNSW-NB15 veri setinden geçiş yapılan **CIC-IDS2017** veri setinin yapısal ve niteliksel analizini gerçekleştirmektir. Elde edilen bulgular, model eğitim aşaması öncesinde veri ön işleme, veri temizleme ve mimari kararlar için temel oluşturacaktır.
+Bu raporun amacı, SecureWatch AI projesinin Gün 2 çalışmaları kapsamında analiz edilen **CIC-IDS2017** veri setinin yapısal ve niteliksel analizini gerçekleştirmektir. Elde edilen bulgular, model eğitim aşaması öncesinde veri ön işleme, veri temizleme ve mimari kararlar için temel oluşturacaktır.
 
 ## 2. Veri Setinin Resmî Kaynağı
 Veri seti, New Brunswick Üniversitesi bünyesindeki Kanada Siber Güvenlik Enstitüsü (Canadian Institute for Cybersecurity - UNB) tarafından sağlanmaktadır.
@@ -84,4 +84,4 @@ Veri setinde belirgin bir sınıf dengesizliği (class imbalance) mevcuttur. Nor
 *   **Dosya Yönetimi:** Ham CSV dosyaları büyük boyutları nedeniyle Git repository'sine eklenmeyecek, `.gitignore` kuralları ile engellenmeye devam edilecektir.
 
 ## 12. Proje Açısından Sonuç ve Değerlendirme
-UNSW-NB15 veri setine kıyasla CIC-IDS2017, daha güncel saldırı vektörlerini (örneğin modern DDoS, Web ve Infiltration saldırıları) barındırması ve daha zengin bir özellik setine (79 sütun) sahip olması nedeniyle SecureWatch AI platformuna daha yüksek karar destek doğruluğu sağlayacaktır. Gün 2 analizinde elde edilen bu metrikler, Faz 3'te geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.
+CIC-IDS2017 veri seti, barındırdığı güncel saldırı vektörleri (örneğin modern DDoS, Web ve Infiltration saldırıları) ve zengin özellik seti (79 sütun) sayesinde SecureWatch AI platformuna yüksek karar destek doğruluğu sağlayacaktır. Gün 2 analizinde elde edilen bu metrikler, Faz 3'te geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.
