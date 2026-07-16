@@ -78,7 +78,7 @@ docker-compose up --build
 - Projenin lisansı henüz belirlenmemiştir.
 - Bu proje yalnızca eğitim ve analiz amaçlıdır
 - Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz
-- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik UNSW-NB15 veri seti kullanılır
+- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik CIC-IDS2017 veri seti kullanılır
 - Kullanıcı şifreleri hashlenerek saklanır
 - JWT secret ve veritabanı bilgileri `.env` üzerinden okunur
 
