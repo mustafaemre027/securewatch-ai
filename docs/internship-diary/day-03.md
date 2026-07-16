@@ -25,11 +25,11 @@
 ### 1. 7 Bağımsız Mimari Belgesinin Oluşturulması (#14)
 -   `01-functional-requirements.md` — Gereksinimler listelendi. `FR-[Bileşen]-[ÜçHaneliSayı]` standardı kuruldu.
 -   `02-user-scenarios.md` — Yönetici ve analist rolleri için kullanım senaryoları detaylandırıldı. Analistlerin model risk skorunu değiştiremeyeceği kısıtı ve durum geçişlerinde `RESOLVED` / `FALSE_POSITIVE` kullanımı sağlandı.
--   `03-database-design.md` — ER diyagramı ve veri sözlüğü hazırlandı. `DetectionResult` tablosu alanları CIC-IDS2017 şemasına göre IP/Port bilgileri hariç tutularak tasarlandı, ilişkisel kısıtlar (Cascade, Restrict, Set Null) gerekçelendirildi.
+-   `03-database-design.md` — ER diyagramı ve veri sözlüğü hazırlandı. `DetectionResult` tablosu alanları CIC-IDS2017 şemasına göre `destination_port` korunup; veri setinde bulunmayan `source_ip`, `destination_ip`, `source_port` ve `protocol` bilgileri hariç tutularak tasarlandı. İlişkisel kısıtlar (Cascade, Restrict, Set Null) gerekçelendirildi.
 -   `04-state-machines.md` — `AnalysisJob` ve `Incident` nesneleri için durum geçişleri ve Mermaid diyagramları eklendi.
 -   `05-system-architecture.md` — Sunum, API, Servis, ML ve DB katmanlarının detayları açıklandı.
 -   `06-api-endpoints.md` — REST uç noktaları, request/response gövdeleri ve standart hata kodları tasarlandı.
--   `07-ml-training-and-inference.md` — Data leakage önleme adımları ve batch tahmin süreci MVP kapsamında prototiplendi.
+-   `07-ml-training-and-inference.md` — Data leakage önleme adımları ve batch tahmin süreci MVP kapsamında tasarlandı ve dokümante edildi.
 
 ### 2. Dokümantasyon Tutarsızlıklarının Düzeltilmesi
 -   `docs/cicids2017-analysis-report.md` içerisindeki eski "UNSW-NB15" referansları temizlendi.
@@ -39,13 +39,22 @@
 ### 3. Eksik Günlüklerin Tamamlanması
 -   Eksik olan Gün 2 staj günlüğü (`day-02.md`) hazırlanarak `docs/internship-diary/` dizinine eklendi.
 
+### 4. Teknik İnceleme ve Düzeltmeler (Review Fixes)
+-   Arayüz ve gereksinimlerdeki dosya boyutu sınırı (sabit 50MB) kaldırılarak yapılandırılabilir hale getirildi.
+-   Dashboard'dan detaylı saldırı türü dağılımları kaldırıldı, ikili model çıktısı normal/şüpheli ve risk seviyesi dağılımları ile sınırlandırıldı.
+-   ER diyagramındaki isteğe bağlı (optional) kullanıcı ilişkileri düzeltildi ve `incident_comments.user_id` nullable olarak işaretlendi.
+-   Durum makinelerindeki Celery atıfları kaldırılarak MVP worker soyutlaması yapıldı; resolved/false positive durumlarından geri açılma geçişleri kaldırıldı.
+-   API taslağındaki HTTP yanıt kodları (201 Created, 202 Accepted) düzeltildi, eksik 5 API uç noktası eklendi ve yetki limitleri netleştirildi.
+-   ML süreç diyagramları ve katman bağımlılık şemaları Mermaid formatında görselleştirildi.
+-   Ön analiz raporu ve uygulama planındaki sentetik veri üretimi Day 6'ya ertelenecek şekilde uyumlu hale getirildi.
+
 ---
 
 ## Karşılaşılan Zorluklar
 
 | Sorun | Çözüm |
 | :--- | :--- |
-| CIC-IDS2017 veri setinde bulunmayan IP ve port bilgilerinin `DetectionResult` tablosunda zorunlu tutulmasının veri tutarsızlığına yol açacağı fark edildi. | ER tasarımı güncellenerek bu alanlar tablodan çıkarıldı ve ham özniteliklerin tamamı `feature_snapshot_json` (JSONB) alanına taşındı. |
+| CIC-IDS2017 veri setinde bulunmayan IP ve port bilgilerinin `DetectionResult` tablosunda zorunlu tutulmasının veri tutarsızlığına yol açacağı fark edildi. | ER tasarımı güncellenerek `destination_port` korunmuş; veri setinde yer almayan `source_ip`, `destination_ip`, `source_port` ve `protocol` sütunları tablodan çıkarılmıştır. Ham özniteliklerin tamamı ise `feature_snapshot_json` (JSONB) alanında saklanacak şekilde tasarlanmıştır. |
 
 ---
 
@@ -92,3 +101,12 @@
     - `b7a6158` (docs(api): draft core API endpoints)
     - `2327a50` (docs(ml): document training and batch inference flows)
     - `5f56c84` (docs(diary): add missing day 02 internship entry)
+    - `729afbd` (docs(diary): add day 03 internship entry)
+    - `905a8a8` (docs(requirements): align upload schema and dashboard scope)
+    - `ee44738` (docs(database): fix nullable relationships and dataset fields)
+    - `edb6648` (docs(workflow): correct MVP state transitions)
+    - `48e2714` (docs(architecture): correct layered component dependencies)
+    - `8eef0ae` (docs(api): correct endpoint semantics and RBAC coverage)
+    - `6b3ae40` (docs(ml): fix training diagram and risk boundaries)
+    - `96af059` (docs(data): align preprocessing decisions and roadmap claims)
+    - `96ec6d7` (docs(diary): refine day 02 technical statements)
