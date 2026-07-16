@@ -1,7 +1,7 @@
 # CIC-IDS2017 Veri Seti Analiz Raporu
 
 ## 1. Amaç
-Bu raporun amacı, SecureWatch AI projesinin Gün 2 çalışmaları kapsamında UNSW-NB15 veri setinden geçiş yapılan **CIC-IDS2017** veri setinin yapısal ve niteliksel analizini gerçekleştirmektir. Elde edilen bulgular, model eğitim aşaması öncesinde veri ön işleme, veri temizleme ve mimari kararlar için temel oluşturacaktır.
+Bu raporun amacı, SecureWatch AI projesinin Gün 2 çalışmaları kapsamında analiz edilen **CIC-IDS2017** veri setinin yapısal ve niteliksel analizini gerçekleştirmektir. Elde edilen bulgular, model eğitim aşaması öncesinde veri ön işleme, veri temizleme ve mimari kararlar için temel oluşturacaktır.
 
 ## 2. Veri Setinin Resmî Kaynağı
 Veri seti, New Brunswick Üniversitesi bünyesindeki Kanada Siber Güvenlik Enstitüsü (Canadian Institute for Cybersecurity - UNB) tarafından sağlanmaktadır.
@@ -24,7 +24,7 @@ CIC-IDS2017 MachineLearningCSV paketi içerisinde yer alan 8 adet resmî CSV dos
 ## 5. Veri Setinin Genel Boyutu
 *   **CSV Dosyası Sayısı:** 8 adet
 *   **Toplam Kayıt Sayısı:** 2.830.743 satır
-*   **Özellik (Sütun) Sayısı:** 79 adet
+*   **Sütun Sayısı:** 79 adet (78 adet özellik + 1 adet Label)
 *   **Eksik Label Sayısı:** 0 adet
 
 ## 6. Dosya Bazında Analiz Sonuçları
@@ -78,10 +78,10 @@ Veri setinde belirgin bir sınıf dengesizliği (class imbalance) mevcuttur. Nor
 
 ## 11. Ön İşleme İçin Alınan Kararlar
 *   **İkili Etiketleme:** İlk model geliştirme aşamasında hedef değişken `Label` ikili sınıflandırmaya tabi tutulacaktır (`BENIGN` = 0, diğer tüm saptanan saldırı sınıfları = 1).
-*   **NaN ve Infinity Yönetimi:** Model eğitiminden önce `NaN` değerleri sütun ortalaması veya medianı ile doldurulacak, `Infinity` değerleri ise o sütunun maksimum değeriyle değiştirilecek veya ilgili satırlar elenecektir.
+*   **NaN ve Infinity Yönetimi:** Model eğitiminden önce sayısal sütunlardaki `Infinity` değerleri `NaN` değerine dönüştürülecek, ardından eksik değerler (`NaN`) stratified split sonrasında **yalnızca eğitim setinde fit edilen** median imputer ile doldurulacaktır.
 *   **Duplicate Temizliği:** Tekrarlanan (duplicate) kayıtlar, modelin ezberlemesini (overfitting) önlemek amacıyla eğitim seti oluşturulurken elenecektir.
 *   **Mükerrer Sütun Eleme:** Aynı veriyi içeren `Fwd Header Length.1` sütunu modelleme öncesinde veri setinden düşürülecektir.
 *   **Dosya Yönetimi:** Ham CSV dosyaları büyük boyutları nedeniyle Git repository'sine eklenmeyecek, `.gitignore` kuralları ile engellenmeye devam edilecektir.
 
 ## 12. Proje Açısından Sonuç ve Değerlendirme
-UNSW-NB15 veri setine kıyasla CIC-IDS2017, daha güncel saldırı vektörlerini (örneğin modern DDoS, Web ve Infiltration saldırıları) barındırması ve daha zengin bir özellik setine (79 sütun) sahip olması nedeniyle SecureWatch AI platformuna daha yüksek karar destek doğruluğu sağlayacaktır. Gün 2 analizinde elde edilen bu metrikler, Faz 3'te geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.
+CIC-IDS2017 veri seti, barındırdığı güncel saldırı vektörleri ve zengin sütun yapısı (78 özellik + 1 Label) ile model geliştirme çalışmaları için uygun ve sağlam bir temel sunmaktadır. Modellerin gerçek performans çıktıları ve sağlayacağı karar destek doğruluğu, Faz 3 kapsamındaki Gün 8–10 çalışmaları sırasında ölçülerek kesinleştirilecektir. Gün 2 analizinde elde edilen bu metrikler, geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.

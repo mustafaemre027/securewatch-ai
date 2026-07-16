@@ -47,7 +47,7 @@ Conventional Commits formatı kullanılır:
 3. Branch'i push et
 4. GitHub'da PR aç (`Closes #IssueNumber`)
 5. Review sürecini bekle
-6. Onay sonrası merge et
+6. PR onaylandıktan sonra kendiniz merge etmeyin; danışman onayını ve danışman tarafından merge edilmesini bekleyin.
 
 ## Label Kullanımı
 
