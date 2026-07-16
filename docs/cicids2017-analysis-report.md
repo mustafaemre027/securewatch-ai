@@ -24,7 +24,7 @@ CIC-IDS2017 MachineLearningCSV paketi içerisinde yer alan 8 adet resmî CSV dos
 ## 5. Veri Setinin Genel Boyutu
 *   **CSV Dosyası Sayısı:** 8 adet
 *   **Toplam Kayıt Sayısı:** 2.830.743 satır
-*   **Özellik (Sütun) Sayısı:** 79 adet
+*   **Sütun Sayısı:** 79 adet (78 adet özellik + 1 adet Label)
 *   **Eksik Label Sayısı:** 0 adet
 
 ## 6. Dosya Bazında Analiz Sonuçları
@@ -78,10 +78,10 @@ Veri setinde belirgin bir sınıf dengesizliği (class imbalance) mevcuttur. Nor
 
 ## 11. Ön İşleme İçin Alınan Kararlar
 *   **İkili Etiketleme:** İlk model geliştirme aşamasında hedef değişken `Label` ikili sınıflandırmaya tabi tutulacaktır (`BENIGN` = 0, diğer tüm saptanan saldırı sınıfları = 1).
-*   **NaN ve Infinity Yönetimi:** Model eğitiminden önce `NaN` değerleri sütun ortalaması veya medianı ile doldurulacak, `Infinity` değerleri ise o sütunun maksimum değeriyle değiştirilecek veya ilgili satırlar elenecektir.
+*   **NaN ve Infinity Yönetimi:** Model eğitiminden önce sayısal sütunlardaki `Infinity` değerleri `NaN` değerine dönüştürülecek, ardından eksik değerler (`NaN`) stratified split sonrasında **yalnızca eğitim setinde fit edilen** median imputer ile doldurulacaktır.
 *   **Duplicate Temizliği:** Tekrarlanan (duplicate) kayıtlar, modelin ezberlemesini (overfitting) önlemek amacıyla eğitim seti oluşturulurken elenecektir.
 *   **Mükerrer Sütun Eleme:** Aynı veriyi içeren `Fwd Header Length.1` sütunu modelleme öncesinde veri setinden düşürülecektir.
 *   **Dosya Yönetimi:** Ham CSV dosyaları büyük boyutları nedeniyle Git repository'sine eklenmeyecek, `.gitignore` kuralları ile engellenmeye devam edilecektir.
 
 ## 12. Proje Açısından Sonuç ve Değerlendirme
-CIC-IDS2017 veri seti, barındırdığı güncel saldırı vektörleri (örneğin modern DDoS, Web ve Infiltration saldırıları) ve zengin özellik seti (79 sütun) sayesinde SecureWatch AI platformuna yüksek karar destek doğruluğu sağlayacaktır. Gün 2 analizinde elde edilen bu metrikler, Faz 3'te geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.
+CIC-IDS2017 veri seti, barındırdığı güncel saldırı vektörleri ve zengin sütun yapısı (78 özellik + 1 Label) ile model geliştirme çalışmaları için uygun ve sağlam bir temel sunmaktadır. Modellerin gerçek performans çıktıları ve sağlayacağı karar destek doğruluğu, Faz 3 kapsamındaki Gün 8–10 çalışmaları sırasında ölçülerek kesinleştirilecektir. Gün 2 analizinde elde edilen bu metrikler, geliştirilecek makine öğrenmesi pipeline'ı için yol haritası niteliğindedir.
