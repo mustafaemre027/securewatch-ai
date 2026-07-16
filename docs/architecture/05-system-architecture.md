@@ -5,31 +5,16 @@ Bu belge, SecureWatch AI karar destek platformunun katmanlı mimari yapısını 
 ## 1. Katmanlı Mimari Genel Bakış
 Uygulama; sürdürülebilirlik, ölçeklenebilirlik, test edilebilirlik ve sorumlulukların ayrılması (Separation of Concerns) ilkelerine uygun olarak **Katmanlı Mimari (Layered Architecture)** şablonuna göre tasarlanmıştır.
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        SUNUM KATMANI (Frontend)                        │
-│                 React + TypeScript + Tailwind + Recharts               │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ HTTP / REST API (JSON)
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                          API KATMANI (Backend)                         │
-│                    FastAPI Routers + Dependency Injection              │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Direct Calls
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    İŞ MANTIĞI VE SERVİS KATMANI (Service)              │
-│       File Service + Preprocessing Pipeline + Incident & Audit Logger   │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Models & Inference Calls
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                      MAKİNE ÖĞRENMESİ KATMANI (ML)                     │
-│               scikit-learn Preprocessor + Saved Models (Joblib)        │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ ORM (SQLAlchemy)
-┌───────────────────────────────────▼────────────────────────────────────┐
-│              VERİ ERİŞİM VE VERİTABANI KATMANI (Data Access / DB)      │
-│                     SQLAlchemy ORM + PostgreSQL                        │
-└────────────────────────────────────────────────────────────────────────┘
+## 2. Varlık-İlişki ve Katman Bağımlılıkları Diyagramı
+Aşağıdaki Mermaid diyagramı katmanları ve aralarındaki bağımlılık ilişkilerini göstermektedir:
+
+```mermaid
+flowchart TD
+    FE[Sunum Katmanı - React Frontend] --> BE[API Katmanı - FastAPI API]
+    BE --> SVC[İş Mantığı ve Servis Katmanı - Service Layer]
+    SVC --> ML[Makine Öğrenmesi Katmanı - ML Pipeline]
+    SVC --> DA[Veri Erişim Katmanı - Data Access Layer / SQLAlchemy]
+    DA --> DB[(Veritabanı Katmanı - PostgreSQL)]
 ```
 
 ### 1.1. Sunum Katmanı (Presentation Layer)
@@ -66,7 +51,7 @@ Verilerin kalıcı olarak saklandığı ve yönetildiği katmandır.
 
 ---
 
-## 2. Bileşenler Arası İletişim Akışları
+## 3. Bileşenler Arası İletişim Akışları
 
 Sistemdeki kritik operasyonel akışların katmanlar ve bileşenler arasındaki geçiş sırası aşağıda Mermaid şemasıyla gösterilmiştir:
 
@@ -77,28 +62,38 @@ sequenceDiagram
     participant FE as React Frontend
     participant BE as FastAPI API
     participant SVC as File/Inference Service
+    participant DA as Data Access Layer (SQLAlchemy)
     participant ML as ML Pipeline (Joblib)
     participant DB as PostgreSQL DB
 
     Analist->>FE: CSV Dosyasını Seçer & Yükler
     FE->>BE: POST /api/v1/analysis/upload (Multipart CSV)
     Note over BE: SHA-256 & Şema Doğrulama
-    BE->>DB: AnalysisJob Oluştur (durum: 'PENDING')
+    BE->>SVC: Analiz İşi Başlatma İsteği
+    SVC->>DA: AnalysisJob Oluştur (durum: 'PENDING')
+    DA->>DB: INSERT AnalysisJob
     BE-->>FE: HTTP 202 Accepted (Job ID döner)
     
-    Note over BE: Asenkron Arka Plan Görevi Başlar
-    BE->>DB: AnalysisJob Durumunu Güncelle ('PROCESSING')
-    BE->>SVC: Batch Inference Başlat (Dosya Yolu)
+    Note over BE: Asenkron Arka Plan Görevi (Worker Abstraction) Başlar
+    BE->>SVC: Batch Inference İşlemini Tetikle
+    SVC->>DA: AnalysisJob Durumunu Güncelle ('PROCESSING')
+    DA->>DB: UPDATE AnalysisJob (status='PROCESSING')
     SVC->>ML: Eğitilmiş Pipeline'ı Yükle & Veriyi Ön İşlemeden Geçir
     ML-->>SVC: Tahmin Olasılıkları (attack_probability) üretir
     SVC->>SVC: Risk Skorlarını & Seviyelerini Hesapla
-    SVC->>DB: Toplu Kayıt: DetectionResult Tablosuna Yaz
-    BE->>DB: AnalysisJob Durumunu Güncelle ('COMPLETED')
+    SVC->>DA: Toplu Tahmin Sonuçları Ekle (DetectionResult)
+    DA->>DB: INSERT DetectionResults (Bulk)
+    SVC->>DA: AnalysisJob Durumunu Güncelle ('COMPLETED')
+    DA->>DB: UPDATE AnalysisJob (status='COMPLETED')
     
     Analist->>FE: Analiz Sonuçlarını Görüntüler
     FE->>BE: GET /api/v1/analysis/{job_id}/results
-    BE->>DB: Sonuçları Sorgula
-    DB-->>BE: Kayıtlar
+    BE->>SVC: Sonuçları Al
+    SVC->>DA: Sonuçları Sorgula
+    DA->>DB: SELECT DetectionResults
+    DB-->>DA: Kayıtlar
+    DA-->>SVC: Kayıt Listesi
+    SVC-->>BE: Kayıt Listesi
     BE-->>FE: HTTP 200 OK (Sonuç Listesi)
     FE-->>Analist: Tehditleri & Detayları Gösterir
 ```
