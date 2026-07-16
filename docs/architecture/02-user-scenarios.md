@@ -57,14 +57,14 @@ Kullanıcı senaryoları, platformun fonksiyonel gereksinimlerinin kullanıcı g
 
 ## 4. Güvenlik Analisti (Security Analyst) Kullanıcı Senaryoları
 
-### Senaryo A: Ağ Trafiği CSV Dosyası Yükleme ve Analiz Başlatma
-*   **Amaç:** Ağ trafiği loglarını makine öğrenmesi modeliyle analiz etmek üzere sisteme göndermek.
+### Senaryo A: Ağ Trafiği Inference CSV Dosyası Yükleme ve Analiz Başlatma
+*   **Amaç:** Kullanıcıya ait ağ trafiği kayıtlarını içeren inference CSV dosyasını makine öğrenmesi modeliyle analiz etmek üzere sisteme göndermek (bu dosya, model eğitimi için kullanılan 8 resmî MachineLearningCSV dosyasından bağımsızdır).
 *   **Aktör:** Güvenlik Analisti (Security Analyst)
-*   **Ön Koşullar:** Analist sisteme giriş yapmış olmalı ve elinde CIC-IDS2017 şemasına uygun 50MB'ın altında bir CSV dosyası olmalıdır.
+*   **Ön Koşullar:** Analist sisteme giriş yapmış olmalı ve elinde CIC-IDS2017 şemasına uygun, yapılandırılmış limitlerin altındaki bir inference CSV dosyası bulunmalıdır.
 *   **Adımlar:**
     1. Analist, "Yeni Analiz" sayfasına girer.
-    2. Sürükle-bırak alanına ağ trafiği CSV dosyasını ekler.
-    3. Sistem istemci tarafında dosya uzantısını (`.csv`) ve dosya boyutunu kontrol eder.
+    2. Sürükle-bırak alanına ağ trafiği inference CSV dosyasını ekler.
+    3. Sistem istemci tarafında dosya uzantısını (`.csv`) ve settings üzerinden tanımlanan dosya boyut limitini kontrol eder.
     4. Analist "Analizi Başlat" butonuna tıklar.
     5. Backend tarafında dosya yüklenir, SHA-256 hash değeri kontrol edilir (aynı dosya önceden yüklendiyse reddedilir) ve sütun isimleri doğrulanır.
     6. Doğrulama başarılıysa sistem veritabanında `PENDING` durumunda bir `AnalysisJob` oluşturur ve arka planda analiz işlemini başlatarak durumu `PROCESSING` yapar.
@@ -81,7 +81,7 @@ Kullanıcı senaryoları, platformun fonksiyonel gereksinimlerinin kullanıcı g
     3. Analist, modelin atadığı risk seviyelerini (`risk_level`), saldırı olasılığını (`attack_probability`) ve hedef port (`destination_port`) bilgilerini inceler.
     4. **Not:** Analist modelin belirlediği risk skorunu veya seviyesini doğrudan değiştiremez; yalnızca bu tespitlerin detaylarındaki 78 adet orijinal özelliğin snapshot'ını inceler.
     5. Analist, incelediği yüksek riskli bir tespit için "Yeni Güvenlik Olayı Oluştur" butonuna basar. Sistem bu tespiti referans alan `OPEN` durumunda yeni bir olay oluşturur.
-    6. Analist olay altına analiz notlarını eklemek için "Yorum Ekle" kutusuna teknik açıklamasını ("Port taraması şüphesi doğrulandı, hedef port 22.") yazar ve gönderir.
+    6. Analist olay altına analiz notlarını eklemek için "Yorum Ekle" kutusuna teknik açıklamasını ("Yüksek riskli şüpheli trafik akışı doğrulandı, hedef port 22.") yazar ve gönderir.
 *   **İlişkili Gereksinimler:** `FR-DET-004`, `FR-INC-001`, `FR-INC-002`, `FR-INC-005`
 
 ### Senaryo C: Olay Yaşam Döngüsü Yönetimi
