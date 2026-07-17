@@ -30,26 +30,71 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 
 ## Kurulum
 
-> **Not:** Backend ve frontend henüz geliştirme aşamasındadır. Aşağıdaki kurulum adımları planlanmış olup henüz doğrulanmamıştır.
+### Genel Gereksinimler
 
-### Gereksinimler
-
-- Python 3.10+
+- Python 3.10+ (Yerel geliştirme Python 3.14 ile doğrulanmıştır)
 - Node.js 18+
-- PostgreSQL 15+
+- PostgreSQL 15+ (Yerel geliştirme PostgreSQL 18 ile doğrulanmıştır)
 - Docker (opsiyonel)
 
-### Backend Kurulumu (planlandı / henüz doğrulanmadı)
+### Backend Yerel Kurulumu (Doğrulandı)
 
-```bash
+Geliştirme ortamında test edilmiş ve doğrulanmış backend kurulum adımları:
+
+> **Not:** Bu aşamada Docker zorunlu değildir; yerel PostgreSQL sunucusu üzerinden geliştirme yapılmaktadır.
+
+#### 1. Dizin Geçişi ve Sanal Ortam (Virtual Environment)
+PowerShell üzerinde `backend` dizinine geçerek sanal ortamı oluşturun ve aktifleştirin:
+
+```powershell
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# .env dosyasını düzenleyin
-alembic upgrade head
-uvicorn app.main:app --reload
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+*Linux/macOS için aktifleştirme komutu:* `source .venv/bin/activate`
+
+#### 2. Bağımlılıkların Kurulması
+Sanal ortam aktifken gerekli Python paketlerini yükleyin:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+#### 3. Yapılandırma (.env) Dosyası
+Örnek yapılandırma dosyasını kopyalayarak yerel `.env` dosyasını oluşturun:
+
+```powershell
+copy .env.example .env
+```
+
+*Linux/macOS için kopyalama komutu:* `cp .env.example .env`
+
+> **Önemli:** Oluşturulan `.env` dosyası gizli verileri içerdiği için hiçbir şekilde Git takibine eklenmemelidir (otomatik olarak `.gitignore` kapsamındadır). Dosyayı açarak `DATABASE_URL` içindeki `change_me` şablon parolasını kendi PostgreSQL parolanızla değiştirin.
+>
+> Örnek bağlantı adresi şablonu:
+> `DATABASE_URL=postgresql+psycopg://securewatch_user:change_me@localhost:5432/securewatch_db`
+
+#### 4. Göç Kontrolü ve Uygulamanın Çalıştırılması
+Veritabanı bağlantısının ve alembic göç altyapısının aktifliğini doğruladıktan sonra sunucuyu başlatın:
+
+```powershell
+# Alembic güncel sürüm durumunu kontrol et
+python -m alembic current
+
+# Uvicorn sunucusunu başlat
+python -m uvicorn app.main:app --reload
+```
+
+- **Sağlık (Health) Endpoint:** `http://127.0.0.1:8000/api/v1/health`
+- **Otomatik API Dokümantasyonu (Swagger UI):** `http://127.0.0.1:8000/docs`
+
+#### 5. Testlerin Çalıştırılması
+Backend test suitini çalıştırmak için şu komutu kullanabilirsiniz:
+
+```powershell
+python -m pytest -q
 ```
 
 ### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
