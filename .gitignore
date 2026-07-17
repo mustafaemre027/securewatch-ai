@@ -13,9 +13,13 @@ data/*.tgz
 
 # Python Virtual Environment and Caches
 venv/
+.venv/
 .env
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .ipynb_checkpoints/
+.pytest_cache/
+.coverage
+htmlcov/
