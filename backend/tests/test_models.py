@@ -8,10 +8,19 @@ from app.models.audit_log import AuditLog
 from app.models.user import User, UserRole
 
 
+from sqlalchemy.pool import StaticPool
+
+
 @pytest.fixture
 def db_session():
     """Isolated SQLite in-memory database session fixture with foreign key support."""
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=False,
+    )
+
 
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
