@@ -43,6 +43,8 @@ def db_session():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
 
 
 from app.core.exception_handlers import register_exception_handlers

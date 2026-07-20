@@ -36,6 +36,8 @@ def db_session():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
 
 
 def test_user_role_enum_values() -> None:

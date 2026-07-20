@@ -46,6 +46,8 @@ def db_session():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
 
 
 def test_create_user_service_success(db_session: Session) -> None:
