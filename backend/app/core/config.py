@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     database_url: str
+    jwt_secret_key: str = "dev_secret_key_placeholder_change_me_in_env"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
 
     model_config = SettingsConfigDict(
         env_file=".env",
