@@ -101,8 +101,63 @@ def create_user(db: Session, user_create: UserCreate) -> User:
         role=user_create.role,
     )
     db.add(db_user)
-    db.commit()
+    db.flush()  # Write to DB within current transaction; caller must commit.
     db.refresh(db_user)
 
     logger.info("Created user account id=%s username=%s role=%s", db_user.id, db_user.username, db_user.role)
     return db_user
+
+
+def create_user_with_audit(
+    db: Session,
+    user_create: UserCreate,
+    created_by_user_id: int,
+    ip_address: str,
+) -> User:
+    """Atomically create a new user account and a USER_CREATED audit log entry.
+
+    Both the user and the audit log are flushed within the same transaction and
+    committed together. If either operation fails, the entire transaction is rolled
+    back, preventing a user from existing without a corresponding audit record.
+
+    Args:
+        db (Session): Database session — this function owns and commits the transaction.
+        user_create (UserCreate): User creation request schema.
+        created_by_user_id (int): ID of the admin user performing the creation.
+        ip_address (str): Client IP address for audit logging.
+
+    Returns:
+        User: The committed User database model instance.
+
+    Raises:
+        AppException: If username or email already exists (rolls back on duplicate).
+    """
+    from app.models.audit_log import AuditLog
+
+    try:
+        new_user = create_user(db=db, user_create=user_create)
+
+        role_str = new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role)
+        audit_entry = AuditLog(
+            user_id=created_by_user_id,
+            action_type="USER_CREATED",
+            description=f"User {new_user.username} created with role {role_str}.",
+            ip_address=ip_address,
+        )
+        db.add(audit_entry)
+        db.flush()
+        db.refresh(audit_entry)
+
+        # Both user and audit log are committed atomically here.
+        db.commit()
+        db.refresh(new_user)
+        logger.info(
+            "Atomically committed user id=%s and audit log id=%s",
+            new_user.id,
+            audit_entry.id,
+        )
+        return new_user
+
+    except Exception:
+        db.rollback()
+        raise

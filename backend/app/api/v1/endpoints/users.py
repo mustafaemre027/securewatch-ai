@@ -6,7 +6,7 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse
-from app.services import audit_service, user_service
+from app.services import user_service
 
 router = APIRouter()
 
@@ -30,23 +30,19 @@ def create_new_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.ADMIN])),
 ) -> UserResponse:
-    """Create a new user account.
+    """Create a new user account and audit log atomically.
 
     Protected: Admin role required.
+    Both the new user and the USER_CREATED audit log entry are committed in a single
+    transaction. If either operation fails, the entire transaction is rolled back.
     """
     ip_address = get_client_ip(request)
-    new_user = user_service.create_user(db=db, user_create=user_create)
-
-    # Log user creation audit event
-    role_str = new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role)
-    audit_service.create_audit_log(
+    new_user = user_service.create_user_with_audit(
         db=db,
-        action_type="USER_CREATED",
-        description=f"Admin {current_user.username} created user {new_user.username} with role {role_str}.",
+        user_create=user_create,
+        created_by_user_id=current_user.id,
         ip_address=ip_address,
-        user_id=current_user.id,
     )
-
     return UserResponse.model_validate(new_user)
 
 

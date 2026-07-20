@@ -34,7 +34,7 @@ def create_audit_log(
         ip_address=ip_address,
     )
     db.add(audit_entry)
-    db.commit()
+    db.flush()  # Write to DB within current transaction; caller must commit.
     db.refresh(audit_entry)
 
     logger.info("Audit log created id=%s action_type=%s user_id=%s", audit_entry.id, action_type, user_id)

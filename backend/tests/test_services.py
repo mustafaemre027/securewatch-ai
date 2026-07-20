@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.exceptions import AppException
 from app.db.base import Base
+from app.models.audit_log import AuditLog
 from app.models.user import UserRole
 from app.schemas.auth import UserLogin
 from app.schemas.user import UserCreate
@@ -11,11 +12,13 @@ from app.services.audit_service import create_audit_log, list_audit_logs
 from app.services.auth_service import authenticate_user
 from app.services.user_service import (
     create_user,
+    create_user_with_audit,
     get_user_by_email,
     get_user_by_id,
     get_user_by_username,
     list_users,
 )
+
 
 
 from sqlalchemy.pool import StaticPool
@@ -178,3 +181,64 @@ def test_audit_log_service_and_filters(db_session: Session) -> None:
     upload_logs = list_audit_logs(db_session, action_type="FILE_UPLOAD")
     assert len(upload_logs) == 2
 
+
+# --- H2 Atomicity Tests ---
+
+def test_create_user_with_audit_atomically_commits_both(db_session: Session) -> None:
+    """Test that create_user_with_audit commits both the user and audit log atomically."""
+    admin = create_user(db_session, UserCreate(username="admin_atomic", email="atomic_admin@test.ai", password="Password123!", role=UserRole.ADMIN))
+    db_session.commit()  # Commit admin so they exist for audit FK
+
+    new_user = create_user_with_audit(
+        db=db_session,
+        user_create=UserCreate(username="new_atomic_user", email="new_atomic@test.ai", password="Password123!", role=UserRole.ANALYST),
+        created_by_user_id=admin.id,
+        ip_address="10.0.0.5",
+    )
+
+    assert new_user.id is not None
+    fetched_user = db_session.query(type(new_user)).filter_by(id=new_user.id).first()
+    assert fetched_user is not None
+
+    audit_log = db_session.query(AuditLog).filter(
+        AuditLog.action_type == "USER_CREATED",
+        AuditLog.user_id == admin.id,
+    ).first()
+    assert audit_log is not None
+    assert "new_atomic_user" in audit_log.description
+    assert "password" not in audit_log.description.lower()
+
+
+def test_create_user_with_audit_rollback_on_duplicate(db_session: Session) -> None:
+    """Test that duplicate username causes rollback; no orphaned user is created."""
+    admin = create_user(db_session, UserCreate(username="admin_rollback", email="rollback_admin@test.ai", password="Password123!", role=UserRole.ADMIN))
+    db_session.commit()
+
+    create_user_with_audit(
+        db=db_session,
+        user_create=UserCreate(username="user_to_duplicate", email="dup@test.ai", password="Password123!", role=UserRole.ANALYST),
+        created_by_user_id=admin.id,
+        ip_address="10.0.0.5",
+    )
+
+    # Attempt to create a duplicate — should raise and roll back fully.
+    with pytest.raises(AppException) as exc_info:
+        create_user_with_audit(
+            db=db_session,
+            user_create=UserCreate(username="user_to_duplicate", email="different@test.ai", password="Password123!", role=UserRole.ANALYST),
+            created_by_user_id=admin.id,
+            ip_address="10.0.0.6",
+        )
+    assert exc_info.value.code == "DUPLICATE_USERNAME"
+
+    # Verify only one user with that username exists.
+    from app.models.user import User
+    count = db_session.query(User).filter(User.username == "user_to_duplicate").count()
+    assert count == 1
+
+    # Verify only one USER_CREATED audit log exists for this admin (not two).
+    audit_count = db_session.query(AuditLog).filter(
+        AuditLog.action_type == "USER_CREATED",
+        AuditLog.user_id == admin.id,
+    ).count()
+    assert audit_count == 1

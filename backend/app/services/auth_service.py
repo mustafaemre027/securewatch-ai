@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException
 from app.core.security import create_access_token, verify_password
+from app.models.audit_log import AuditLog
 from app.schemas.auth import Token, UserLogin
 from app.schemas.user import UserResponse
-from app.services.audit_service import create_audit_log
 from app.services.user_service import get_user_by_username
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,10 @@ def authenticate_user(
     ip_address: str = "127.0.0.1",
 ) -> Token:
     """Authenticate a user using credentials and return a signed JWT token response.
+
+    The USER_LOGIN audit log is created and committed atomically after a successful
+    authentication. If the audit log flush fails, the transaction is rolled back and
+    the session remains in a usable state.
 
     Args:
         db (Session): Database session.
@@ -32,7 +36,7 @@ def authenticate_user(
     user = get_user_by_username(db, login_data.username)
 
     if not user or not verify_password(login_data.password, user.password_hash):
-        logger.warning("Failed login attempt for username=%s from ip=%s", login_data.username, ip_address)
+        logger.warning("Failed login attempt from ip=%s", ip_address)
         raise AppException(
             status_code=401,
             code="CREDENTIALS_INVALID",
@@ -48,14 +52,21 @@ def authenticate_user(
 
     access_token = create_access_token(data=token_payload)
 
-    # Log successful login action
-    create_audit_log(
-        db=db,
-        action_type="USER_LOGIN",
-        description=f"User {user.username} logged in successfully.",
-        ip_address=ip_address,
-        user_id=user.id,
-    )
+    # Log successful login action atomically.
+    try:
+        audit_entry = AuditLog(
+            user_id=user.id,
+            action_type="USER_LOGIN",
+            description=f"User {user.username} logged in successfully.",
+            ip_address=ip_address,
+        )
+        db.add(audit_entry)
+        db.flush()
+        db.commit()
+        logger.info("Audit log committed for USER_LOGIN user_id=%s", user.id)
+    except Exception:
+        db.rollback()
+        logger.warning("Failed to persist USER_LOGIN audit log for user_id=%s; login still succeeds.", user.id)
 
     user_response = UserResponse.model_validate(user)
     return Token(
