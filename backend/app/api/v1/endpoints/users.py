@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.utils import get_client_ip
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse
@@ -11,19 +12,7 @@ from app.services import user_service
 router = APIRouter()
 
 
-def get_client_ip(request: Request) -> str:
-    """Extract client IP address from HTTP request safely.
-
-    Args:
-        request (Request): Incoming HTTP request.
-
-    Returns:
-        str: Client IP address.
-    """
-    return request.client.host if request.client else "127.0.0.1"
-
-
-@router.post("/", response_model=UserResponse, status_code=201)
+@router.post("", response_model=UserResponse, status_code=201)
 def create_new_user(
     user_create: UserCreate,
     request: Request,
@@ -46,7 +35,7 @@ def create_new_user(
     return UserResponse.model_validate(new_user)
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 def get_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),

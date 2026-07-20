@@ -12,7 +12,7 @@ from app.services import audit_service
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AuditLogResponse])
+@router.get("", response_model=List[AuditLogResponse])
 def get_audit_logs(
     user_id: Optional[int] = Query(None, description="Filter by user ID"),
     action_type: Optional[str] = Query(None, description="Filter by action type"),

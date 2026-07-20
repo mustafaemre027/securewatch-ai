@@ -97,7 +97,7 @@ def test_create_user_admin_success(db_session: Session, client: TestClient) -> N
         "password": "AnalystPassword123!",
         "role": "ANALYST",
     }
-    response = client.post("/api/v1/users/", json=create_payload, headers={"Authorization": f"Bearer {token}"})
+    response = client.post("/api/v1/users", json=create_payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 201
     data = response.json()
     assert data["username"] == "new_analyst"
@@ -119,7 +119,7 @@ def test_create_user_analyst_forbidden(db_session: Session, client: TestClient) 
         "password": "Password123!",
         "role": "ANALYST",
     }
-    response = client.post("/api/v1/users/", json=create_payload, headers={"Authorization": f"Bearer {token}"})
+    response = client.post("/api/v1/users", json=create_payload, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
     data = response.json()
     assert data["error"]["code"] == "PERMISSION_DENIED"
@@ -127,7 +127,7 @@ def test_create_user_analyst_forbidden(db_session: Session, client: TestClient) 
 
 def test_protected_route_unauthenticated(client: TestClient) -> None:
     """Test accessing protected route without token returns 401 Unauthorized."""
-    response = client.get("/api/v1/users/")
+    response = client.get("/api/v1/users")
     assert response.status_code == 401
     data = response.json()
     assert data["error"]["code"] == "CREDENTIALS_INVALID"
@@ -142,14 +142,14 @@ def test_list_audit_logs_admin_and_analyst_forbidden(db_session: Session, client
     analyst_token = client.post("/api/v1/auth/login", json={"username": "analyst_audit", "password": "Password123!"}).json()["access_token"]
 
     # Admin lists audit logs
-    admin_resp = client.get("/api/v1/audit-logs/", headers={"Authorization": f"Bearer {admin_token}"})
+    admin_resp = client.get("/api/v1/audit-logs", headers={"Authorization": f"Bearer {admin_token}"})
     assert admin_resp.status_code == 200
     logs = admin_resp.json()
     assert isinstance(logs, list)
     assert len(logs) >= 2  # Login audit logs
 
     # Analyst listing audit logs -> 403
-    analyst_resp = client.get("/api/v1/audit-logs/", headers={"Authorization": f"Bearer {analyst_token}"})
+    analyst_resp = client.get("/api/v1/audit-logs", headers={"Authorization": f"Bearer {analyst_token}"})
     assert analyst_resp.status_code == 403
 
 
@@ -161,5 +161,5 @@ def test_openapi_route_registration_uniqueness(client: TestClient) -> None:
     paths = openapi.get("paths", {})
 
     assert "/api/v1/auth/login" in paths
-    assert "/api/v1/users/" in paths
-    assert "/api/v1/audit-logs/" in paths
+    assert "/api/v1/users" in paths
+    assert "/api/v1/audit-logs" in paths
