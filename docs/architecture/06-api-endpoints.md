@@ -387,27 +387,34 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 ## 4. Hata Kodları ve Hata Yanıt Şeması
 
-Platform, bir hata durumunda istemciye standart olarak aşağıdaki formatta yanıt döner:
+Platform, bir hata durumunda istemciye standart olarak aşağıdaki nested formatta yanıt döner:
 ```json
 {
-  "error_code": "RESOURCE_NOT_FOUND",
-  "message": "Aranılan kayıt veritabanında bulunamadı.",
-  "details": {
-    "resource": "Incident",
-    "id": 999
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "Aranılan kayıt veritabanında bulunamadı.",
+    "details": {
+      "resource": "Incident",
+      "id": 999
+    }
   }
 }
 ```
 
+> **Not:** Tüm hata yanıtları `error` anahtarı altında `code`, `message` ve `details` alanlarını içeren nested bir nesne yapısında döner. Doğrulama hatalarında (422) `details` alanı hata listesini içerir; diğer durumlarda `null` olabilir.
+
 ### Standart Hata Kodları Tablosu
 
-| HTTP Durumu | Hata Kodu (`error_code`) | Açıklama |
+| HTTP Durumu | Hata Kodu (`code`) | Açıklama |
 | :--- | :--- | :--- |
-| **400 Bad Request** | `INVALID_INPUT` | Gönderilen istek gövdesindeki veriler doğrulanmadı (eksik alan vb.). |
+| **400 Bad Request** | `DUPLICATE_USERNAME` | Bu kullanıcı adı zaten kullanılmaktadır. |
+| **400 Bad Request** | `DUPLICATE_EMAIL` | Bu e-posta adresi zaten kullanılmaktadır. |
 | **400 Bad Request** | `DUPLICATE_FILE` | Aynı SHA-256 hash değerine sahip bir dosya zaten yüklenmiş. |
-| **401 Unauthorized** | `CREDENTIALS_INVALID` | Yanlış kullanıcı adı veya parola girildi. |
+| **401 Unauthorized** | `CREDENTIALS_INVALID` | Yanlış kullanıcı adı veya parola girildi; ya da kimlik doğrulama token'ı eksik/geçersiz. |
 | **401 Unauthorized** | `TOKEN_EXPIRED` | JWT oturum token'ının süresi dolmuş. |
+| **401 Unauthorized** | `TOKEN_INVALID` | JWT token doğrulanamadı veya geçersiz. |
 | **403 Forbidden** | `PERMISSION_DENIED` | Kullanıcının bu işlemi gerçekleştirmek için yetkisi (rolü) yetersiz. |
-| **404 Not Found** | `RESOURCE_NOT_FOUND` | Belirtilen ID'ye sahip kaynak (Analiz, Olay vb.) bulunamadı. |
+| **404 Not Found** | `NOT_FOUND` | İstenen kaynak bulunamadı. |
+| **422 Unprocessable** | `VALIDATION_ERROR` | İstek gövdesi veya parametreleri doğrulamayı geçemedi. |
 | **422 Unprocessable** | `SCHEMA_MISMATCH` | Yüklenen CSV dosyasının sütunları CIC-IDS2017 şemasıyla eşleşmiyor. |
-| **500 Internal Error** | `SERVER_ERROR` | Beklenmeyen bir sunucu hatası oluştu. |
+| **500 Internal Error** | `INTERNAL_SERVER_ERROR` | Beklenmeyen bir sunucu hatası oluştu. |
