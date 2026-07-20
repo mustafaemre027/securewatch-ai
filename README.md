@@ -10,25 +10,52 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 
 ## Temel Özellikler
 
-- **Kullanıcı Yönetimi:** JWT tabanlı kimlik doğrulama, yönetici ve güvenlik analisti rolleri
-- **Veri Yükleme:** CSV formatında ağ trafiği verisi yükleme, doğrulama ve analiz
-- **Makine Öğrenmesi:** İkili sınıflandırma (normal/şüpheli), model karşılaştırma
-- **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi
-- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi
-- **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler, grafikler ve model performans metrikleri
+- **Kimlik Doğrulama & Güvenlik:** JWT (JSON Web Token) tabanlı oturum yönetimi, `bcrypt` ile güvenli parola hashleme ve saklama.
+- **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
+- **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
+- **Veri Yükleme:** CSV formatında ağ trafiği verisi yükleme, doğrulama ve analiz (planlandı).
+- **Makine Öğrenmesi:** İkili sınıflandırma (normal/şüpheli), model karşılaştırma (planlandı).
+- **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi (planlandı).
+- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
+- **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
 
 ## Teknoloji Yığını
 
 | Katman | Teknoloji |
 |--------|-----------|
 | **Frontend** | React, TypeScript, Vite, Tailwind CSS, Recharts |
-| **Backend** | Python, FastAPI, Pydantic, SQLAlchemy, Alembic |
+| **Backend** | Python, FastAPI, Pydantic, SQLAlchemy, Alembic, PyJWT, bcrypt |
 | **Veritabanı** | PostgreSQL |
 | **Makine Öğrenmesi** | Pandas, NumPy, scikit-learn, Joblib |
 | **Test** | Pytest, HTTPX, Vitest, React Testing Library |
 | **DevOps** | Docker, Docker Compose, GitHub Actions (planlandı) |
 
-## Kurulum
+---
+
+## Kimlik Doğrulama, RBAC ve Audit Günlükleri
+
+Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik katmanlarına sahiptir:
+
+### Rol Tabanlı Erişim (RBAC) Yetki Matrisi
+
+| Endpoint | HTTP Metodu | Erişim Rolü | Açıklama |
+|----------|-------------|-------------|----------|
+| `/api/v1/auth/login` | `POST` | `PUBLIC` | Kullanıcı adı ve parola ile giriş yapar, JWT token döner. |
+| `/api/v1/users` | `POST` | `ADMIN` | Yeni kullanıcı hesabı oluşturur ve `USER_CREATED` audit kaydı düşer. |
+| `/api/v1/users` | `GET` | `ADMIN` | Sistemde kayıtlı tüm kullanıcıları listeler. |
+| `/api/v1/audit-logs` | `GET` | `ADMIN` | Sistem denetim günlüklerini listeler (kullanıcı, eylem ve tarih filtresi destekler). |
+
+### Audit Log Güvenlik İlkeleri
+
+- **İlişki Güvenliği:** Bir kullanıcı veritabanından silindiğinde geçmiş audit logları silinmez; `user_id` alanı otomatik olarak `NULL` değerine çekilir (`ON DELETE SET NULL`).
+- **Gizlilik:** Parola, password hash, JWT token veya veritabanı bağlantı şifresi gibi hassas veriler asla audit loglarına kaydedilmez.
+- **Atomik İşlem:** Kullanıcı oluşturma işlemi ve `USER_CREATED` audit log kaydı tek bir veritabanı işleminde (transaction) atomik olarak tamamlanır; bir işlem başarısız olursa tüm değişiklikler geri alınır (`rollback`).
+
+Ayrıntılı API uç nokta sözleşmeleri ve hata kodları için bkz. [docs/architecture/06-api-endpoints.md](docs/architecture/06-api-endpoints.md).
+
+---
+
+## Kurulum ve Çalıştırma
 
 ### Genel Gereksinimler
 
@@ -71,17 +98,28 @@ copy .env.example .env
 
 *Linux/macOS için kopyalama komutu:* `cp .env.example .env`
 
-> **Önemli:** Oluşturulan `.env` dosyası gizli verileri içerdiği için hiçbir şekilde Git takibine eklenmemelidir (otomatik olarak `.gitignore` kapsamındadır). Dosyayı açarak `DATABASE_URL` içindeki `change_me` şablon parolasını kendi PostgreSQL parolanızla değiştirin.
->
-> Örnek bağlantı adresi şablonu:
-> `DATABASE_URL=postgresql+psycopg://securewatch_user:change_me@localhost:5432/securewatch_db`
+> **Önemli:** Oluşturulan `.env` dosyası gizli verileri içerdiği için hiçbir şekilde Git takibine eklenmemelidir (otomatik olarak `.gitignore` kapsamındadır).
 
-#### 4. Göç Kontrolü ve Uygulamanın Çalıştırılması
-Veritabanı bağlantısının ve alembic göç altyapısının aktifliğini doğruladıktan sonra sunucuyu başlatın:
+**.env Değişkenleri ve Yapılandırma:**
+
+```env
+# Veritabanı Bağlantısı
+DATABASE_URL=postgresql+psycopg://securewatch_user:change_me@localhost:5432/securewatch_db
+
+# JWT Güvenlik Ayarları
+# ÖNEMLİ: JWT_SECRET_KEY en az 32 karakterlik, rastgele ve güçlü bir anahtar olmalıdır.
+# Üretmek için: python -c "import secrets; print(secrets.token_urlsafe(64))"
+JWT_SECRET_KEY=change_me_to_a_secure_random_string_at_least_32_chars
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+#### 4. Veritabanı Göçü (Migration) ve Uygulamanın Çalıştırılması
+Veritabanı tablolarını en güncel migration seviyesine getirin ve uvicorn sunucusunu başlatın:
 
 ```powershell
-# Alembic güncel sürüm durumunu kontrol et
-python -m alembic current
+# Alembic migration'larını uygula (users ve audit_logs tablolarını oluşturur)
+python -m alembic upgrade head
 
 # Uvicorn sunucusunu başlat
 python -m uvicorn app.main:app --reload
@@ -89,9 +127,10 @@ python -m uvicorn app.main:app --reload
 
 - **Sağlık (Health) Endpoint:** `http://127.0.0.1:8000/api/v1/health`
 - **Otomatik API Dokümantasyonu (Swagger UI):** `http://127.0.0.1:8000/docs`
+- **Alternatif Dokümantasyon (ReDoc):** `http://127.0.0.1:8000/redoc`
 
 #### 5. Testlerin Çalıştırılması
-Backend test suitini çalıştırmak için şu komutu kullanabilirsiniz:
+Backend test suitini (birim, entegrasyon ve güvenlik testleri) çalıştırmak için:
 
 ```powershell
 python -m pytest -q
@@ -121,11 +160,11 @@ docker-compose up --build
 ## Lisans ve Güvenlik Notu
 
 - Projenin lisansı henüz belirlenmemiştir.
-- Bu proje yalnızca eğitim ve analiz amaçlıdır
-- Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz
-- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik CIC-IDS2017 veri seti kullanılır
-- Kullanıcı şifreleri hashlenerek saklanır
-- JWT secret ve veritabanı bilgileri `.env` üzerinden okunur
+- Bu proje yalnızca eğitim ve analiz amaçlıdır.
+- Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz.
+- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik CIC-IDS2017 veri seti kullanılır.
+- Kullanıcı parolaları `bcrypt` ile hashlenerek saklanır; şifreler asla açık metin (plain text) olarak kaydedilmez.
+- JWT secret ve veritabanı kimlik bilgileri yalnızca yerel `.env` dosyası üzerinden okunur.
 
 ---
 

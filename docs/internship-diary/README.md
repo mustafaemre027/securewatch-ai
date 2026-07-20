@@ -22,8 +22,11 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | Dosya | Açıklama |
 |-------|----------|
 | `template.md` | Günlük şablonu |
-| `day-01.md` | Gün 1 kaydı |
-| ... | ... |
+| `day-01.md` | Gün 1 kaydı — Proje kurulumu, Git/GitHub ortamı ve mimari belgelerin oluşturulması |
+| `day-02.md` | Gün 2 kaydı — Model eğitim scripti, veri önişleme, CIC-IDS2017 eğitim süreci ve metrikler |
+| `day-03.md` | Gün 3 kaydı — Batch inference modülü, risk skorlama ve açıklanabilir kural motoru |
+| `day-04.md` | Gün 4 kaydı — FastAPI backend altyapısı, PostgreSQL 18, Alembic ve sağlık kontrolleri |
+| `day-05.md` | Gün 5 kaydı — Authentication (JWT, bcrypt), RBAC rolleri ve denetim günlükleri (Audit Logging) |
 
 ## Format
 
