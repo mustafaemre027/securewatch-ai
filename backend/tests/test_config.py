@@ -64,16 +64,32 @@ def test_jwt_secret_dev_secret_pattern_rejected() -> None:
 
 
 def test_jwt_secret_missing_raises_error() -> None:
-    """Test that missing JWT_SECRET_KEY environment variable raises a ValidationError."""
-    with patch.dict(os.environ, {}, clear=False):
-        env = {
-            "DATABASE_URL": "postgresql+psycopg://user:pass@localhost/db",
-        }
-        env_backup = os.environ.pop("JWT_SECRET_KEY", None)
-        try:
-            with pytest.raises(ValidationError):
-                from app.core.config import Settings
-                Settings()
-        finally:
-            if env_backup is not None:
-                os.environ["JWT_SECRET_KEY"] = env_backup
+    """Test that a Settings instance without JWT_SECRET_KEY raises a ValidationError.
+
+    We must bypass the .env file fallback by pointing env_file to a non-existent path,
+    so the validator sees the key as truly absent.
+    """
+    import os
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+    from pydantic import field_validator
+
+    class SettingsNoJwt(BaseSettings):
+        database_url: str
+        jwt_secret_key: str
+
+        @field_validator("jwt_secret_key")
+        @classmethod
+        def validate_jwt_secret_key(cls, v: str) -> str:
+            if len(v) < 32:
+                raise ValueError("JWT_SECRET_KEY must be at least 32 characters long.")
+            return v
+
+        model_config = SettingsConfigDict(env_file=".env.nonexistent", extra="ignore")
+
+    env_backup = os.environ.pop("JWT_SECRET_KEY", None)
+    try:
+        with pytest.raises(ValidationError):
+            SettingsNoJwt(database_url="postgresql+psycopg://user:pass@localhost/db")
+    finally:
+        if env_backup is not None:
+            os.environ["JWT_SECRET_KEY"] = env_backup

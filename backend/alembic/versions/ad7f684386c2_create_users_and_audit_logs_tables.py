@@ -1,9 +1,8 @@
 """create_users_and_audit_logs_tables
 
 Revision ID: ad7f684386c2
-Revises: 
+Revises:
 Create Date: 2026-07-20 14:35:21.852258
-
 """
 from typing import Sequence, Union
 
