@@ -47,7 +47,7 @@ class AnalysisJob(Base):
     file_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[AnalysisJobStatus] = mapped_column(
-        Enum(AnalysisJobStatus, native_enum=False, values_callable=lambda obj: [e.value for e in obj]),
+        Enum(AnalysisJobStatus, native_enum=False, length=20, values_callable=lambda obj: [e.value for e in obj]),
         default=AnalysisJobStatus.PENDING,
         server_default=AnalysisJobStatus.PENDING.value,
         nullable=False,
