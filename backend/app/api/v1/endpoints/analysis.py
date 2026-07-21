@@ -23,7 +23,6 @@ from app.services.analysis_service import (
 )
 
 router = APIRouter()
-settings = get_settings()
 
 
 @router.post("/upload", response_model=AnalysisUploadResponse, status_code=202)
@@ -32,6 +31,7 @@ async def upload_analysis_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([UserRole.ANALYST])),
+    settings = Depends(get_settings),
 ) -> AnalysisUploadResponse:
     """Upload a CIC-IDS2017 format CSV for batch inference.
 
@@ -39,7 +39,7 @@ async def upload_analysis_csv(
     Admin cannot perform uploads.
     """
     ip_address = get_client_ip(request)
-    
+
     try:
         db_job = await handle_csv_upload(
             db=db,
@@ -49,7 +49,7 @@ async def upload_analysis_csv(
             analyst_id=current_user.id,
             ip_address=ip_address,
         )
-        
+
         # Manually construct response to map the DB model's `id` to the schema's `job_id`
         return AnalysisUploadResponse(
             job_id=db_job.id,
@@ -78,7 +78,7 @@ def list_jobs(
     Admins see all jobs; Analysts see only jobs they created.
     """
     is_admin = current_user.role == UserRole.ADMIN
-    
+
     jobs = list_analysis_jobs(
         db=db,
         user_id=current_user.id,
@@ -87,7 +87,7 @@ def list_jobs(
         skip=skip,
         limit=limit,
     )
-    
+
     return [AnalysisJobListItem.model_validate(job) for job in jobs]
 
 
@@ -104,19 +104,19 @@ def get_job(
     Returns 404 if the job doesn't exist or is not owned by the Analyst.
     """
     is_admin = current_user.role == UserRole.ADMIN
-    
+
     job = get_analysis_job_by_id(
         db=db,
         job_id=job_id,
         user_id=current_user.id,
         is_admin=is_admin,
     )
-    
+
     if not job:
         raise AppException(
             status_code=404,
             code="NOT_FOUND",
             message="Analysis job not found.",
         )
-        
+
     return AnalysisJobDetail.model_validate(job)
