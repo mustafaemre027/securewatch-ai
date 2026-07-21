@@ -15,6 +15,13 @@ from app.services.storage_service import (
     finalise_upload,
     stage_upload,
 )
+from app.services.csv_validation_service import (
+    CICIDS2017_FEATURE_COLUMNS,
+    CICIDS2017_OPTIONAL_LABEL,
+    CsvValidationResult,
+    validate_csv_metadata,
+    validate_csv_schema,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -30,4 +37,9 @@ __all__ = [
     "stage_upload",
     "finalise_upload",
     "discard_staged",
+    "CICIDS2017_FEATURE_COLUMNS",
+    "CICIDS2017_OPTIONAL_LABEL",
+    "CsvValidationResult",
+    "validate_csv_metadata",
+    "validate_csv_schema",
 ]
