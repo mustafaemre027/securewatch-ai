@@ -93,3 +93,28 @@ def test_jwt_secret_missing_raises_error() -> None:
     finally:
         if env_backup is not None:
             os.environ["JWT_SECRET_KEY"] = env_backup
+
+
+def test_max_upload_size_bytes_default() -> None:
+    """Test that max_upload_size_bytes defaults to 50MB (52428800)."""
+    settings = _make_settings()
+    assert settings.max_upload_size_bytes == 52428800
+
+
+def test_max_upload_size_bytes_zero_rejected() -> None:
+    """Test that max_upload_size_bytes cannot be zero."""
+    with pytest.raises(ValidationError):
+        _make_settings(MAX_UPLOAD_SIZE_BYTES="0")
+
+
+def test_max_upload_size_bytes_negative_rejected() -> None:
+    """Test that max_upload_size_bytes cannot be negative."""
+    with pytest.raises(ValidationError):
+        _make_settings(MAX_UPLOAD_SIZE_BYTES="-1024")
+
+
+def test_upload_dir_is_path_and_resolves_correctly() -> None:
+    """Test that upload_dir is parsed as a Path object."""
+    from pathlib import Path
+    settings = _make_settings()
+    assert isinstance(settings.upload_dir, Path)

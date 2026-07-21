@@ -6,6 +6,7 @@ data/processed/**
 data/uploads/**
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/samples/*.csv
 
 # Archives
 data/*.zip

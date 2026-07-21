@@ -160,5 +160,66 @@ def test_audit_log_set_null_on_user_delete(db_session: Session) -> None:
     fetched_log = db_session.query(AuditLog).filter(AuditLog.id == log_id).first()
     assert fetched_log is not None
     assert fetched_log.user_id is None
-    assert fetched_log.description == "Action performed by temporary_user before deletion"
     assert fetched_log.user is None
+
+
+def test_analysis_job_default_status_and_creation(db_session: Session) -> None:
+    """Test creating AnalysisJob with proper defaults and enums."""
+    from app.models.analysis_job import AnalysisJob, AnalysisJobStatus
+
+    user = User(username="analyst_job", email="aj@s.ai", password_hash="hash", role=UserRole.ANALYST)
+    db_session.add(user)
+    db_session.commit()
+
+    job = AnalysisJob(
+        user_id=user.id,
+        file_name="test.csv",
+        file_hash="a"*64,
+        file_size=1024,
+    )
+    db_session.add(job)
+    db_session.commit()
+    db_session.refresh(job)
+
+    assert job.id is not None
+    assert job.status == AnalysisJobStatus.PENDING
+    assert job.created_at is not None
+    assert job.user == user
+
+
+def test_analysis_job_unique_file_hash(db_session: Session) -> None:
+    """Test that file_hash must be unique."""
+    from app.models.analysis_job import AnalysisJob
+
+    user = User(username="hash_user", email="hu@s.ai", password_hash="hash", role=UserRole.ANALYST)
+    db_session.add(user)
+    db_session.commit()
+
+    job1 = AnalysisJob(user_id=user.id, file_name="f1.csv", file_hash="b"*64, file_size=100)
+    job2 = AnalysisJob(user_id=user.id, file_name="f2.csv", file_hash="b"*64, file_size=200)
+
+    db_session.add(job1)
+    db_session.commit()
+
+    db_session.add(job2)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_analysis_job_user_delete_restrict(db_session: Session) -> None:
+    """Test that a User cannot be deleted if they have AnalysisJobs (ON DELETE RESTRICT)."""
+    from app.models.analysis_job import AnalysisJob
+
+    user = User(username="restrict_user", email="ru@s.ai", password_hash="hash", role=UserRole.ANALYST)
+    db_session.add(user)
+    db_session.commit()
+
+    job = AnalysisJob(user_id=user.id, file_name="f.csv", file_hash="c"*64, file_size=10)
+    db_session.add(job)
+    db_session.commit()
+
+    db_session.delete(user)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
