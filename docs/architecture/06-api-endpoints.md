@@ -80,11 +80,11 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 ### 3.3. Ağ Trafiği ve Analiz Yönetimi (Analysis Management)
 
 #### **POST `/api/v1/analysis/upload`**
-*   **Açıklama:** Ağ trafiği inference CSV dosyasını sunucuya yükler ve batch tahmin (inference) sürecini başlatır.
+*   **Açıklama:** Ağ trafiği inference CSV dosyasını sunucuya yükler ve PENDING durumunda bir iş oluşturur. Bu aşamada inference başlatılmaz. Dosya boyutu (varsayılan 50 MB, değiştirilebilir), MIME (`text/csv`) ve şema doğrulaması (78 zorunlu özellik, opsiyonel Label) yapılır. Başarılı yüklemede `FILE_UPLOAD` audit kaydı oluşturulur.
 *   **Rol:** ANALYST
 *   **İstek Tipi:** `multipart/form-data`
 *   **İstek Parametreleri:**
-    - `file`: CSV dosyası (MIME: `text/csv`, dosya boyutu sistem ayarlarındaki upload limitine uygun olmalıdır)
+    - `file`: CSV dosyası (MIME: `text/csv`)
 *   **Başarılı Yanıt (202 Accepted):**
     ```json
     {
@@ -99,7 +99,7 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
 
 #### **GET `/api/v1/analysis`**
 *   **Açıklama:** Geçmiş analiz işlerini (`AnalysisJob`) listeler.
-*   **Rol:** ALL (Yöneticiler tüm işleri, Analistler yalnızca kendi başlattıkları işleri listeleyebilir)
+*   **Rol:** ALL (ADMIN tüm işleri, ANALYST yalnızca kendi başlattığı işleri listeleyebilir)
 *   **Sorgu Parametreleri (Query Params):**
     - `status` (opsiyonel): `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`
     - `skip` (varsayılan: 0)
@@ -118,9 +118,27 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
     ]
     ```
 
-#### **GET `/api/v1/analysis/{job_id}/results`**
-*   **Açıklama:** Belirli bir analiz işine ait tahmin ve risk seviyesi sonuçlarını listeler.
-*   **Rol:** ALL (Yöneticiler tüm analiz sonuçlarına erişebilir. Analistler yalnızca kendi yetkili oldukları/oluşturdukları analiz işlerinin sonuçlarını listeleyebilir).
+#### **GET `/api/v1/analysis/{job_id}`**
+*   **Açıklama:** Belirli bir analiz işinin (`AnalysisJob`) detaylı durum ve meta bilgilerini getirir. Yetkisiz bir ANALYST başka birinin işine erişmeye çalışırsa `404 NOT_FOUND` alır.
+*   **Rol:** ALL (ADMIN tüm işleri, ANALYST yalnızca kendi başlattığı işleri görüntüleyebilir).
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    {
+      "id": 45,
+      "user_id": 2,
+      "file_name": "Friday-WorkingHours-Afternoon-Suspicious.csv",
+      "file_hash": "e3b0c44298fc...",
+      "file_size": 25487622,
+      "status": "COMPLETED",
+      "error_message": null,
+      "created_at": "2026-07-16T15:31:00Z",
+      "completed_at": "2026-07-16T15:33:12Z"
+    }
+    ```
+
+#### **POST `/api/v1/analysis/{job_id}/results`**
+*   **Açıklama:** Belirli bir analiz işine ait tahmin ve risk seviyesi sonuçlarını listeler. **(Planlandı: Gün 11 kapsamında uygulanacaktır.)**
+*   **Rol:** ALL (ADMIN tüm analiz sonuçlarına erişebilir. ANALYST yalnızca kendi analiz işlerinin sonuçlarını listeleyebilir).
 *   **Sorgu Parametreleri (Query Params):**
     - `risk_level` (opsiyonel): `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
     - `predicted_label` (opsiyonel): `0` veya `1`
@@ -291,24 +309,6 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
     ]
     ```
 
-#### **GET `/api/v1/analysis/{job_id}`**
-*   **Açıklama:** Belirli bir analiz işinin (`AnalysisJob`) detaylı durum ve meta bilgilerini getirir.
-*   **Rol:** ALL (Analistler yalnızca kendi başlattıkları analiz işlerini görüntüleyebilir).
-*   **Başarılı Yanıt (200 OK):**
-    ```json
-    {
-      "id": 45,
-      "user_id": 2,
-      "file_name": "Friday-WorkingHours-Afternoon-Suspicious.csv",
-      "file_hash": "e3b0c44298fc...",
-      "file_size": 25487622,
-      "status": "COMPLETED",
-      "error_message": null,
-      "created_at": "2026-07-16T15:31:00Z",
-      "completed_at": "2026-07-16T15:33:12Z"
-    }
-    ```
-
 #### **GET `/api/v1/detections/{detection_id}`**
 *   **Açıklama:** Belirli bir tespit sonucunun (`DetectionResult`) detaylı öznitelik snapshot (JSONB) verilerini getirir.
 *   **Rol:** ALL
@@ -415,6 +415,7 @@ Platform, bir hata durumunda istemciye standart olarak aşağıdaki nested forma
 | **401 Unauthorized** | `TOKEN_INVALID` | JWT token doğrulanamadı veya geçersiz. |
 | **403 Forbidden** | `PERMISSION_DENIED` | Kullanıcının bu işlemi gerçekleştirmek için yetkisi (rolü) yetersiz. |
 | **404 Not Found** | `NOT_FOUND` | İstenen kaynak bulunamadı. |
+| **413 Payload Too Large** | `FILE_TOO_LARGE` | Yüklenen dosya belirlenen boyutu aşıyor. |
 | **422 Unprocessable** | `VALIDATION_ERROR` | İstek gövdesi veya parametreleri doğrulamayı geçemedi. |
 | **422 Unprocessable** | `SCHEMA_MISMATCH` | Yüklenen CSV dosyasının sütunları CIC-IDS2017 şemasıyla eşleşmiyor. |
 | **500 Internal Error** | `INTERNAL_SERVER_ERROR` | Beklenmeyen bir sunucu hatası oluştu. |
