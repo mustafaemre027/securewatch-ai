@@ -232,6 +232,33 @@ def discard_staged(staged: StagedUpload) -> None:
     logger.info("Staged upload discarded: tmp=%s", staged.temporary_path.name)
 
 
+def delete_finalised(file_hash: str, upload_dir: Path) -> None:
+    """Safely delete a finalised CSV file by its SHA-256 hash.
+
+    Used primarily for rollback cleanup if a database transaction fails after
+    a file has been successfully finalised. It will only target files with the
+    `.csv` extension located directly in `upload_dir`.
+
+    Args:
+        file_hash (str): The SHA-256 hash of the file.
+        upload_dir (Path): The configured upload directory.
+    """
+    if not file_hash or len(file_hash) != 64:
+        logger.warning("Invalid file hash provided for deletion: %s", file_hash)
+        return
+
+    permanent_path = upload_dir / f"{file_hash}.csv"
+
+    # Ensure the path is actually within upload_dir (prevents traversal)
+    if permanent_path.parent != upload_dir:
+        logger.warning("Refused to delete file outside upload directory: %s", permanent_path)
+        return
+
+    _safe_delete(permanent_path)
+
+    logger.info("Finalised file deleted during rollback: %s", permanent_path.name)
+
+
 def _safe_delete(path: Path) -> None:
     """Remove a file silently, ignoring errors if it no longer exists.
 

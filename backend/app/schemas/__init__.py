@@ -3,6 +3,11 @@ from app.schemas.auth import Token, TokenData, UserLogin
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.health import HealthResponse
 from app.schemas.user import UserCreate, UserResponse
+from app.schemas.analysis_job import (
+    AnalysisJobDetail,
+    AnalysisJobListItem,
+    AnalysisUploadResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -12,4 +17,7 @@ __all__ = [
     "UserCreate",
     "UserResponse",
     "AuditLogResponse",
+    "AnalysisUploadResponse",
+    "AnalysisJobListItem",
+    "AnalysisJobDetail",
 ]
