@@ -9,6 +9,12 @@ from app.services.user_service import (
     get_user_by_username,
     list_users,
 )
+from app.services.storage_service import (
+    StagedUpload,
+    discard_staged,
+    finalise_upload,
+    stage_upload,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -20,4 +26,8 @@ __all__ = [
     "create_audit_log",
     "list_audit_logs",
     "authenticate_user",
+    "StagedUpload",
+    "stage_upload",
+    "finalise_upload",
+    "discard_staged",
 ]
