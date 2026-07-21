@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.analysis_job import AnalysisJob
     from app.models.audit_log import AuditLog
 
 
@@ -28,6 +29,7 @@ class User(Base):
         created_at (datetime): Account creation timestamp.
         updated_at (datetime): Account last update timestamp.
         audit_logs (List[AuditLog]): Relationship to associated audit logs.
+        analysis_jobs (List[AnalysisJob]): Relationship to associated analysis jobs.
     """
     __tablename__ = "users"
 
@@ -54,6 +56,11 @@ class User(Base):
 
     audit_logs: Mapped[List["AuditLog"]] = relationship(
         "AuditLog",
+        back_populates="user",
+        passive_deletes=True,
+    )
+    analysis_jobs: Mapped[List["AnalysisJob"]] = relationship(
+        "AnalysisJob",
         back_populates="user",
         passive_deletes=True,
     )
