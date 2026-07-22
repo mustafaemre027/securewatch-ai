@@ -33,6 +33,8 @@ from app.services.preprocessing_service import (
     TrainingDataResult,
     prepare_training_data,
     build_sklearn_preprocessing_pipeline,
+    SplitDataResult,
+    split_and_transform_data,
 )
 
 __all__ = [
@@ -62,4 +64,6 @@ __all__ = [
     "TrainingDataResult",
     "prepare_training_data",
     "build_sklearn_preprocessing_pipeline",
+    "SplitDataResult",
+    "split_and_transform_data",
 ]

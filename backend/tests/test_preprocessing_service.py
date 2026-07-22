@@ -243,3 +243,148 @@ def test_build_pipeline_reject_empty_names():
         build_sklearn_preprocessing_pipeline(numeric_features=["A", "   "])
     assert excinfo.value.status_code == 422
     assert "empty" in excinfo.value.message
+
+
+from app.services.preprocessing_service import split_and_transform_data, TrainingDataResult
+
+
+@pytest.fixture
+def base_training_data() -> TrainingDataResult:
+    """Create a minimal valid TrainingDataResult with 10 rows (2 classes)."""
+    # 5 BENIGN, 5 ATTACK
+    data = {c: list(range(10)) for c in CICIDS2017_FEATURE_COLUMNS if c != REDUNDANT_COLUMN}
+    features = pd.DataFrame(data)
+    targets = pd.Series(["BENIGN"] * 5 + ["ATTACK"] * 5, name=CICIDS2017_OPTIONAL_LABEL)
+    return TrainingDataResult(
+        features=features,
+        targets=targets,
+        initial_row_count=10,
+        dropped_duplicate_count=0,
+        final_row_count=10
+    )
+
+
+def test_split_and_transform_success(base_training_data):
+    """Verify successful split and transform with stratification."""
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    data_copy = base_training_data.features.copy(deep=True)
+
+    result = split_and_transform_data(
+        data=base_training_data,
+        preprocessor=preprocessor,
+        test_size=0.2,
+        random_state=42
+    )
+
+    # Verify outputs
+    assert len(result.X_train) == 8
+    assert len(result.X_test) == 2
+    assert len(result.y_train) == 8
+    assert len(result.y_test) == 2
+
+    # Disjoint indices and cover all rows
+    assert result.train_indices.intersection(result.test_indices).empty
+    assert len(result.train_indices) + len(result.test_indices) == 10
+
+    # Stratification check (20% of 5 = 1, so test should have exactly 1 of each)
+    assert result.y_test.value_counts()["BENIGN"] == 1
+    assert result.y_test.value_counts()["ATTACK"] == 1
+
+    # Features contain finite numeric values
+    assert np.isfinite(result.X_train.to_numpy()).all()
+    assert np.isfinite(result.X_test.to_numpy()).all()
+
+    # Original data is unmodified
+    pd.testing.assert_frame_equal(base_training_data.features, data_copy)
+
+
+def test_split_and_transform_same_random_state(base_training_data):
+    """Verify same random state produces same indices."""
+    preprocessor1 = build_sklearn_preprocessing_pipeline()
+    preprocessor2 = build_sklearn_preprocessing_pipeline()
+
+    res1 = split_and_transform_data(base_training_data, preprocessor1, random_state=42)
+    res2 = split_and_transform_data(base_training_data, preprocessor2, random_state=42)
+
+    assert res1.train_indices.equals(res2.train_indices)
+    assert res1.test_indices.equals(res2.test_indices)
+
+
+def test_split_and_transform_data_leakage(base_training_data):
+    """Verify test outliers do not affect scaler stats and missing values are handled."""
+    # Find test indices first to inject outlier and NaN reliably
+    dummy_res = split_and_transform_data(base_training_data, build_sklearn_preprocessing_pipeline(), random_state=42)
+    test_idx_0 = dummy_res.test_indices[0]
+    test_idx_1 = dummy_res.test_indices[1]
+
+    # Modify test data to have an outlier and a NaN
+    base_training_data.features.loc[test_idx_0, CICIDS2017_FEATURE_COLUMNS[0]] = 999999.0 # Outlier
+    base_training_data.features.loc[test_idx_1, CICIDS2017_FEATURE_COLUMNS[0]] = np.nan # Missing
+
+    preprocessor = build_sklearn_preprocessing_pipeline()
+
+    result = split_and_transform_data(
+        data=base_training_data,
+        preprocessor=preprocessor,
+        test_size=0.2,
+        random_state=42
+    )
+
+    # Scaler mean for the first column should be computed only on the 8 training rows.
+    # Training values for that col are normal (no outlier).
+    # If the outlier was included, the mean would be huge.
+    num_pipeline = result.preprocessor.transformers_[0][1]
+    scaler = num_pipeline.named_steps["scaler"]
+    mean_val = scaler.mean_[0]
+
+    assert mean_val < 10.0 # Meaning outlier 999999.0 was NOT included in fit
+
+    # The NaN in test should be filled with the training median, then scaled.
+    # Just check it transformed successfully to a finite number
+    col_name = result.X_test.columns[0]
+    assert np.isfinite(result.X_test.loc[test_idx_1, col_name])
+
+
+def test_split_and_transform_invalid_test_size(base_training_data):
+    """Verify rejection of invalid test_size."""
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    with pytest.raises(AppException) as excinfo:
+        split_and_transform_data(base_training_data, preprocessor, test_size=1.5)
+    assert excinfo.value.status_code == 422
+    assert "test_size" in excinfo.value.message
+
+
+def test_split_and_transform_empty_data():
+    """Verify rejection of empty training data."""
+    empty_data = TrainingDataResult(
+        features=pd.DataFrame(),
+        targets=pd.Series(dtype=str),
+        initial_row_count=0,
+        dropped_duplicate_count=0,
+        final_row_count=0
+    )
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    with pytest.raises(AppException) as excinfo:
+        split_and_transform_data(empty_data, preprocessor)
+    assert excinfo.value.status_code == 422
+    assert "empty" in excinfo.value.message
+
+
+def test_split_and_transform_single_class(base_training_data):
+    """Verify rejection if only one class exists."""
+    base_training_data.targets[:] = "BENIGN"
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    with pytest.raises(AppException) as excinfo:
+        split_and_transform_data(base_training_data, preprocessor)
+    assert excinfo.value.status_code == 422
+    assert "two distinct classes" in excinfo.value.message
+
+
+def test_split_and_transform_insufficient_samples(base_training_data):
+    """Verify rejection if a class has < 2 samples."""
+    base_training_data.targets.iloc[9] = "RARE_ATTACK" # Only 1 sample
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    with pytest.raises(AppException) as excinfo:
+        split_and_transform_data(base_training_data, preprocessor)
+    assert excinfo.value.status_code == 422
+    assert "fewer than 2 samples" in excinfo.value.message

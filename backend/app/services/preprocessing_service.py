@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -14,6 +15,7 @@ from app.services.csv_validation_service import (
     CICIDS2017_FEATURE_COLUMNS,
     CICIDS2017_OPTIONAL_LABEL,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -227,4 +229,137 @@ def build_sklearn_preprocessing_pipeline(
     return ColumnTransformer(
         transformers=transformers,
         remainder="drop"
+    )
+
+
+@dataclass(frozen=True)
+class SplitDataResult:
+    """Immutable result structure for train/test split and pipeline execution."""
+    preprocessor: ColumnTransformer
+    X_train: pd.DataFrame
+    X_test: pd.DataFrame
+    y_train: pd.Series
+    y_test: pd.Series
+    train_indices: pd.Index
+    test_indices: pd.Index
+
+
+def split_and_transform_data(
+    data: TrainingDataResult,
+    preprocessor: ColumnTransformer,
+    test_size: float = 0.2,
+    random_state: int = 42
+) -> SplitDataResult:
+    """
+    Splits the data into train/test sets and fits/transforms the preprocessor
+    in a leakage-safe manner (fit only on training data).
+
+    Args:
+        data: The prepared training data containing features and targets.
+        preprocessor: An unfitted scikit-learn ColumnTransformer.
+        test_size: Proportion of the dataset to include in the test split.
+        random_state: Controls the shuffling applied to the data before applying the split.
+
+    Returns:
+        SplitDataResult: The split and transformed data along with the fitted preprocessor.
+
+    Raises:
+        AppException: If validation fails or stratified split cannot be performed.
+    """
+    if not (0 < test_size < 1):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="test_size must be strictly between 0 and 1."
+        )
+
+    if data.features.empty:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Cannot split an empty dataset."
+        )
+
+    # Class count validation for stratified split
+    class_counts = data.targets.value_counts()
+    if len(class_counts) < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="At least two distinct classes are required for stratification."
+        )
+
+    if class_counts.min() < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Stratified split failed: At least one class has fewer than 2 samples."
+        )
+
+    # We must explicitly NOT fallback to normal split
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            data.features,
+            data.targets,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=data.targets
+        )
+    except ValueError as e:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=f"Stratified split failed: {str(e)}"
+        )
+
+    # Fit transform on training data ONLY to prevent data leakage
+    X_train_transformed_arr = preprocessor.fit_transform(X_train)
+    # Transform on test data ONLY
+    X_test_transformed_arr = preprocessor.transform(X_test)
+
+    # Get feature names from preprocessor to maintain dataframe structure
+    feature_names = preprocessor.get_feature_names_out()
+
+    X_train_transformed = pd.DataFrame(X_train_transformed_arr, columns=feature_names, index=X_train.index)
+    X_test_transformed = pd.DataFrame(X_test_transformed_arr, columns=feature_names, index=X_test.index)
+
+    # Ensure dimensions match (columns)
+    if X_train_transformed.shape[1] != X_test_transformed.shape[1]:
+        raise AppException(
+            status_code=500,
+            code="TRANSFORM_ERROR",
+            message="Transformed train and test datasets have mismatched column counts."
+        )
+
+    # Indices validation
+    train_idx = X_train.index
+    test_idx = X_test.index
+
+    if not train_idx.intersection(test_idx).empty:
+        raise AppException(
+            status_code=500,
+            code="SPLIT_ERROR",
+            message="Training and test sets have overlapping indices."
+        )
+
+    if len(train_idx) + len(test_idx) != len(data.features):
+        raise AppException(
+            status_code=500,
+            code="SPLIT_ERROR",
+            message="Training and test sets do not cover all original rows."
+        )
+
+    logger.info(
+        "Data split and transformed successfully. Train: %d rows, Test: %d rows.",
+        len(X_train_transformed), len(X_test_transformed)
+    )
+
+    return SplitDataResult(
+        preprocessor=preprocessor,
+        X_train=X_train_transformed,
+        X_test=X_test_transformed,
+        y_train=y_train,
+        y_test=y_test,
+        train_indices=train_idx,
+        test_indices=test_idx
     )
