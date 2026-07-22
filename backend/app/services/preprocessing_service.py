@@ -234,14 +234,24 @@ def build_sklearn_preprocessing_pipeline(
 
 @dataclass(frozen=True)
 class SplitDataResult:
-    """Immutable result structure for train/test split and pipeline execution."""
+    """Frozen container for train/test split and pipeline execution results.
+
+    Note: ``frozen=True`` prevents re-assignment of fields but does NOT make
+    the contained ``pd.DataFrame``/``pd.Series`` objects deeply immutable.
+    Each field is produced via defensive deep-copy isolation inside
+    ``split_and_transform_data`` so that callers cannot accidentally
+    corrupt shared mutable state.
+
+    ``train_indices`` and ``test_indices`` are stored as plain Python tuples
+    (immutable) rather than ``pd.Index`` objects.
+    """
     preprocessor: ColumnTransformer
     X_train: pd.DataFrame
     X_test: pd.DataFrame
     y_train: pd.Series
     y_test: pd.Series
-    train_indices: pd.Index
-    test_indices: pd.Index
+    train_indices: tuple
+    test_indices: tuple
 
 
 def split_and_transform_data(
@@ -296,14 +306,19 @@ def split_and_transform_data(
             message="Stratified split failed: At least one class has fewer than 2 samples."
         )
 
+    # Defensive deep copies before split - prevents callers from accidentally
+    # mutating the source PreparedTrainingData through pandas' shared buffers.
+    features_copy = data.features.copy(deep=True)
+    targets_copy = data.targets.copy(deep=True)
+
     # We must explicitly NOT fallback to normal split
     try:
         X_train, X_test, y_train, y_test = train_test_split(
-            data.features,
-            data.targets,
+            features_copy,
+            targets_copy,
             test_size=test_size,
             random_state=random_state,
-            stratify=data.targets
+            stratify=targets_copy
         )
     except ValueError as e:
         raise AppException(
@@ -312,18 +327,27 @@ def split_and_transform_data(
             message=f"Stratified split failed: {str(e)}"
         )
 
-    # Fit transform on training data ONLY to prevent data leakage
+    # Fit transform on training data ONLY to prevent data leakage.
     X_train_transformed_arr = preprocessor.fit_transform(X_train)
-    # Transform on test data ONLY
+    # Transform on test data ONLY - no fitting.
     X_test_transformed_arr = preprocessor.transform(X_test)
 
-    # Get feature names from preprocessor to maintain dataframe structure
+    # Get feature names from preprocessor to maintain dataframe structure.
     feature_names = preprocessor.get_feature_names_out()
 
-    X_train_transformed = pd.DataFrame(X_train_transformed_arr, columns=feature_names, index=X_train.index)
-    X_test_transformed = pd.DataFrame(X_test_transformed_arr, columns=feature_names, index=X_test.index)
+    # Build independent DataFrames so X_train and X_test share no mutable buffer.
+    X_train_transformed = pd.DataFrame(
+        X_train_transformed_arr.copy(),
+        columns=feature_names,
+        index=X_train.index
+    )
+    X_test_transformed = pd.DataFrame(
+        X_test_transformed_arr.copy(),
+        columns=feature_names,
+        index=X_test.index
+    )
 
-    # Ensure dimensions match (columns)
+    # Ensure dimensions match (columns).
     if X_train_transformed.shape[1] != X_test_transformed.shape[1]:
         raise AppException(
             status_code=500,
@@ -331,11 +355,11 @@ def split_and_transform_data(
             message="Transformed train and test datasets have mismatched column counts."
         )
 
-    # Indices validation
-    train_idx = X_train.index
-    test_idx = X_test.index
+    # Capture indices as immutable tuples before validation.
+    train_idx = tuple(X_train.index.tolist())
+    test_idx = tuple(X_test.index.tolist())
 
-    if not train_idx.intersection(test_idx).empty:
+    if set(train_idx).intersection(set(test_idx)):
         raise AppException(
             status_code=500,
             code="SPLIT_ERROR",
@@ -358,8 +382,8 @@ def split_and_transform_data(
         preprocessor=preprocessor,
         X_train=X_train_transformed,
         X_test=X_test_transformed,
-        y_train=y_train,
-        y_test=y_test,
+        y_train=y_train.copy(deep=True),
+        y_test=y_test.copy(deep=True),
         train_indices=train_idx,
         test_indices=test_idx
     )

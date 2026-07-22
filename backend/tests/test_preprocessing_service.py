@@ -282,8 +282,8 @@ def test_split_and_transform_success(base_training_data):
     assert len(result.y_train) == 8
     assert len(result.y_test) == 2
 
-    # Disjoint indices and cover all rows
-    assert result.train_indices.intersection(result.test_indices).empty
+    # Disjoint indices (tuples) and cover all rows
+    assert not set(result.train_indices).intersection(set(result.test_indices))
     assert len(result.train_indices) + len(result.test_indices) == 10
 
     # Stratification check (20% of 5 = 1, so test should have exactly 1 of each)
@@ -306,43 +306,53 @@ def test_split_and_transform_same_random_state(base_training_data):
     res1 = split_and_transform_data(base_training_data, preprocessor1, random_state=42)
     res2 = split_and_transform_data(base_training_data, preprocessor2, random_state=42)
 
-    assert res1.train_indices.equals(res2.train_indices)
-    assert res1.test_indices.equals(res2.test_indices)
+    assert res1.train_indices == res2.train_indices
+    assert res1.test_indices == res2.test_indices
 
 
 def test_split_and_transform_data_leakage(base_training_data):
     """Verify test outliers do not affect scaler stats and missing values are handled."""
-    # Find test indices first to inject outlier and NaN reliably
-    dummy_res = split_and_transform_data(base_training_data, build_sklearn_preprocessing_pipeline(), random_state=42)
-    test_idx_0 = dummy_res.test_indices[0]
-    test_idx_1 = dummy_res.test_indices[1]
+    # Discover test indices via a clean run - do NOT mutate the shared fixture.
+    dummy_res = split_and_transform_data(
+        base_training_data, build_sklearn_preprocessing_pipeline(), random_state=42
+    )
+    test_idx_0, test_idx_1 = dummy_res.test_indices[0], dummy_res.test_indices[1]
 
-    # Modify test data to have an outlier and a NaN
-    base_training_data.features.loc[test_idx_0, CICIDS2017_FEATURE_COLUMNS[0]] = 999999.0 # Outlier
-    base_training_data.features.loc[test_idx_1, CICIDS2017_FEATURE_COLUMNS[0]] = np.nan # Missing
-
+    # Build a local deep copy and inject outlier + NaN only on test rows.
+    import dataclasses
+    features_local = base_training_data.features.copy(deep=True)
+    targets_local = base_training_data.targets.copy(deep=True)
+    features_local.loc[test_idx_0, CICIDS2017_FEATURE_COLUMNS[0]] = 999999.0  # Outlier in test
+    features_local.loc[test_idx_1, CICIDS2017_FEATURE_COLUMNS[0]] = np.nan    # Missing in test
+    local_data = dataclasses.replace(
+        base_training_data,
+        features=features_local,
+        targets=targets_local
+    )
     preprocessor = build_sklearn_preprocessing_pipeline()
 
     result = split_and_transform_data(
-        data=base_training_data,
+        data=local_data,
         preprocessor=preprocessor,
         test_size=0.2,
         random_state=42
     )
 
     # Scaler mean for the first column should be computed only on the 8 training rows.
-    # Training values for that col are normal (no outlier).
-    # If the outlier was included, the mean would be huge.
+    # Outlier was injected on test rows, so training stats are unaffected.
     num_pipeline = result.preprocessor.transformers_[0][1]
     scaler = num_pipeline.named_steps["scaler"]
     mean_val = scaler.mean_[0]
 
-    assert mean_val < 10.0 # Meaning outlier 999999.0 was NOT included in fit
+    assert mean_val < 10.0  # Meaning outlier 999999.0 was NOT included in fit
 
     # The NaN in test should be filled with the training median, then scaled.
-    # Just check it transformed successfully to a finite number
     col_name = result.X_test.columns[0]
     assert np.isfinite(result.X_test.loc[test_idx_1, col_name])
+
+    # Confirm base_training_data fixture is completely unmodified
+    assert not base_training_data.features.isna().any().any(), \
+        "Fixture must not have NaN after leakage test"
 
 
 def test_split_and_transform_invalid_test_size(base_training_data):
@@ -388,3 +398,72 @@ def test_split_and_transform_insufficient_samples(base_training_data):
         split_and_transform_data(base_training_data, preprocessor)
     assert excinfo.value.status_code == 422
     assert "fewer than 2 samples" in excinfo.value.message
+
+
+# ---------------------------------------------------------------------------
+# Mutation regression tests
+# ---------------------------------------------------------------------------
+
+def _make_fresh_training_data() -> TrainingDataResult:
+    """Helper: build an independent TrainingDataResult with 10 rows (2 classes)."""
+    data = {c: list(range(10)) for c in CICIDS2017_FEATURE_COLUMNS if c != REDUNDANT_COLUMN}
+    features = pd.DataFrame(data)
+    targets = pd.Series(["BENIGN"] * 5 + ["ATTACK"] * 5, name=CICIDS2017_OPTIONAL_LABEL)
+    return TrainingDataResult(
+        features=features,
+        targets=targets,
+        initial_row_count=10,
+        dropped_duplicate_count=0,
+        final_row_count=10
+    )
+
+
+def test_split_does_not_mutate_source_prepared_data():
+    """split_and_transform_data must not modify PreparedTrainingData.features or .targets."""
+    td = _make_fresh_training_data()
+    features_snapshot = td.features.copy(deep=True)
+    targets_snapshot = td.targets.copy(deep=True)
+
+    split_and_transform_data(td, build_sklearn_preprocessing_pipeline(), random_state=42)
+
+    pd.testing.assert_frame_equal(td.features, features_snapshot)
+    pd.testing.assert_series_equal(td.targets, targets_snapshot)
+
+
+def test_mutating_source_after_split_does_not_affect_result():
+    """Mutating source DataFrame after split must not change X_train/X_test."""
+    td = _make_fresh_training_data()
+    result = split_and_transform_data(td, build_sklearn_preprocessing_pipeline(), random_state=42)
+
+    X_train_snapshot = result.X_train.copy(deep=True)
+    X_test_snapshot = result.X_test.copy(deep=True)
+
+    # Corrupt source features after split
+    td.features.iloc[:, 0] = -999.0
+
+    pd.testing.assert_frame_equal(result.X_train, X_train_snapshot)
+    pd.testing.assert_frame_equal(result.X_test, X_test_snapshot)
+
+
+def test_mutating_result_train_does_not_affect_result_test():
+    """X_train and X_test must not share a mutable underlying buffer."""
+    td = _make_fresh_training_data()
+    result = split_and_transform_data(td, build_sklearn_preprocessing_pipeline(), random_state=42)
+
+    X_test_snapshot = result.X_test.copy(deep=True)
+
+    # Mutate the training output
+    result.X_train.iloc[:, 0] = -777.0
+
+    pd.testing.assert_frame_equal(result.X_test, X_test_snapshot)
+
+
+def test_result_indices_are_immutable_tuples():
+    """train_indices and test_indices must be plain Python tuples."""
+    td = _make_fresh_training_data()
+    result = split_and_transform_data(td, build_sklearn_preprocessing_pipeline(), random_state=42)
+
+    assert isinstance(result.train_indices, tuple)
+    assert isinstance(result.test_indices, tuple)
+    assert not set(result.train_indices).intersection(set(result.test_indices))
+    assert len(result.train_indices) + len(result.test_indices) == 10
