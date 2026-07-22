@@ -29,6 +29,10 @@ from app.services.analysis_service import (
     handle_csv_upload,
     list_analysis_jobs,
 )
+from app.services.preprocessing_service import (
+    TrainingDataResult,
+    prepare_training_data,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -54,4 +58,6 @@ __all__ = [
     "get_analysis_job_by_id",
     "list_analysis_jobs",
     "handle_csv_upload",
+    "TrainingDataResult",
+    "prepare_training_data",
 ]
