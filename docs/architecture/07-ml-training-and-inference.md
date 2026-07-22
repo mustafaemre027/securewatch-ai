@@ -1,64 +1,80 @@
 # SecureWatch AI — Makine Öğrenmesi Süreçleri (ML Training & Inference)
 
-Bu belge, SecureWatch AI projesindeki çevrimdışı (offline) model eğitimi, sürümleme standartları, veri sızıntısını önleme kuralları ve CSV tabanlı batch tahmin (inference) akışlarını tanımlar.
-
-## 1. Giriş
-Platform, ağ trafiği kayıtlarını normal ve şüpheli olarak sınıflandırmak için makine öğrenmesi yöntemlerini kullanır. Model başarısının doğruluğu ve güvenilirliği, verinin ön işleme adımlarının doğru şekilde sıralanmasına bağlıdır.
+Bu belge, SecureWatch AI projesindeki ön işleme (preprocessing) pipeline'ını, çevrimdışı (offline) model eğitimi standartlarını, veri sızıntısını önleme kurallarını ve CSV tabanlı batch tahmin (inference) akışlarını tanımlar.
 
 ---
 
-## 2. ML Eğitim Akışı ve Veri Sızıntısını Önleme (Data Leakage Prevention)
+## 1. Giriş
 
-Eğitim sürecinde test verilerinin eğitim modellerine sızmasını (data leakage) engellemek amacıyla adımlar aşağıdaki sıralamayla uygulanacaktır:
+Platform, ağ trafiği kayıtlarını normal ve şüpheli olarak sınıflandırmak için makine öğrenmesi yöntemlerini kullanır. Model başarısının doğruluğu ve güvenilirliği, verinin ön işleme adımlarının ve veri sızıntısını (data leakage) önleyen mimarinin doğru kurulmasına bağlıdır.
+
+---
+
+## 2. Ön İşleme Pipeline'ı ve Veri Sızıntısını Önleme (Uygulanan Mimari — Gün 7)
+
+Gün 7 kapsamında, model eğitimine giren verilerin hazırlanması, scikit-learn transformer katmanının oluşturulması ve veri sızıntısını (data leakage) tamamen engelleyen train/test ayrım servisi `app.services.preprocessing_service` altında geliştirilmiştir.
 
 ```mermaid
 flowchart TD
-    A[1. Sekiz Adet MachineLearningCSV Dosyasının Okunması] --> B[2. Sütun Adları ve Etiketlerin Normalizasyonu]
-    B --> C[3. Sayısal Alanlardaki Infinity Değerlerinin NaN Yapılması]
-    C --> D[4. Mükerrer Satırların & Fwd Header Length.1'in Silinmesi]
-    D --> E[5. İkili Sınıf BENIGN = 0, Diğerleri = 1 Eşlemesi]
-    E --> F[6. Stratified Split %80 Eğitim, %20 Test]
-    F --> G1[Eğitim Veri Seti]
-    F --> G2[Test Veri Seti]
-    G1 --> H[7. Imputer & Scaler Eğitim Setinde Fit Edilir]
-    H --> I1[8. Ön İşleme Dönüşümü Eğitim Setine Uygulanır - TRANSFORM]
-    G2 --> I2[9. Ön İşleme Dönüşümü Test Setine Uygulanır - TRANSFORM]
-    I1 --> J[10. Modellerin Eğitilmesi]
-    I2 --> K[11. Test Seti Üzerinde Metrik Karşılaştırması]
-    J --> K
-    K --> L[12. Preprocessing + Model Pipeline'ının Joblib ile Kaydedilmesi]
+    A[1. Ham CIC-IDS2017 DataFrame Yüklenmesi] --> B[2. Şema Doğrulaması - 78 Özellik + 1 Label]
+    B --> C[3. Label Ayrıştırması & Fwd Header Length.1 Redundant Sütun Eleme]
+    C --> D[4. Deterministik 77 Sayısal Özellik Sıralaması]
+    D --> E[5. ±inf -> NaN Dönüşümü & Mükerrer Satır Eleme drop_duplicates]
+    E --> F[6. Stratified Split %80 Train, %20 Test - Leakage-Safe]
+    F --> G1[Training Özellikleri X_train]
+    F --> G2[Test Özellikleri X_test]
+    G1 --> H[7. ColumnTransformer YALNIZCA Training Verisinde fit_transform]
+    H --> I1[8. Dönüştürülmüş X_train DataFrame]
+    G2 --> I2[9. ColumnTransformer Test Verisinde YALNIZCA transform]
+    I2 --> I3[10. Dönüştürülmüş X_test DataFrame]
 ```
 
-### 2.1. Eğitim Adımları Detayları
-1.  **Veri Keşfi:** `data/raw/` altında bulunan 8 resmî MachineLearningCSV dosyası belleğe chunking yöntemiyle yüklenir.
-2.  **Etiket Normalizasyonu:** Sütun isimlerindeki boşluklar temizlenir (`strip`). Label sütunundaki metinsel hatalar (büyük/küçük harf, encoding anomalileri) normalize edilerek standartlaştırılır.
-3.  **Infinity Temizliği:** Sayısal sütunlarda yer alan `Infinity` değerleri, sonraki aşamada doldurulabilmesi amacıyla `NaN` (Not a Number) değerlerine dönüştürülür.
-4.  **Mükerrerlik ve Tekrarlı Sütun Eleme:** Overfitting'i önlemek için mükerrer satırlar silinir. Aynı bilgiyi taşıyan mükerrer `Fwd Header Length.1` sütunu veri setinden düşürülür.
-5.  **İkili Hedef Değişken Eşlemesi:** `Label` sütununda `BENIGN` içeren kayıtlar `0` (Normal), diğer tüm saldırı türleri (DDoS, PortScan, Bot vb.) `1` (Saldırı) olarak işaretlenir.
-6.  **Stratified Veri Bölme (Split):** Sınıf dengesizliği koruyacak şekilde veri seti %80 Eğitim, %20 Test olacak şekilde stratified yöntemle bölünür.
-7.  **Ön İşleme Fit Kuralı:** Imputer (Eksik veri tamamlama - median) ve Scaler (Sayısal ölçeklendirme) gibi istatistik öğrenen tüm dönüştürücüler **yalnızca eğitim veri seti üzerinde fit edilir (`fit_transform`)**.
-8.  **Ön İşleme Transform Kuralı:** Fit edilen bu dönüştürücüler test veri setine sadece uygulanır (`transform`). Test verisinin istatistikleri (ortalama, standart sapma, median) asla ön işleme parametrelerini etkilememelidir.
-9.  **Baseline Modeli:** Model değerlendirmelerine temel oluşturması amacıyla en basit tahminleri yürüten `DummyClassifier` eğitilir.
-10. **Modelleme:** Ön işleme katmanından geçen eğitim verileriyle `Logistic Regression` ve `Random Forest` algoritmaları eğitilir.
-11. **Karşılaştırma:** Test seti üzerinde tahminler yürütülerek modeller; `precision`, `recall`, `F1-Score`, `ROC-AUC`, `FPR` (False Positive Rate) ve `confusion matrix` metriklerine göre karşılaştırılır.
-12. **Bütünsel Pipeline Kaydı:** Seçilen en başarılı ön işleme transformatörleri ve sınıflandırıcı model, tek bir scikit-learn `Pipeline` nesnesi olarak paketlenip **Joblib** formatında disk üzerine kaydedilir.
-13. **Model Kartı:** Kaydedilen model; sürüm bilgisi (örn: `v1.0.0`), girdi özellikleri şeması ve elde ettiği metriklerle birlikte belgelenerek kayıt altına alınır.
+### 2.1. Eğitim Verisi Hazırlama (`prepare_training_data`)
+
+Model eğitimi öncesinde verinin temizlenmesi ve standart biçime getirilmesi adımları:
+
+1. **Şema Doğrulaması:** Ham DataFrame, canonical CIC-IDS2017 şemasına (`CICIDS2017_FEATURE_COLUMNS`, 78 özellik) göre doğrulanır. Eksik veya fazla özellik varlığında `SCHEMA_MISMATCH` (422) hatası üretilir.
+2. **Hedef Değişken (`Label`) Ayrımı:** Yükleme aşamasında opsiyonel olan `Label` sütunu, model eğitimi verisi hazırlanırken **zorunludur**. Eksik veya boş etiketler reddedilir. `Label` sütunu özellik matrisinden ayrılır.
+3. **Redundant Özellik Eleme:** CIC-IDS2017 şemasında mükerrer kayıtlı `Fwd Header Length.1` sütunu, şema doğrulamasından **sonra** özellik matrisinden düşürülür.
+4. **Model Özellik Sayısı ve Sıralaması:** Model girdisi, `REDUNDANT_COLUMN` çıkarıldıktan sonra tam olarak **77 sayısal özellikten** oluşur ve sıralama deterministiktir.
+5. **Sayısal Özellikler ve `Destination Port`:** `Destination Port` dahil 77 özelliğin tamamı sayısal veri tipine dönüştürülür (`pd.to_numeric`). `Destination Port` varsayılan yapıda kategorik sütun olarak zorlanmaz; diğer özelliklerle birlikte sayısal pipeline'a dahil edilir.
+6. **Infinity ve Eksik Değer İşleme:** Pozitif ve negatif sonsuz (`+inf`, `-inf`) değerler `NaN` değerine dönüştürülür.
+7. **Mükerrer Satır Temizliği:** Overfitting'i önlemek amacıyla tam mükerrer (exact duplicate) satırlar train/test split işleminden **önce** (`drop_duplicates()`) kaldırılır.
+8. **Hedef Değişken Durumu:** `Label` değerleri Gün 7 aşamasında metin (string) olarak korunur; etiket kodlaması (label encoding) henüz uygulanmamıştır.
+
+### 2.2. Scikit-Learn Ön İşleme Transformer'ı (`build_sklearn_preprocessing_pipeline`)
+
+Özelliklerin imputer ve scaler katmanlarından geçirilmesi için esnek ve unfitted scikit-learn `ColumnTransformer` builder'ı oluşturulmuştur:
+
+- **Sayısal Pipeline (`num`):** `SimpleImputer(strategy="median", keep_empty_features=True)` → `StandardScaler()`. Medyan imputer ile eksik veriler doldurulur, ardından ortalaması 0 ve varyansı 1 olacak şekilde ölçeklenir. `keep_empty_features=True` sayesinde tamamen NaN olan sütunlar çıktı matrisinden kaybolmaz.
+- **Varsayılan Yapı:** 77 sayısal özellik, 0 kategorik özellik içerir.
+- **Opsiyonel Kategorik Desteği (`cat`):** `SimpleImputer(strategy="most_frequent", keep_empty_features=True)` → `OneHotEncoder(handle_unknown="ignore", sparse_output=False)`. İleride eklenebilecek kategorik alanlar için en sık tekrarlanan değerle doldurma ve bilinmeyen kategorileri sessizce yoksayma (`handle_unknown="ignore"`) desteği mevcuttur.
+- **Doğrulamalar:** Sayısal ve kategorik sütun listelerinde çakışma (overlap), mükerrer sütun adı veya boş sütun adı olması durumunda `VALIDATION_ERROR` (422) fırlatılır.
+- **Unfitted Nesne Garantisi:** Builder fonksiyonu her çağrıda bağımsız, eğitilmemiş (unfitted) ve klonlanabilir (`sklearn.base.clone`) bir `ColumnTransformer(remainder="drop")` nesnesi döndürür.
+
+### 2.3. Veri Sızıntısını Önleyen Train/Test Ayrımı (`split_and_transform_data`)
+
+Model değerlendirmesinin güvenilirliği için veri sızıntısı (data leakage) tam olarak engellenmiştir:
+
+- **Fit Öncesi Split:** Train/test ayrımı, transformer `fit` edilmeden **önce** gerçekleştirilir.
+- **Varsayılan Bölme:** `test_size=0.2`, `random_state=42` ve etiket dağılımını koruyan `stratify=data.targets` kullanır.
+- **Katı Stratification Kuralı:** Stratified split başarısız olursa (örneğin veri setinde < 2 sınıf bulunması veya herhangi bir sınıfta < 2 örnek olması durumunda) sessizce normal split'e **düşülmez**; açıkça `VALIDATION_ERROR` (422) hatası verilir.
+- **Eğitim Setinde `fit_transform`:** Transformer **yalnızca** eğitim verisi (`X_train`) üzerinde `fit_transform()` edilerek imputer medyanı ve scaler ortalama/standart sapma istatistikleri öğrenilir.
+- **Test Setinde YALNIZCA `transform`:** Test verisi (`X_test`) üzerinde asla `fit` veya `fit_transform` çağrılmaz; yalnızca eğitilmiş transformer üzerinden `transform()` çalıştırılır. Test kümesindeki aykırı değerler (outlier) veya eksik veriler eğitim istatistiklerini değiştiremez.
+- **Deterministik ve Ayrık İndeksler:** Training ve test indeksleri kesişmez (`train_indices ∩ test_indices = ∅`) ve toplam satır sayısını tam kapsar. İndeksler immutable Python `tuple` tipinde saklanır.
+- **Defensive Copy (Derin Kopya) Yalıtımı:** `split_and_transform_data` fonksiyonu giriş `TrainingDataResult` verisinin ve çıktı `X_train`/`X_test`/`y_train`/`y_test` DataFrames/Series nesnelerinin bağımsız derin kopyalarını (`copy(deep=True)`) oluşturur. Çağrıcıların mutable pandas buffer'larını değiştirmesi durumunda kaynak veri veya diğer küme etkilenmez.
 
 ---
 
-## 3. CSV Tabanlı Batch Tahmin (Inference) Akışı
+## 3. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
 
-> **ÖNEMLİ:** SecureWatch AI, canlı ağ trafiğini dinleyen veya PCAP paketlerini koklayan (sniffing) gerçek zamanlı bir IDS/IPS değildir. Tamamen web arayüzünden yüklenen CSV dosyaları üzerinden çalışan asenkron bir **MVP karar destek prototipidir**.
+Aşağıdaki bileşenler Gün 7 kapsamında **uygulanmamıştır** ve sonraki günlerin (Gün 8+) geliştirme planında yer almaktadır:
 
-### 3.1. Batch Tahmin Yaşam Döngüsü Adımları
-1.  **CSV Yükleme:** Güvenlik Analisti, web arayüzünü kullanarak ağ trafiği verilerini barındıran CSV dosyasını sisteme yükler.
-2.  **Şema Doğrulama:** Backend servisleri dosyanın boyut sınırlarını ve CIC-IDS2017 şemasına (78 özellik sütunu zorunlu, Label sütunu ise opsiyonel olacak şekilde) uyumluluğunu doğrular.
-3.  **Kuyruğa Ekleme:** Doğrulama başarılı olursa veritabanında `PENDING` durumunda bir `AnalysisJob` oluşturulur ve istemciye HTTP 202 kabul yanıtı verilir.
-4.  **İşlem Başlatma:** Arka planda çalışan işçi (Background Task) görevi devralarak iş durumunu `PROCESSING` olarak günceller.
-5.  **Ön İşleme ve Tahmin:** Kaydedilmiş olan Joblib pipeline dosyası yüklenir. CSV'deki her bir satır pipeline'dan geçirilerek model tarafından saldırı olasılığı (`attack_probability`) hesaplanır.
-6.  **Risk Skorlama:** Üretilen olasılık değeri (0.0 - 1.0) temel alınarak risk skoru (0 - 100) ve risk seviyesi (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) hesaplanır.
-7.  **Veritabanı Kaydı:** Tahmin sonuçları, orijinal özellik snapshot'ları (JSONB) ile birlikte toplu (bulk insert) olarak `detection_results` tablosuna yazılır.
-8.  **İş Tamamlama:** Tüm satırlar başarıyla işlendiğinde `AnalysisJob` durumu `COMPLETED` olarak işaretlenir. Süreçte kritik bir hata alınırsa durum `FAILED` yapılır.
+- **Etiket Kodlaması (Label Encoding):** `BENIGN` → `0`, Saldırı türleri → `1` ikili etiket dönüşümü.
+- **Model Eğitimi & Sınıflandırıcılar:** Baseline `DummyClassifier`, `LogisticRegression` ve `RandomForestClassifier` modellerinin eğitilmesi.
+- **Model Seçimi ve Değerlendirme:** Precision, Recall, F1-Score, ROC-AUC ve Confusion Matrix metrikleriyle model karşılaştırması.
+- **Joblib Model Persistence:** Preprocessor ve eğitilmiş modelin tek bir scikit-learn `Pipeline` olarak `.joblib` formatında diske kaydedilmesi.
+- **Asenkron Batch Inference:** Web arayüzünden yüklenen CSV analiz işlerinin background worker tarafından `.joblib` modeli kullanılarak tahmin edilmesi ve veritabanına kaydedilmesi.
 
 ---
 
@@ -69,8 +85,6 @@ Modelin ürettiği saldırı olasılığı (`p`), risk skoru ve risk seviyelerin
 $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
 ### 4.1. Başlangıç (Provisional) Risk Eşikleri
-
-Aşağıdaki seviyeler geliştirme aşaması için belirlenmiş başlangıç değerleridir:
 
 | Risk Seviyesi (`risk_level`) | Risk Skoru Aralığı | Açıklama |
 | :--- | :--- | :--- |

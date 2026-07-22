@@ -14,7 +14,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
 - **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
 - **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
-- **Makine Öğrenmesi:** İkili sınıflandırma (normal/şüpheli), model karşılaştırma (planlandı).
+- **Makine Öğrenmesi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı (imputer + scaler) ve sızıntı korumalı (leakage-safe) train/test ayrımı uygulandı (bknz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md)). İkili sınıflandırma, model eğitimi ve risk skorlaması (planlandı).
 - **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi (planlandı).
 - **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
 - **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
