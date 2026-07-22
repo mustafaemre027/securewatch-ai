@@ -12,7 +12,7 @@ Sistemdeki veri tutarlılığını korumak ve iş kurallarını işletmek amacı
 `AnalysisJob` nesnesi, bir analist tarafından yüklenen ağ trafiği CSV dosyasının kuyruğa alınmasından tahmin sonuçlarının üretilmesine kadar geçen süreci yönetir.
 
 ### 2.1. Geçerli Durumlar
-*   **`PENDING` (Beklemede):** Dosya sisteme başarıyla yüklenmiş, SHA-256 ve şema doğrulamalarından geçmiş ve arka plan analiz sırasına (arka plan görev mekanizması/worker abstraction) eklenmiştir.
+*   **`PENDING` (Beklemede):** Dosya sisteme başarıyla yüklenmiş, MIME, uzantı, boyut, şema ve SHA-256 çift kopya kontrollerinden geçerek veritabanında kaydı oluşturulmuştur. Bu aşamada dosya gelecekteki analiz (inference) işlemini bekler. (Gelecekteki background worker entegrasyonu tamamlandığında otomatik sıraya alınacaktır).
 *   **`PROCESSING` (İşleniyor):** Arka plan işçisi (worker) görevi devralmış, CSV dosyasını satır satır okumaya, veri ön işlemeye ve makine öğrenmesi tahmini yürütmeye başlamıştır.
 *   **`COMPLETED` (Tamamlandı):** CSV dosyasındaki tüm satırlar başarıyla işlenmiş, risk skorları hesaplanmış ve `detection_results` tablosuna yazılmıştır.
 *   **`FAILED` (Başarısız):** Görevin başlatılamaması (işçi çökmesi, dosya erişim hatası vb.) veya dosya işleme sırasında herhangi bir hatanın (beklenmeyen veri formatı, bellek yetersizliği vb.) oluşması durumudur. Hata detayları `error_message` alanına kaydedilir.

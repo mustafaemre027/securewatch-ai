@@ -67,8 +67,9 @@ Kullanıcı senaryoları, platformun fonksiyonel gereksinimlerinin kullanıcı g
     3. Sistem istemci tarafında dosya uzantısını (`.csv`) ve settings üzerinden tanımlanan dosya boyut limitini kontrol eder.
     4. Analist "Analizi Başlat" butonuna tıklar.
     5. Backend tarafında dosya yüklenir, SHA-256 hash değeri kontrol edilir (aynı dosya önceden yüklendiyse reddedilir) ve sütun isimleri doğrulanır.
-    6. Doğrulama başarılıysa sistem veritabanında `PENDING` durumunda bir `AnalysisJob` oluşturur ve arka planda analiz işlemini başlatarak durumu `PROCESSING` yapar.
-    7. Analist arayüzdeki ilerleme çubuğundan analiz durumunu izler.
+    6. Doğrulama başarılıysa sistem veritabanında `PENDING` durumunda bir `AnalysisJob` oluşturur.
+    7. Gün 6 uygulamasında dosya yüklenir ve `PENDING` olarak bekler. (Background inference entegrasyonu tamamlandığında `PENDING` -> `PROCESSING` geçişi sistem tarafından yapılacaktır).
+    8. Kullanıcı mevcut durumda liste ve detay endpointleri üzerinden `PENDING` işini takip edebilir.
 *   **İlişkili Gereksinimler:** `FR-DUD-001`, `FR-DUD-002`, `FR-DUD-003`, `FR-DUD-004`, `FR-DUD-005`, `FR-DET-001`
 
 ### Senaryo B: Tehdit Analizi, Tespit Sonuçlarını İnceleme ve Yorum Ekleme

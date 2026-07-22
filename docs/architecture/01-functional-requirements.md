@@ -26,10 +26,10 @@ Tüm gereksinimler `FR-[Bileşen]-[ÜçHaneliSayı]` biçiminde etiketlenmiştir
 
 ## 4. Ağ Trafiği Veri Yükleme ve Doğrulama (DUD)
 *   **FR-DUD-001:** Yalnızca Analyst rolüne sahip kullanıcılar, batch tahmin (inference) yapılmak üzere ağ trafiği içeren inference CSV dosyası yükleyebilmelidir. Bu dosyalar, model eğitimi için çevrimdışı (offline) kullanılan 8 resmî MachineLearningCSV dosyasından bağımsızdır.
-*   **FR-DUD-002:** Yüklenen dosyaların boyutu, sistem ayarları (environment/settings) üzerinden belirlenen limiti aşmamalıdır. Kesin limit değeri, CSV yükleme modülü geliştirilirken testler eşliğinde belirlenecektir.
+*   **FR-DUD-002:** Yüklenen dosyaların boyutu, sistem ayarları (environment/settings) üzerinden belirlenen limiti aşmamalıdır. Başlangıç limiti 50 MB (52_428_800 byte) olarak yapılandırılmış olup, limit aşıldığında HTTP 413 `FILE_TOO_LARGE` hatası döndürülmelidir.
 *   **FR-DUD-003:** Sistem, yüklenen dosyanın MIME tipini ve `.csv` uzantısını doğrulamalıdır.
 *   **FR-DUD-004:** Yüklenen dosyanın bütünlüğünü korumak ve mükerrer yüklemeleri önlemek için dosyanın SHA-256 hash değeri hesaplanıp veritabanında sorgulanmalıdır. Eğer aynı hash değerine sahip bir dosya daha önce yüklenmişse işlem reddedilmelidir.
-*   **FR-DUD-005:** Yüklenen inference CSV dosyasının sütunları, CIC-IDS2017 şemasına uygun 78 adet özellik sütununu içermelidir (bu alanlar zorunludur). Veri setindeki 'Label' sütunu ise tahmin doğruluğu karşılaştırmalarında kullanılmak üzere opsiyoneldir. Eksik veya geçersiz sütun içeren dosyalar reddedilmelidir.
+*   **FR-DUD-005:** Yüklenen inference CSV dosyasının sütunları, CIC-IDS2017 şemasına uygun 78 adet özellik sütununu içermelidir (bu alanlar zorunludur). Veri setindeki 'Label' sütunu ise tahmin doğruluğu karşılaştırmalarında kullanılmak üzere opsiyoneldir. Karşılaştırmadan önce sütun isimlerindeki baş/son boşluklar (whitespace) temizlenmelidir. Eksik veya geçersiz sütun içeren dosyalar reddedilmelidir.
 
 ## 5. Makine Öğrenmesi Model Eğitimi ve Karşılaştırma (MLT)
 *   **FR-MLT-001:** Sistem, 8 adet resmî MachineLearningCSV dosyasını okuyup veri kalitesi analizi (NaN, Infinity, duplicate satır temizliği) yapacak bir ön işleme pipeline'ına sahip olmalıdır.

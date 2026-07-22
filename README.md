@@ -13,7 +13,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Kimlik Doğrulama & Güvenlik:** JWT (JSON Web Token) tabanlı oturum yönetimi, `bcrypt` ile güvenli parola hashleme ve saklama.
 - **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
 - **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
-- **Veri Yükleme:** CSV formatında ağ trafiği verisi yükleme, doğrulama ve analiz (planlandı).
+- **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
 - **Makine Öğrenmesi:** İkili sınıflandırma (normal/şüpheli), model karşılaştırma (planlandı).
 - **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi (planlandı).
 - **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
@@ -32,7 +32,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 
 ---
 
-## Kimlik Doğrulama, RBAC ve Audit Günlükleri
+## Güvenlik, RBAC ve API Uç Noktaları
 
 Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik katmanlarına sahiptir:
 
@@ -44,6 +44,9 @@ Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik kat
 | `/api/v1/users` | `POST` | `ADMIN` | Yeni kullanıcı hesabı oluşturur ve `USER_CREATED` audit kaydı düşer. |
 | `/api/v1/users` | `GET` | `ADMIN` | Sistemde kayıtlı tüm kullanıcıları listeler. |
 | `/api/v1/audit-logs` | `GET` | `ADMIN` | Sistem denetim günlüklerini listeler (kullanıcı, eylem ve tarih filtresi destekler). |
+| `/api/v1/analysis/upload` | `POST` | `ANALYST` | CIC-IDS2017 CSV dosyası yükler, doğrular ve `PENDING` analiz işi oluşturur. |
+| `/api/v1/analysis` | `GET` | `ADMIN`, `ANALYST` | Analiz işlerini listeler (Admin tümünü, Analist sadece kendi işlerini görür). |
+| `/api/v1/analysis/{job_id}` | `GET` | `ADMIN`, `ANALYST` | Belirli bir analiz işinin detaylarını getirir. |
 
 ### Audit Log Güvenlik İlkeleri
 

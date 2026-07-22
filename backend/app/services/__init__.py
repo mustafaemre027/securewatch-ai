@@ -9,6 +9,26 @@ from app.services.user_service import (
     get_user_by_username,
     list_users,
 )
+from app.services.storage_service import (
+    StagedUpload,
+    delete_finalised,
+    discard_staged,
+    finalise_upload,
+    stage_upload,
+)
+from app.services.csv_validation_service import (
+    CICIDS2017_FEATURE_COLUMNS,
+    CICIDS2017_OPTIONAL_LABEL,
+    CsvValidationResult,
+    validate_csv_metadata,
+    validate_csv_schema,
+)
+from app.services.analysis_service import (
+    get_analysis_job_by_hash,
+    get_analysis_job_by_id,
+    handle_csv_upload,
+    list_analysis_jobs,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -20,4 +40,18 @@ __all__ = [
     "create_audit_log",
     "list_audit_logs",
     "authenticate_user",
+    "StagedUpload",
+    "stage_upload",
+    "finalise_upload",
+    "discard_staged",
+    "delete_finalised",
+    "CICIDS2017_FEATURE_COLUMNS",
+    "CICIDS2017_OPTIONAL_LABEL",
+    "CsvValidationResult",
+    "validate_csv_metadata",
+    "validate_csv_schema",
+    "get_analysis_job_by_hash",
+    "get_analysis_job_by_id",
+    "list_analysis_jobs",
+    "handle_csv_upload",
 ]

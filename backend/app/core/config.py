@@ -1,4 +1,6 @@
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -33,6 +35,8 @@ class Settings(BaseSettings):
         jwt_secret_key (str): Secret key for signing JWT tokens (required, min 32 chars).
         jwt_algorithm (str): Algorithm used for JWT signing.
         access_token_expire_minutes (int): JWT token expiry duration in minutes.
+        upload_dir (Path): Storage directory path for uploaded CSV files.
+        max_upload_size_bytes (int): Maximum allowed CSV upload size in bytes (default: 52428800 = 50MB).
     """
     app_name: str = "SecureWatch AI"
     app_version: str = "0.1.0"
@@ -43,6 +47,51 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    upload_dir: Path = Path("../data/uploads")
+    max_upload_size_bytes: int = 52428800
+
+    @field_validator("upload_dir", mode="before")
+    @classmethod
+    def validate_upload_dir(cls, v: Any) -> Path:
+        """Validate and resolve upload directory path.
+
+        Ensures path is a pathlib.Path and relative paths are resolved relative to
+        the project root to prevent working-directory dependent path issues.
+
+        Args:
+            v (Any): Raw upload directory path (str or Path).
+
+        Returns:
+            Path: Resolved pathlib.Path object.
+        """
+        path = Path(v) if isinstance(v, str) else v
+        if not path.is_absolute():
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            repo_root = backend_dir.parent
+            if path.parts and path.parts[0] == "..":
+                return (backend_dir / path).resolve()
+            return (repo_root / path).resolve()
+        return path
+
+    @field_validator("max_upload_size_bytes")
+    @classmethod
+    def validate_max_upload_size_bytes(cls, v: int) -> int:
+        """Validate max_upload_size_bytes is strictly positive.
+
+        Args:
+            v (int): Maximum upload size in bytes.
+
+        Returns:
+            int: Validated size in bytes.
+
+        Raises:
+            ValueError: If size is zero or negative.
+        """
+        if v <= 0:
+            raise ValueError(
+                f"MAX_UPLOAD_SIZE_BYTES must be a positive integer greater than zero (got {v})."
+            )
+        return v
 
     @field_validator("jwt_secret_key")
     @classmethod

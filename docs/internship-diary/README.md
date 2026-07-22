@@ -27,6 +27,7 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | `day-03.md` | Gün 3 kaydı — Batch inference modülü, risk skorlama ve açıklanabilir kural motoru |
 | `day-04.md` | Gün 4 kaydı — FastAPI backend altyapısı, PostgreSQL 18, Alembic ve sağlık kontrolleri |
 | `day-05.md` | Gün 5 kaydı — Authentication (JWT, bcrypt), RBAC rolleri ve denetim günlükleri (Audit Logging) |
+| `day-06.md` | Gün 6 kaydı: Güvenli CSV yükleme, CIC-IDS2017 şema doğrulaması ve AnalysisJob durum takibi |
 
 ## Format
 
