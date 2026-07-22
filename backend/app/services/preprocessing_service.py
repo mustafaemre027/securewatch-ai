@@ -2,6 +2,12 @@ import logging
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd
+from typing import List, Optional
+
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from app.core.exceptions import AppException
 from app.services.csv_validation_service import (
@@ -144,4 +150,81 @@ def prepare_training_data(df: pd.DataFrame) -> TrainingDataResult:
         initial_row_count=initial_row_count,
         dropped_duplicate_count=dropped_duplicate_count,
         final_row_count=final_row_count,
+    )
+
+
+def build_sklearn_preprocessing_pipeline(
+    numeric_features: Optional[List[str]] = None,
+    categorical_features: Optional[List[str]] = None,
+) -> ColumnTransformer:
+    """
+    Builds an unfitted scikit-learn ColumnTransformer for preprocessing CIC-IDS2017 data.
+
+    Args:
+        numeric_features: List of numeric column names. Defaults to all 77 features.
+        categorical_features: List of categorical column names. Defaults to an empty list.
+
+    Returns:
+        ColumnTransformer: An unfitted scikit-learn ColumnTransformer instance.
+
+    Raises:
+        AppException: If there's an overlap between numeric and categorical features,
+                      or if duplicate/empty feature names are provided.
+    """
+    if numeric_features is None:
+        numeric_features = [col for col in CICIDS2017_FEATURE_COLUMNS if col != REDUNDANT_COLUMN]
+    if categorical_features is None:
+        categorical_features = []
+
+    # Validate empty names
+    if any(not str(col).strip() for col in numeric_features + categorical_features):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Feature lists cannot contain empty column names."
+        )
+
+    # Validate duplicates within lists
+    if len(numeric_features) != len(set(numeric_features)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Numeric feature list contains duplicate column names."
+        )
+    if len(categorical_features) != len(set(categorical_features)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Categorical feature list contains duplicate column names."
+        )
+
+    # Validate intersection
+    overlap = set(numeric_features).intersection(set(categorical_features))
+    if overlap:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="A feature cannot be both numeric and categorical.",
+            details={"overlapping_features": sorted(list(overlap))}
+        )
+
+    transformers = []
+
+    if numeric_features:
+        num_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median", keep_empty_features=True)),
+            ("scaler", StandardScaler())
+        ])
+        transformers.append(("num", num_pipeline, list(numeric_features)))
+
+    if categorical_features:
+        cat_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="most_frequent", keep_empty_features=True)),
+            ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ])
+        transformers.append(("cat", cat_pipeline, list(categorical_features)))
+
+    return ColumnTransformer(
+        transformers=transformers,
+        remainder="drop"
     )
