@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.compose import ColumnTransformer
 
 from app.core.exceptions import AppException
@@ -12,6 +13,7 @@ from app.services.model_service import (
     ClassificationMetrics,
     ModelTrainingResult,
     train_dummy_classifier,
+    train_logistic_regression,
 )
 from app.services.preprocessing_service import SplitDataResult
 
@@ -497,3 +499,228 @@ def test_dummy_classifier_validation_error_code(synthetic_split_data):
         train_dummy_classifier(None)  # type: ignore
     assert excinfo.value.status_code == 422
     assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_training_success(synthetic_split_data):
+    """Test 1: Logistic Regression modelinin başarıyla eğitilmesi."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert isinstance(result, ModelTrainingResult)
+
+
+def test_lr_estimator_is_lr(synthetic_split_data):
+    """Test 2: Estimator'ın LogisticRegression olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert isinstance(result.estimator, LogisticRegression)
+
+
+def test_lr_default_class_weight(synthetic_split_data):
+    """Test 3: Varsayılan class_weight değerinin 'balanced' olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert result.estimator.class_weight == "balanced"
+
+
+def test_lr_default_params(synthetic_split_data):
+    """Test 4: max_iter=1000, solver='lbfgs' ve random_state=42 parametrelerinin doğrulanması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert result.estimator.max_iter == 1000
+    assert result.estimator.solver == "lbfgs"
+    assert result.estimator.random_state == 42
+
+
+def test_lr_model_name(synthetic_split_data):
+    """Test 5: model_name değerinin logistic_regression olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert result.model_name == "logistic_regression"
+
+
+def test_lr_classes_(synthetic_split_data):
+    """Test 6: Estimator'ın classes_ değerlerinin [0, 1] olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert result.estimator.classes_.tolist() == [0, 1]
+
+
+def test_lr_coef_shape(synthetic_split_data):
+    """Test 7: Katsayı feature boyutunun X_train feature sayısıyla eşleşmesi."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert result.estimator.coef_.shape[1] == synthetic_split_data.X_train.shape[1]
+
+
+def test_lr_predictions_length(synthetic_split_data):
+    """Test 8: Tahmin sayısının X_test satır sayısıyla eşleşmesi."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert len(result.predictions) == len(synthetic_split_data.X_test)
+
+
+def test_lr_predictions_type_and_values(synthetic_split_data):
+    """Test 9: Tahminlerin immutable tuple ve yalnızca 0/1 olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    assert isinstance(result.predictions, tuple)
+    assert set(result.predictions).issubset({0, 1})
+
+
+def test_lr_metrics_match(synthetic_split_data):
+    """Test 10: Metriklerin evaluate_binary_classification sonucu ile eşleşmesi."""
+    result = train_logistic_regression(synthetic_split_data)
+    expected_metrics = evaluate_binary_classification(
+        synthetic_split_data.y_test,
+        result.predictions
+    )
+    assert result.metrics == expected_metrics
+
+
+def test_lr_confusion_matrix_structure(synthetic_split_data):
+    """Test 11: Confusion matrix ve tn/fp/fn/tp değerlerinin doğru olması."""
+    result = train_logistic_regression(synthetic_split_data)
+    cm = result.metrics.confusion_matrix
+    assert result.metrics.tn == cm[0][0]
+    assert result.metrics.fp == cm[0][1]
+    assert result.metrics.fn == cm[1][0]
+    assert result.metrics.tp == cm[1][1]
+
+
+def test_lr_deterministic(synthetic_split_data):
+    """Test 12: Aynı veri ve parametrelerle deterministik sonuç üretilmesi."""
+    res1 = train_logistic_regression(synthetic_split_data)
+    res2 = train_logistic_regression(synthetic_split_data)
+    assert res1.predictions == res2.predictions
+    assert np.allclose(res1.estimator.coef_, res2.estimator.coef_)
+
+
+def test_lr_test_targets_not_used(synthetic_split_data):
+    """Test 13/14: Modelin yalnızca training verisinde fit edilmesi ve y_test'in fit işlemine sızmaması."""
+    split_data_modified = synthetic_split_data
+    split_data_modified.y_test[:] = 1  # Changing test targets should not change predictions
+    res1 = train_logistic_regression(synthetic_split_data)
+    res2 = train_logistic_regression(split_data_modified)
+    assert res1.predictions == res2.predictions
+
+
+def test_lr_input_not_mutated(synthetic_split_data):
+    """Test 15: Girdi SplitDataResult içeriğinin değiştirilmemesi."""
+    X_train_copy = synthetic_split_data.X_train.copy(deep=True)
+    y_train_copy = synthetic_split_data.y_train.copy(deep=True)
+    X_test_copy = synthetic_split_data.X_test.copy(deep=True)
+    y_test_copy = synthetic_split_data.y_test.copy(deep=True)
+
+    train_logistic_regression(synthetic_split_data)
+
+    pd.testing.assert_frame_equal(synthetic_split_data.X_train, X_train_copy)
+    pd.testing.assert_series_equal(synthetic_split_data.y_train, y_train_copy)
+    pd.testing.assert_frame_equal(synthetic_split_data.X_test, X_test_copy)
+    pd.testing.assert_series_equal(synthetic_split_data.y_test, y_test_copy)
+
+
+def test_lr_supports_none_weight(synthetic_split_data):
+    """Test 16: class_weight=None seçeneğinin desteklenmesi."""
+    result = train_logistic_regression(synthetic_split_data, class_weight=None)
+    assert result.estimator.class_weight is None
+
+
+def test_lr_supports_dict_weight(synthetic_split_data):
+    """Test 17: Geçerli özel sınıf ağırlığının desteklenmesi."""
+    custom_weight = {0: 1.0, 1: 5.0}
+    result = train_logistic_regression(synthetic_split_data, class_weight=custom_weight)
+    assert result.estimator.class_weight == custom_weight
+
+
+def test_lr_rejects_invalid_string_weight(synthetic_split_data):
+    """Test 18: Geçersiz string class weight değerinin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        train_logistic_regression(synthetic_split_data, class_weight="unbalanced")
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_invalid_dict_keys(synthetic_split_data):
+    """Test 19: Eksik veya fazladan dictionary anahtarlarının reddedilmesi."""
+    invalid_weights = [{0: 1.0}, {0: 1.0, 1: 1.0, 2: 1.0}, {"0": 1.0, "1": 1.0}]
+    for cw in invalid_weights:
+        with pytest.raises(AppException) as excinfo:
+            train_logistic_regression(synthetic_split_data, class_weight=cw)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_invalid_dict_values(synthetic_split_data):
+    """Test 20: Sıfır, negatif, sonsuz, NaN, boolean ve metin ağırlıkların reddedilmesi."""
+    invalid_weights = [
+        {0: 0, 1: 1},
+        {0: -1.0, 1: 1.0},
+        {0: np.inf, 1: 1.0},
+        {0: np.nan, 1: 1.0},
+        {0: True, 1: 1.0},
+        {0: "1.0", 1: 1.0}
+    ]
+    for cw in invalid_weights:
+        with pytest.raises(AppException) as excinfo:
+            train_logistic_regression(synthetic_split_data, class_weight=cw)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_empty_splits(synthetic_split_data):
+    """Test 21: Boş veya uyumsuz train/test verisinin reddedilmesi (Empty)."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        X_train=pd.DataFrame()
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_logistic_regression(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_non_binary_targets(synthetic_split_data):
+    """Test 22: Binary olmayan hedeflerin reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        y_train=pd.Series([0, 1, 2, 0])
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_logistic_regression(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_single_class_training(synthetic_split_data):
+    """Test 23: Tek sınıflı training hedefinin reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        y_train=pd.Series([0, 0, 0, 0])
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_logistic_regression(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_rejects_invalid_feature_values(synthetic_split_data):
+    """Test 24: Sayısal olmayan veya sonlu olmayan feature değerlerinin reddedilmesi."""
+    import dataclasses
+    invalid_splits = [
+        dataclasses.replace(synthetic_split_data, X_train=pd.DataFrame({"f1": [np.nan, 2, 3, 4], "f2": [5, 6, 7, 8]})),
+        dataclasses.replace(synthetic_split_data, X_train=pd.DataFrame({"f1": [np.inf, 2, 3, 4], "f2": [5, 6, 7, 8]})),
+        dataclasses.replace(synthetic_split_data, X_train=pd.DataFrame({"f1": ["a", "b", "c", "d"], "f2": [5, 6, 7, 8]}))
+    ]
+    for inv in invalid_splits:
+        with pytest.raises(AppException) as excinfo:
+            train_logistic_regression(inv)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_validation_error_code(synthetic_split_data):
+    """Test 25: Geçersiz girdilerde 422 ve VALIDATION_ERROR sözleşmesinin korunması."""
+    with pytest.raises(AppException) as excinfo:
+        train_logistic_regression("invalid")  # type: ignore
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_no_warnings(synthetic_split_data):
+    """Test 27: Eğitim sırasında hiçbir warning oluşmaması (ConvergenceWarning vs)."""
+    # -W error parametresiyle test edildiği için warning oluşursa test doğrudan patlar
+    train_logistic_regression(synthetic_split_data)

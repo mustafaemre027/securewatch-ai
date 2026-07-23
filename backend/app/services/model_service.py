@@ -4,6 +4,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Any
 from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -208,19 +209,7 @@ class ModelTrainingResult:
     metrics: ClassificationMetrics
 
 
-def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
-    """
-    Trains and evaluates a baseline DummyClassifier.
-
-    Args:
-        split_data: The result of preprocessing, containing train/test splits.
-
-    Returns:
-        ModelTrainingResult: Results containing the trained estimator, predictions, and metrics.
-
-    Raises:
-        AppException: If input validation fails.
-    """
+def _validate_training_data(split_data: SplitDataResult):
     if not isinstance(split_data, SplitDataResult):
         raise AppException(
             status_code=422,
@@ -278,6 +267,66 @@ def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
             message="Targets cannot contain NaN values."
         )
 
+
+def _validate_class_weight(class_weight: Any):
+    if class_weight is None or class_weight == "balanced":
+        return
+
+    if isinstance(class_weight, dict):
+        if set(class_weight.keys()) != {0, 1}:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="class_weight dictionary must have exactly keys 0 and 1."
+            )
+        for k, v in class_weight.items():
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be numeric."
+                )
+            if pd.isna(v) or np.isinf(v):
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be finite numbers."
+                )
+            if v <= 0:
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be positive."
+                )
+        return
+
+    raise AppException(
+        status_code=422,
+        code="VALIDATION_ERROR",
+        message="class_weight must be 'balanced', None, or a dictionary with keys 0 and 1."
+    )
+
+
+def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
+    """
+    Trains and evaluates a baseline DummyClassifier.
+
+    Args:
+        split_data: The result of preprocessing, containing train/test splits.
+
+    Returns:
+        ModelTrainingResult: Results containing the trained estimator, predictions, and metrics.
+
+    Raises:
+        AppException: If input validation fails.
+    """
+    _validate_training_data(split_data)
+
+    X_train = split_data.X_train
+    y_train = split_data.y_train
+    X_test = split_data.X_test
+    y_test = split_data.y_test
+
     # Defensive copy to avoid mutating source dataset
     X_train_clean = X_train.copy(deep=True)
     y_train_clean = y_train.copy(deep=True)
@@ -299,6 +348,75 @@ def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
     return ModelTrainingResult(
         model_name="dummy_classifier",
         estimator=dummy,
+        predictions=predictions_tuple,
+        metrics=metrics
+    )
+
+
+def train_logistic_regression(
+    split_data: SplitDataResult,
+    class_weight: Any = "balanced"
+) -> ModelTrainingResult:
+    """
+    Trains and evaluates a LogisticRegression baseline model.
+    """
+    _validate_training_data(split_data)
+    _validate_class_weight(class_weight)
+
+    try:
+        X_train_np = split_data.X_train.to_numpy()
+        X_test_np = split_data.X_test.to_numpy()
+
+        if X_train_np.dtype.kind not in {'i', 'f', 'u'} or X_test_np.dtype.kind not in {'i', 'f', 'u'}:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features must be numeric."
+            )
+
+        if np.isnan(X_train_np).any() or np.isnan(X_test_np).any():
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features cannot contain NaN."
+            )
+
+        if np.isinf(X_train_np).any() or np.isinf(X_test_np).any():
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features cannot contain infinite values."
+            )
+    except Exception as e:
+        if isinstance(e, AppException):
+            raise
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Features validation failed."
+        )
+
+    X_train_clean = split_data.X_train.copy(deep=True)
+    y_train_clean = split_data.y_train.copy(deep=True)
+    X_test_clean = split_data.X_test.copy(deep=True)
+
+    model = LogisticRegression(
+        class_weight=class_weight,
+        max_iter=1000,
+        solver="lbfgs",
+        random_state=42
+    )
+
+    model.fit(X_train_clean, y_train_clean)
+
+    preds_arr = model.predict(X_test_clean)
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    metrics = evaluate_binary_classification(split_data.y_test, preds_arr)
+
+    return ModelTrainingResult(
+        model_name="logistic_regression",
+        estimator=model,
         predictions=predictions_tuple,
         metrics=metrics
     )
