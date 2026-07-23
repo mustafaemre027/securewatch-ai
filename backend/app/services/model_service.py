@@ -1,0 +1,584 @@
+import logging
+import numpy as np
+import pandas as pd
+from dataclasses import dataclass
+from typing import Any
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+)
+
+from app.core.exceptions import AppException
+from app.services.preprocessing_service import (
+    SplitDataResult,
+    TrainingDataResult,
+    build_sklearn_preprocessing_pipeline,
+    prepare_training_data,
+    split_and_transform_data,
+)
+
+logger = logging.getLogger(__name__)
+
+def encode_binary_labels(labels: pd.Series) -> pd.Series:
+    """
+    Encodes CIC-IDS2017 labels into binary classification targets.
+    BENIGN -> 0, any attack -> 1.
+
+    Args:
+        labels: A pandas Series containing string labels.
+
+    Returns:
+        pd.Series: A new Series containing only integer 0 and 1 values,
+                   with the same index and name as the input.
+
+    Raises:
+        AppException: If input validation fails.
+    """
+    if not isinstance(labels, pd.Series):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Input must be a pandas Series."
+        )
+
+    if labels.empty:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Input Series cannot be empty."
+        )
+
+    if labels.isna().any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Labels cannot contain NaN or None values."
+        )
+
+    if not all(isinstance(val, str) for val in labels):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="All label values must be strings."
+        )
+
+    # Operate on a deep copy to ensure original series is untouched
+    processed = labels.copy(deep=True)
+
+    # Clean whitespace and normalize case
+    processed = processed.str.strip().str.upper()
+
+    if (processed == "").any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Labels cannot contain empty or whitespace-only strings."
+        )
+
+    # BENIGN becomes 0, all other attacks become 1
+    encoded = pd.Series(1, index=processed.index, name=processed.name, dtype=int)
+
+    benign_mask = processed == "BENIGN"
+    encoded.loc[benign_mask] = 0
+
+    return encoded
+
+
+@dataclass(frozen=True)
+class ClassificationMetrics:
+    """Immutable struct for binary classification evaluation results."""
+    accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
+    confusion_matrix: tuple
+    tn: int
+    fp: int
+    fn: int
+    tp: int
+
+
+def evaluate_binary_classification(y_true, y_pred) -> ClassificationMetrics:
+    """
+    Evaluates binary classification predictions.
+    Positive class is 1, negative class is 0.
+
+    Args:
+        y_true: Array-like true labels.
+        y_pred: Array-like predicted labels.
+
+    Returns:
+        ClassificationMetrics: Evaluation metrics and confusion matrix.
+
+    Raises:
+        AppException: If input validation fails.
+    """
+    try:
+        y_true_arr = np.asarray(y_true)
+        y_pred_arr = np.asarray(y_pred)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs must be array-like."
+        )
+
+    if y_true_arr.size == 0 or y_pred_arr.size == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot be empty."
+        )
+
+    if y_true_arr.shape != y_pred_arr.shape:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="y_true and y_pred must have the same length."
+        )
+
+    if y_true_arr.ndim != 1 or y_pred_arr.ndim != 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs must be 1-dimensional."
+        )
+
+    if y_true_arr.dtype.kind not in {'i', 'u', 'f'} or y_pred_arr.dtype.kind not in {'i', 'u', 'f'}:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain text or non-numeric values."
+        )
+
+    if np.isnan(y_true_arr).any() or np.isnan(y_pred_arr).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain NaN."
+        )
+
+    if np.isinf(y_true_arr).any() or np.isinf(y_pred_arr).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain infinite values."
+        )
+
+    if not np.isin(y_true_arr, [0, 1]).all() or not np.isin(y_pred_arr, [0, 1]).all():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs must contain only 0 and 1."
+        )
+
+    acc = float(accuracy_score(y_true_arr, y_pred_arr))
+    prec = float(precision_score(y_true_arr, y_pred_arr, pos_label=1, zero_division=0))
+    rec = float(recall_score(y_true_arr, y_pred_arr, pos_label=1, zero_division=0))
+    f1 = float(f1_score(y_true_arr, y_pred_arr, pos_label=1, zero_division=0))
+
+    cm = confusion_matrix(y_true_arr, y_pred_arr, labels=[0, 1])
+    tn, fp, fn, tp = int(cm[0, 0]), int(cm[0, 1]), int(cm[1, 0]), int(cm[1, 1])
+
+    cm_tuple = ((tn, fp), (fn, tp))
+
+    return ClassificationMetrics(
+        accuracy=acc,
+        precision=prec,
+        recall=rec,
+        f1_score=f1,
+        confusion_matrix=cm_tuple,
+        tn=tn,
+        fp=fp,
+        fn=fn,
+        tp=tp
+    )
+
+
+@dataclass(frozen=True)
+class ModelTrainingResult:
+    """
+    Immutable structure for storing model training and evaluation results.
+
+    Note: The `estimator` object inside this frozen dataclass is a scikit-learn
+    estimator and is intrinsically mutable. Deep immutability is not guaranteed
+    for the estimator itself.
+    """
+    model_name: str
+    estimator: Any
+    predictions: tuple[int, ...]
+    metrics: ClassificationMetrics
+
+
+def _validate_training_data(split_data: SplitDataResult):
+    if not isinstance(split_data, SplitDataResult):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Input must be a SplitDataResult object."
+        )
+
+    X_train = split_data.X_train
+    y_train = split_data.y_train
+    X_test = split_data.X_test
+    y_test = split_data.y_test
+
+    if X_train.empty or y_train.empty or X_test.empty or y_test.empty:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training and test features or targets cannot be empty."
+        )
+
+    if len(X_train) != len(y_train) or len(X_test) != len(y_test):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Row counts for features and targets must match within each split."
+        )
+
+    if X_train.shape[1] != X_test.shape[1]:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Feature counts for train and test splits must match."
+        )
+
+    y_train_unique = y_train.unique()
+    y_test_unique = y_test.unique()
+
+    if not np.isin(y_train_unique, [0, 1]).all() or not np.isin(y_test_unique, [0, 1]).all():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain only binary values 0 and 1."
+        )
+
+    if len(y_train_unique) < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training targets must contain both classes (0 and 1)."
+        )
+
+    if y_train.isna().any() or y_test.isna().any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets cannot contain NaN values."
+        )
+
+
+def _validate_class_weight(class_weight: Any):
+    if class_weight is None or class_weight == "balanced":
+        return
+
+    if isinstance(class_weight, dict):
+        if set(class_weight.keys()) != {0, 1}:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="class_weight dictionary must have exactly keys 0 and 1."
+            )
+        for k, v in class_weight.items():
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be numeric."
+                )
+            if pd.isna(v) or np.isinf(v):
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be finite numbers."
+                )
+            if v <= 0:
+                raise AppException(
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="class_weight values must be positive."
+                )
+        return
+
+    raise AppException(
+        status_code=422,
+        code="VALIDATION_ERROR",
+        message="class_weight must be 'balanced', None, or a dictionary with keys 0 and 1."
+    )
+
+
+def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
+    """
+    Trains and evaluates a baseline DummyClassifier.
+
+    Args:
+        split_data: The result of preprocessing, containing train/test splits.
+
+    Returns:
+        ModelTrainingResult: Results containing the trained estimator, predictions, and metrics.
+
+    Raises:
+        AppException: If input validation fails.
+    """
+    _validate_training_data(split_data)
+
+    X_train = split_data.X_train
+    y_train = split_data.y_train
+    X_test = split_data.X_test
+    y_test = split_data.y_test
+
+    # Defensive copy to avoid mutating source dataset
+    X_train_clean = X_train.copy(deep=True)
+    y_train_clean = y_train.copy(deep=True)
+    X_test_clean = X_test.copy(deep=True)
+
+    # Train dummy classifier
+    dummy = DummyClassifier(strategy="most_frequent", random_state=42)
+    dummy.fit(X_train_clean, y_train_clean)
+
+    # Predict only on test set
+    preds_arr = dummy.predict(X_test_clean)
+
+    # Tuple conversion for immutability
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    # Evaluate metrics against y_test
+    metrics = evaluate_binary_classification(y_test, preds_arr)
+
+    return ModelTrainingResult(
+        model_name="dummy_classifier",
+        estimator=dummy,
+        predictions=predictions_tuple,
+        metrics=metrics
+    )
+
+
+def train_logistic_regression(
+    split_data: SplitDataResult,
+    class_weight: Any = "balanced"
+) -> ModelTrainingResult:
+    """
+    Trains and evaluates a LogisticRegression baseline model.
+    """
+    _validate_training_data(split_data)
+    _validate_class_weight(class_weight)
+
+    try:
+        X_train_np = split_data.X_train.to_numpy()
+        X_test_np = split_data.X_test.to_numpy()
+
+        if X_train_np.dtype.kind not in {'i', 'f', 'u'} or X_test_np.dtype.kind not in {'i', 'f', 'u'}:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features must be numeric."
+            )
+
+        if np.isnan(X_train_np).any() or np.isnan(X_test_np).any():
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features cannot contain NaN."
+            )
+
+        if np.isinf(X_train_np).any() or np.isinf(X_test_np).any():
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Features cannot contain infinite values."
+            )
+    except Exception as e:
+        if isinstance(e, AppException):
+            raise
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Features validation failed."
+        )
+
+    X_train_clean = split_data.X_train.copy(deep=True)
+    y_train_clean = split_data.y_train.copy(deep=True)
+    X_test_clean = split_data.X_test.copy(deep=True)
+
+    model = LogisticRegression(
+        class_weight=class_weight,
+        max_iter=1000,
+        solver="lbfgs",
+        random_state=42
+    )
+
+    model.fit(X_train_clean, y_train_clean)
+
+    preds_arr = model.predict(X_test_clean)
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    metrics = evaluate_binary_classification(split_data.y_test, preds_arr)
+
+    return ModelTrainingResult(
+        model_name="logistic_regression",
+        estimator=model,
+        predictions=predictions_tuple,
+        metrics=metrics
+    )
+
+
+@dataclass(frozen=True)
+class BaselineTrainingReport:
+    """
+    Immutable report containing the full baseline training evaluation results.
+
+    Note: The ``estimator`` objects inside the nested ``ModelTrainingResult``
+    instances are scikit-learn models and are intrinsically mutable. Deep
+    immutability of the estimators is not guaranteed.
+
+    This report is descriptive only; it does not declare a winner or final
+    model, and must not be interpreted as a model selection decision.
+    """
+    initial_row_count: int
+    dropped_duplicate_count: int
+    final_row_count: int
+    feature_count: int
+    train_row_count: int
+    test_row_count: int
+    train_class_distribution: tuple
+    test_class_distribution: tuple
+    dummy_result: ModelTrainingResult
+    logistic_result: ModelTrainingResult
+
+
+def train_baseline_models(df: pd.DataFrame) -> BaselineTrainingReport:
+    """
+    Runs the full end-to-end baseline training workflow.
+
+    Workflow (in order):
+      1. Validate and prepare training data via prepare_training_data.
+      2. Encode raw Label strings to binary 0/1 targets (BENIGN=0, attack=1).
+      3. Construct a binary-label TrainingDataResult (no mutation of originals).
+      4. Build an unfitted sklearn preprocessor.
+      5. Split and transform data (stratified on binary target, leakage-safe).
+      6. Train DummyClassifier baseline.
+      7. Train LogisticRegression with balanced class weights.
+      8. Return a BaselineTrainingReport with both results.
+
+    Args:
+        df: Raw CIC-IDS2017 DataFrame with all 78 feature columns + Label.
+
+    Returns:
+        BaselineTrainingReport: Full evaluation results for both models.
+
+    Raises:
+        AppException: If any validation step fails.
+    """
+    # Step 1: Validate schema and prepare raw training data
+    raw_result = prepare_training_data(df)
+
+    # Step 2: Encode raw attack labels to binary targets BEFORE split
+    binary_targets = encode_binary_labels(raw_result.targets)
+
+    # Step 3: Build an independent TrainingDataResult with binary targets
+    binary_result = TrainingDataResult(
+        features=raw_result.features.copy(deep=True),
+        targets=binary_targets,
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+    )
+
+    # Step 4: Build a fresh unfitted preprocessor
+    preprocessor = build_sklearn_preprocessing_pipeline()
+
+    # Step 5: Stratified split and leakage-safe transform (binary target used)
+    split_data = split_and_transform_data(binary_result, preprocessor)
+
+    # Compute class distributions from the binary split targets
+    train_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_train.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+    test_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_test.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+
+    # Step 6: Train DummyClassifier baseline
+    dummy_result = train_dummy_classifier(split_data)
+
+    # Step 7: Train LogisticRegression with balanced class weights
+    logistic_result = train_logistic_regression(split_data, class_weight="balanced")
+
+    feature_count = binary_result.features.shape[1]
+
+    return BaselineTrainingReport(
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+        feature_count=feature_count,
+        train_row_count=len(split_data.X_train),
+        test_row_count=len(split_data.X_test),
+        train_class_distribution=train_dist,
+        test_class_distribution=test_dist,
+        dummy_result=dummy_result,
+        logistic_result=logistic_result,
+    )
+
+
+def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) -> dict:
+    """Converts a ModelTrainingResult to a JSON-safe dictionary."""
+    m = result.metrics
+    sample = list(result.predictions[:max_sample])
+    return {
+        "model_name": str(result.model_name),
+        "prediction_count": int(len(result.predictions)),
+        "prediction_sample": [int(p) for p in sample],
+        "accuracy": float(m.accuracy),
+        "precision": float(m.precision),
+        "recall": float(m.recall),
+        "f1_score": float(m.f1_score),
+        "confusion_matrix": [
+            [int(m.tn), int(m.fp)],
+            [int(m.fn), int(m.tp)]
+        ],
+        "tn": int(m.tn),
+        "fp": int(m.fp),
+        "fn": int(m.fn),
+        "tp": int(m.tp),
+    }
+
+
+def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
+    """
+    Converts a BaselineTrainingReport to a JSON-safe dictionary.
+
+    No estimator objects, raw data rows, or feature values are included.
+    All numeric values are converted to Python-native int/float types.
+    """
+    return {
+        "dataset": {
+            "initial_row_count": int(report.initial_row_count),
+            "dropped_duplicate_count": int(report.dropped_duplicate_count),
+            "final_row_count": int(report.final_row_count),
+            "feature_count": int(report.feature_count),
+            "train_row_count": int(report.train_row_count),
+            "test_row_count": int(report.test_row_count),
+            "train_class_distribution": {
+                str(k): int(v) for k, v in report.train_class_distribution
+            },
+            "test_class_distribution": {
+                str(k): int(v) for k, v in report.test_class_distribution
+            },
+        },
+        "models": {
+            "dummy_classifier": _model_result_to_dict(report.dummy_result),
+            "logistic_regression": _model_result_to_dict(report.logistic_result),
+        },
+    }
