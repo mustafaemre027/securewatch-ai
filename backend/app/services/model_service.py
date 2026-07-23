@@ -2,6 +2,8 @@ import logging
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
+from typing import Any
+from sklearn.dummy import DummyClassifier
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -11,6 +13,7 @@ from sklearn.metrics import (
 )
 
 from app.core.exceptions import AppException
+from app.services.preprocessing_service import SplitDataResult
 
 logger = logging.getLogger(__name__)
 
@@ -187,4 +190,115 @@ def evaluate_binary_classification(y_true, y_pred) -> ClassificationMetrics:
         fp=fp,
         fn=fn,
         tp=tp
+    )
+
+
+@dataclass(frozen=True)
+class ModelTrainingResult:
+    """
+    Immutable structure for storing model training and evaluation results.
+
+    Note: The `estimator` object inside this frozen dataclass is a scikit-learn
+    estimator and is intrinsically mutable. Deep immutability is not guaranteed
+    for the estimator itself.
+    """
+    model_name: str
+    estimator: Any
+    predictions: tuple[int, ...]
+    metrics: ClassificationMetrics
+
+
+def train_dummy_classifier(split_data: SplitDataResult) -> ModelTrainingResult:
+    """
+    Trains and evaluates a baseline DummyClassifier.
+
+    Args:
+        split_data: The result of preprocessing, containing train/test splits.
+
+    Returns:
+        ModelTrainingResult: Results containing the trained estimator, predictions, and metrics.
+
+    Raises:
+        AppException: If input validation fails.
+    """
+    if not isinstance(split_data, SplitDataResult):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Input must be a SplitDataResult object."
+        )
+
+    X_train = split_data.X_train
+    y_train = split_data.y_train
+    X_test = split_data.X_test
+    y_test = split_data.y_test
+
+    if X_train.empty or y_train.empty or X_test.empty or y_test.empty:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training and test features or targets cannot be empty."
+        )
+
+    if len(X_train) != len(y_train) or len(X_test) != len(y_test):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Row counts for features and targets must match within each split."
+        )
+
+    if X_train.shape[1] != X_test.shape[1]:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Feature counts for train and test splits must match."
+        )
+
+    y_train_unique = y_train.unique()
+    y_test_unique = y_test.unique()
+
+    if not np.isin(y_train_unique, [0, 1]).all() or not np.isin(y_test_unique, [0, 1]).all():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain only binary values 0 and 1."
+        )
+
+    if len(y_train_unique) < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training targets must contain both classes (0 and 1)."
+        )
+
+    if y_train.isna().any() or y_test.isna().any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets cannot contain NaN values."
+        )
+
+    # Defensive copy to avoid mutating source dataset
+    X_train_clean = X_train.copy(deep=True)
+    y_train_clean = y_train.copy(deep=True)
+    X_test_clean = X_test.copy(deep=True)
+
+    # Train dummy classifier
+    dummy = DummyClassifier(strategy="most_frequent", random_state=42)
+    dummy.fit(X_train_clean, y_train_clean)
+
+    # Predict only on test set
+    preds_arr = dummy.predict(X_test_clean)
+
+    # Tuple conversion for immutability
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    # Evaluate metrics against y_test
+    metrics = evaluate_binary_classification(y_test, preds_arr)
+
+    return ModelTrainingResult(
+        model_name="dummy_classifier",
+        estimator=dummy,
+        predictions=predictions_tuple,
+        metrics=metrics
     )

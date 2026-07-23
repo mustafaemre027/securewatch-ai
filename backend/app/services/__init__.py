@@ -40,6 +40,8 @@ from app.services.model_service import (
     encode_binary_labels,
     ClassificationMetrics,
     evaluate_binary_classification,
+    ModelTrainingResult,
+    train_dummy_classifier,
 )
 
 __all__ = [
@@ -74,4 +76,6 @@ __all__ = [
     "encode_binary_labels",
     "ClassificationMetrics",
     "evaluate_binary_classification",
+    "ModelTrainingResult",
+    "train_dummy_classifier",
 ]

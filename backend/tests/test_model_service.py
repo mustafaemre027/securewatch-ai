@@ -2,8 +2,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from sklearn.dummy import DummyClassifier
+from sklearn.compose import ColumnTransformer
+
 from app.core.exceptions import AppException
-from app.services.model_service import encode_binary_labels, evaluate_binary_classification, ClassificationMetrics
+from app.services.model_service import (
+    encode_binary_labels,
+    evaluate_binary_classification,
+    ClassificationMetrics,
+    ModelTrainingResult,
+    train_dummy_classifier,
+)
+from app.services.preprocessing_service import SplitDataResult
 
 
 def test_encode_benign():
@@ -285,5 +295,205 @@ def test_invalid_input_structure():
     """Test 16: Geçersiz girdilerde 422 ve VALIDATION_ERROR sözleşmesinin korunması."""
     with pytest.raises(AppException) as excinfo:
         evaluate_binary_classification(object(), [1, 0])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+@pytest.fixture
+def synthetic_split_data():
+    X_train = pd.DataFrame({"f1": [1.0, 2.0, 3.0, 4.0], "f2": [5.0, 6.0, 7.0, 8.0]})
+    y_train = pd.Series([0, 0, 0, 1])  # 0 is the majority class
+    X_test = pd.DataFrame({"f1": [9.0, 10.0], "f2": [11.0, 12.0]})
+    y_test = pd.Series([1, 0])
+
+    preprocessor = ColumnTransformer([], remainder="drop")
+
+    return SplitDataResult(
+        preprocessor=preprocessor,
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
+        train_indices=(0, 1, 2, 3),
+        test_indices=(4, 5)
+    )
+
+
+def test_dummy_classifier_training_success(synthetic_split_data):
+    """Test 1: DummyClassifier'ın başarıyla eğitilmesi."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert isinstance(result, ModelTrainingResult)
+
+
+def test_dummy_classifier_estimator_is_dummy(synthetic_split_data):
+    """Test 2: Estimator'ın DummyClassifier olması."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert isinstance(result.estimator, DummyClassifier)
+
+
+def test_dummy_classifier_strategy(synthetic_split_data):
+    """Test 3: Stratejinin most_frequent olması."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert result.estimator.strategy == "most_frequent"
+
+
+def test_dummy_model_name(synthetic_split_data):
+    """Test 4: model_name değerinin dummy_classifier olması."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert result.model_name == "dummy_classifier"
+
+
+def test_dummy_classifier_predictions_length(synthetic_split_data):
+    """Test 5: Tahmin sayısının test satırı sayısıyla eşleşmesi."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert len(result.predictions) == len(synthetic_split_data.X_test)
+
+
+def test_dummy_classifier_predictions_is_tuple(synthetic_split_data):
+    """Test 6: Tahminlerin immutable tuple olması."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert isinstance(result.predictions, tuple)
+
+
+def test_dummy_classifier_all_majority_class(synthetic_split_data):
+    """Test 7: Tahminlerin tamamının training kümesindeki çoğunluk sınıfı olması (0)."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert set(result.predictions) == {0}
+
+
+def test_dummy_classifier_metrics_match(synthetic_split_data):
+    """Test 8: Metriklerin mevcut evaluate_binary_classification sonucu ile eşleşmesi."""
+    result = train_dummy_classifier(synthetic_split_data)
+    expected_metrics = evaluate_binary_classification(
+        synthetic_split_data.y_test,
+        result.predictions
+    )
+    assert result.metrics == expected_metrics
+
+
+def test_dummy_classifier_confusion_matrix(synthetic_split_data):
+    """Test 9: Confusion matrix ve tn/fp/fn/tp değerlerinin doğru olması."""
+    result = train_dummy_classifier(synthetic_split_data)
+    assert result.metrics.tn == 1
+    assert result.metrics.fp == 0
+    assert result.metrics.fn == 1
+    assert result.metrics.tp == 0
+    assert result.metrics.confusion_matrix == ((1, 0), (1, 0))
+
+
+def test_dummy_classifier_deterministic(synthetic_split_data):
+    """Test 10: Aynı girdilerle tekrarlanan eğitimin deterministik sonuç üretmesi."""
+    res1 = train_dummy_classifier(synthetic_split_data)
+    res2 = train_dummy_classifier(synthetic_split_data)
+    assert res1.predictions == res2.predictions
+    assert res1.metrics == res2.metrics
+
+
+def test_dummy_classifier_test_targets_not_used(synthetic_split_data):
+    """Test 11: Modelin yalnızca training kümesinde fit edilmesi."""
+    # Since DummyClassifier fit only accesses y_train to find the majority class,
+    # we can pass y_test as all 1s (which would make 1 the majority if mistakenly used).
+    # It should still predict 0, which is the majority of y_train.
+    split_data_modified = synthetic_split_data
+    split_data_modified.y_test[:] = 1
+    result = train_dummy_classifier(split_data_modified)
+    assert set(result.predictions) == {0}
+
+
+def test_dummy_classifier_input_not_mutated(synthetic_split_data):
+    """Test 12: Girdi SplitDataResult içeriğinin değiştirilmemesi."""
+    X_train_copy = synthetic_split_data.X_train.copy(deep=True)
+    y_train_copy = synthetic_split_data.y_train.copy(deep=True)
+    X_test_copy = synthetic_split_data.X_test.copy(deep=True)
+    y_test_copy = synthetic_split_data.y_test.copy(deep=True)
+
+    train_dummy_classifier(synthetic_split_data)
+
+    pd.testing.assert_frame_equal(synthetic_split_data.X_train, X_train_copy)
+    pd.testing.assert_series_equal(synthetic_split_data.y_train, y_train_copy)
+    pd.testing.assert_frame_equal(synthetic_split_data.X_test, X_test_copy)
+    pd.testing.assert_series_equal(synthetic_split_data.y_test, y_test_copy)
+
+
+def test_dummy_classifier_rejects_empty_splits(synthetic_split_data):
+    """Test 13: Boş training veya test kümesinin reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        X_train=pd.DataFrame()
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "empty" in excinfo.value.message.lower()
+
+
+def test_dummy_classifier_rejects_row_mismatch(synthetic_split_data):
+    """Test 14: X/y satır sayısı uyuşmazlığının reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        y_train=pd.Series([0, 1])  # Only 2 rows instead of 4
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "match" in excinfo.value.message.lower()
+
+
+def test_dummy_classifier_rejects_feature_mismatch(synthetic_split_data):
+    """Test 15: Feature boyutu uyuşmazlığının reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        X_test=pd.DataFrame({"f1": [9.0, 10.0]})  # Missing f2
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_dummy_classifier_rejects_non_binary_targets(synthetic_split_data):
+    """Test 16: Binary olmayan veya geçersiz hedeflerin reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        y_train=pd.Series([0, 1, 2, 0])  # Contains 2
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_dummy_classifier_rejects_single_class_training(synthetic_split_data):
+    """Test 17: Training hedefinde yalnızca tek sınıf bulunmasının reddedilmesi."""
+    import dataclasses
+    invalid_split = dataclasses.replace(
+        synthetic_split_data,
+        y_train=pd.Series([0, 0, 0, 0])  # Only class 0
+    )
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "both classes" in excinfo.value.message.lower()
+
+
+def test_dummy_classifier_rejects_invalid_input_type():
+    """Test 18: SplitDataResult olmayan girdinin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier("not a split data result")  # type: ignore
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_dummy_classifier_validation_error_code(synthetic_split_data):
+    """Test 19: Geçersiz girdilerde 422 ve VALIDATION_ERROR sözleşmesinin korunması."""
+    with pytest.raises(AppException) as excinfo:
+        train_dummy_classifier(None)  # type: ignore
     assert excinfo.value.status_code == 422
     assert excinfo.value.code == "VALIDATION_ERROR"
