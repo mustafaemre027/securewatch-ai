@@ -36,7 +36,11 @@ from app.services.preprocessing_service import (
     SplitDataResult,
     split_and_transform_data,
 )
-from app.services.model_service import encode_binary_labels
+from app.services.model_service import (
+    encode_binary_labels,
+    ClassificationMetrics,
+    evaluate_binary_classification,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -68,4 +72,6 @@ __all__ = [
     "SplitDataResult",
     "split_and_transform_data",
     "encode_binary_labels",
+    "ClassificationMetrics",
+    "evaluate_binary_classification",
 ]
