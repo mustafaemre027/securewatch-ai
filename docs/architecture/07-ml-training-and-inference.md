@@ -1,12 +1,12 @@
 # SecureWatch AI — Makine Öğrenmesi Süreçleri (ML Training & Inference)
 
-Bu belge, SecureWatch AI projesindeki ön işleme (preprocessing) pipeline'ını, çevrimdışı (offline) model eğitimi standartlarını, veri sızıntısını önleme kurallarını ve CSV tabanlı batch tahmin (inference) akışlarını tanımlar.
+Bu belge, SecureWatch AI projesindeki ön işleme (preprocessing) pipeline'ını, ikili sınıflandırma etiket kodlamasını, baseline model eğitimini, performans metriklerini, uçtan uca CLI iş akışını, veri sızıntısını önleme kurallarını ve gelecek aşamaları tanımlar.
 
 ---
 
 ## 1. Giriş
 
-Platform, ağ trafiği kayıtlarını normal ve şüpheli olarak sınıflandırmak için makine öğrenmesi yöntemlerini kullanır. Model başarısının doğruluğu ve güvenilirliği, verinin ön işleme adımlarının ve veri sızıntısını (data leakage) önleyen mimarinin doğru kurulmasına bağlıdır.
+Platform, ağ trafiği kayıtlarını normal (`BENIGN`) ve şüpheli/saldırı olarak sınıflandırmak için makine öğrenmesi yöntemlerini kullanır. Model başarısının doğruluğu ve güvenilirliği, verinin ön işleme adımlarının, etiket dönüşümünün ve veri sızıntısını (data leakage) önleyen mimarinin doğru kurulmasına bağlıdır.
 
 ---
 
@@ -40,7 +40,6 @@ Model eğitimi öncesinde verinin temizlenmesi ve standart biçime getirilmesi a
 5. **Sayısal Özellikler ve `Destination Port`:** `Destination Port` dahil 77 özelliğin tamamı sayısal veri tipine dönüştürülür (`pd.to_numeric`). `Destination Port` varsayılan yapıda kategorik sütun olarak zorlanmaz; diğer özelliklerle birlikte sayısal pipeline'a dahil edilir.
 6. **Infinity ve Eksik Değer İşleme:** Pozitif ve negatif sonsuz (`+inf`, `-inf`) değerler `NaN` değerine dönüştürülür.
 7. **Mükerrer Satır Temizliği:** Overfitting'i önlemek amacıyla tam mükerrer (exact duplicate) satırlar train/test split işleminden **önce** (`drop_duplicates()`) kaldırılır.
-8. **Hedef Değişken Durumu:** `Label` değerleri Gün 7 aşamasında metin (string) olarak korunur; etiket kodlaması (label encoding) henüz uygulanmamıştır.
 
 ### 2.2. Scikit-Learn Ön İşleme Transformer'ı (`build_sklearn_preprocessing_pipeline`)
 
@@ -66,31 +65,98 @@ Model değerlendirmesinin güvenilirliği için veri sızıntısı (data leakage
 
 ---
 
-## 3. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
+## 3. İkili Etiket Kodlaması ve Baseline Model Eğitimi (Uygulanan Mimari — Gün 8)
 
-Aşağıdaki bileşenler Gün 7 kapsamında **uygulanmamıştır** ve sonraki günlerin (Gün 8+) geliştirme planında yer almaktadır:
+Gün 8 kapsamında ikili etiket kodlaması servisi, baseline performans metrikleri altyapısı, `DummyClassifier` ve `LogisticRegression` modelleri, uçtan uca eğitim iş akışı ve CLI betiği `app.services.model_service` ve `scripts.train_baseline_models` altında geliştirilmiştir.
 
-- **Etiket Kodlaması (Label Encoding):** `BENIGN` → `0`, Saldırı türleri → `1` ikili etiket dönüşümü.
-- **Model Eğitimi & Sınıflandırıcılar:** Baseline `DummyClassifier`, `LogisticRegression` ve `RandomForestClassifier` modellerinin eğitilmesi.
-- **Model Seçimi ve Değerlendirme:** Precision, Recall, F1-Score, ROC-AUC ve Confusion Matrix metrikleriyle model karşılaştırması.
-- **Joblib Model Persistence:** Preprocessor ve eğitilmiş modelin tek bir scikit-learn `Pipeline` olarak `.joblib` formatında diske kaydedilmesi.
-- **Asenkron Batch Inference:** Web arayüzünden yüklenen CSV analiz işlerinin background worker tarafından `.joblib` modeli kullanılarak tahmin edilmesi ve veritabanına kaydedilmesi.
+### 3.1. İkili Saldırı Etiketi Kodlama (`encode_binary_labels`)
+
+CIC-IDS2017 veri setindeki metin tabanlı `Label` değerlerini ikili sınıflandırma hedefine (`0` ve `1`) dönüştürür:
+
+- **Zorunlu Label Varlığı:** `Label` sütunundaki metinler temizlenir (whitespace stripping ve büyük harfe dönüştürme).
+- **`BENIGN → 0`:** Normal trafik etiketleri ikili `0` sınıfına atanır.
+- **Saldırı Trafigi → `1`:** `BENIGN` dışındaki tüm geçerli saldırı etiketleri ikili `1` sınıfına atanır.
+- **Doğrulamalar:** Boş Series, NaN/None içeren Series, metin dışı değerler veya boş dize barındıran Series durumunda `VALIDATION_ERROR` (422) üretilir.
+- **Sıralama Garantisi:** Etiket kodlaması, stratified split işleminden **önce** gerçekleştirilir. Stratification ham saldırı metinleri üzerinden değil, ikili `0/1` etiketleri üzerinden yapılır.
+
+### 3.2. Baseline Sınıflandırıcılar (`train_dummy_classifier` & `train_logistic_regression`)
+
+#### 3.2.1. DummyClassifier Baseline (`train_dummy_classifier`)
+- **Hiperparametreler:** `strategy="most_frequent"`, `random_state=42`
+- **Amaç:** Eğitim verisindeki en sık gözlenen sınıfa göre sabit tahmin üreten en alt referans çizgisidir. Model seçimi amacıyla kullanılmaz.
+- **Eğitim & Değerlendirme:** Yalnızca `X_train`/`y_train` üzerinde `fit` edilir, yalnızca `X_test` üzerinde tahmin yürütür.
+
+#### 3.2.2. Logistic Regression Baseline (`train_logistic_regression`)
+- **Hiperparametreler:** `class_weight="balanced"` (varsayılan), `max_iter=1000`, `solver="lbfgs"`, `random_state=42`
+- **Esnek Sınıf Ağırlığı Desteği:** `"balanced"`, `None` veya özel sözlük `{0: weight_for_0, 1: weight_for_1}` desteklenir. Sözlük anahtarlarının tam olarak `0` ve `1` olması, değerlerin pozitif ve sonlu sayılar olması zorunludur (0, negatif, NaN, inf, bool veya string değerler `VALIDATION_ERROR` 422 ile reddedilir).
+- **Eğitim & Değerlendirme:** Yalnızca `X_train`/`y_train` üzerinde `fit` edilir, `X_test` üzerinde tahmin yürütür. `y_test` hedefleri fit aşamasına kesinlikle sızdırılmaz. Katsayı boyutu (`coef_`) 77 sayısal özellik boyutuyla tam eşleşir.
+
+### 3.3. Sınıflandırma Performans Metrikleri (`evaluate_binary_classification`)
+
+İkili sınıflandırma tahminlerini değerlendirmek üzere immutable `ClassificationMetrics` yapısını döndürür:
+
+- **Hedef Sınıflar:** Pozitif sınıf = `1` (Saldırı), Negatif sınıf = `0` (`BENIGN`).
+- **Hesaplanan Metrikler:** Accuracy, Precision, Recall, F1-Score.
+- **Sıfır Bölme Güvenliği:** Precision, Recall ve F1 hesaplamalarında `zero_division=0` kullanılarak uyarı (warning) üretilmesi engellenmiştir.
+- **Confusion Matrix Düzeni:** Metrik raporlarında karmaşıklık matrisi sırası `[[TN, FP], [FN, TP]]` olarak belirlenmiştir.
+- **2x2 Matris Garantisi:** Test verisinde tek bir sınıf bulunsa dahi karmaşıklık matrisi 2x2 boyutunda üretilir.
+
+### 3.4. Uçtan Uca Eğitim İş Akışı (`train_baseline_models`)
+
+Bütün ön işleme ve model eğitimi adımlarını sırasıyla çalıştıran public fonksiyondur:
+
+1. `prepare_training_data(df)` ile şema ve veri doğrulaması yapılır.
+2. `encode_binary_labels(...)` ile ham etiketler ikili `0/1` hedefe dönüştürülür.
+3. İkili hedef içeren bağımsız `TrainingDataResult` oluşturulur.
+4. `build_sklearn_preprocessing_pipeline()` ile unfitted preprocessor hazırlanır.
+5. `split_and_transform_data(...)` ile leakage-safe train/test ayrımı yapılır.
+6. `train_dummy_classifier(...)` çalıştırılır.
+7. `train_logistic_regression(..., class_weight="balanced")` çalıştırılır.
+8. Metrikler ve sınıf dağılımları `BaselineTrainingReport` olarak döndürülür.
+
+### 3.5. Eğitim CLI Betiği (`scripts.train_baseline_models`)
+
+Backend dizininden aşağıdaki komutla çalıştırılabilir:
+
+```bash
+python -m scripts.train_baseline_models --input path/to/training.csv
+```
+
+- **Girdi Kontrolü:** `--input` parametresi zorunludur; dosya uzantısının `.csv` olduğunu ve varlığını doğrular.
+- **Çıktı Formatı:** Başarılı çalışmada JSON raporunu stdout'a yazar (`allow_nan=False`).
+- **Hata Yönetimi:** Geçersiz dosya, şema veya eğitim hatasında sıfırdan farklı bir exit code ile stderr'e kısa ve güvenli bir hata mesajı basar (asla traceback, veri satırları veya mutlak yerel yollar basmaz).
+- **Güvenlik & İzolasyon:** Kalıcı model dosyası, Joblib artifact'i veya diske rapor dosyası yazmaz. Tahmin dizisi rapora sızdırılmaz (en fazla 10 elemanlık `prediction_sample` sunulur).
 
 ---
 
-## 4. Risk Skorlama ve Eşik (Threshold) Yönetimi
+## 4. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
+
+Aşağıdaki bileşenler Gün 8 itibarıyla **uygulanmamıştır** ve sonraki günlerin geliştirme planında yer almaktadır:
+
+- **RandomForestClassifier:** Karmaşık ve non-linear ilişkileri yakalayan gelişmiş sınıflandırıcı.
+- **Kontrollü Parametre Denemeleri & Feature Importance:** Özellik önem derecelerinin çıkarılması.
+- **Gelişmiş Değerlendirme:** ROC-AUC, Precision-Recall Eğrisi ve False Positive Rate (FPR) analizi.
+- **Model Seçimi:** Baseline ve gelişmiş modellerin karşılaştırılıp nihai modelin seçilmesi.
+- **Risk Eşiklerinin Kesinleştirilmesi:** İş gereksinimlerine göre FPR/FNR tolerans sınırlarının ayarlanması.
+- **Model Kartı (Model Card):** Model performans, limitasyon ve eğitim detaylarının dokümantasyonu.
+- **Joblib Model Persistence:** Preprocessor ve eğitilmiş modelin `.joblib` formatında diske kaydedilmesi.
+- **Asenkron Batch Inference:** Yüklenen CSV analiz işlerinin background worker tarafından tahmin edilmesi.
+
+---
+
+## 5. Risk Skorlama ve Eşik (Threshold) Yönetimi
 
 Modelin ürettiği saldırı olasılığı (`p`), risk skoru ve risk seviyelerine aşağıdaki kuralla dönüştürülür:
 
 $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
-### 4.1. Başlangıç (Provisional) Risk Eşikleri
+### 5.1. Başlangıç (Provisional) Risk Eşikleri
 
 | Risk Seviyesi (`risk_level`) | Risk Skoru Aralığı | Açıklama |
 | :--- | :--- | :--- |
 | **`LOW`** (Düşük) | 0 – 30 | Normal trafik, analistin aksiyon alması gerekmez. |
 | **`MEDIUM`** (Orta) | 31 – 60 | Şüpheli akış, analist detayları inceleyebilir. |
-| **`HIGH`** (Yüksek) | 61 – 85 | Yüksek saldırı olasılığı, güvenlik olayına dönüştürülebilir. |
+| **`HIGH`** Yüksek | 61 – 85 | Yüksek saldırı olasılığı, güvenlik olayına dönüştürülebilir. |
 | **`CRITICAL`** (Kritik) | 86 – 100 | Kritik tehdit tespiti, analist tarafından güvenlik olayına dönüştürülmesi önerilir. |
 
 > [!WARNING]
