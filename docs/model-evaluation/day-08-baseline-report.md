@@ -1,7 +1,7 @@
 # SecureWatch AI — Gün 08 Baseline Model Değerlendirme Raporu
 
-**Tarih:** 23 Temmuz 2026  
-**Kapsam:** Baseline Model Altyapısı (`DummyClassifier` & `LogisticRegression`), İkili Etiket Kodlaması, Metrik Servisleri, Uçtan Uca Eğitim İş Akışı ve CLI  
+**Tarih:** 23 Temmuz 2026
+**Kapsam:** Baseline Model Altyapısı (`DummyClassifier` & `LogisticRegression`), İkili Etiket Kodlaması, Metrik Servisleri, Uçtan Uca Eğitim İş Akışı ve CLI
 **İlişkili Dokümanlar:** [docs/architecture/07-ml-training-and-inference.md](../architecture/07-ml-training-and-inference.md)
 
 ---
@@ -16,7 +16,7 @@ Bu rapor, SecureWatch AI projesinin Gün 8 geliştirmeleri kapsamında hayata ge
 
 - **Girdi Özellik Sayısı:** CIC-IDS2017 veri setindeki 78 zorunlu özelliğin doğrulanmasının ardından, mükerrer olan `Fwd Header Length.1` sütunu elenerek model girdisi **77 sayısal özelliğe** düşürülür.
 - **Sayısal Dönüşüm & Temizlik:** `Destination Port` dahil tüm özellikler sayısal formata dönüştürülür; `+inf` ve `-inf` değerleri `NaN` yapıldıktan sonra medyan imputer ve standart ölçekleyici (`StandardScaler`) uygulanır.
-- **İkili Etiket Kodlaması (`encode_binary_labels`):** 
+- **İkili Etiket Kodlaması (`encode_binary_labels`):**
   - `BENIGN` (Normal trafik) → `0`
   - Saldırı trafiği (tüm geçerli saldırı dizeleri) → `1`
 - **Etiket Kodlama Zamanlaması:** Etiket kodlaması, train/test ayrımından **önce** gerçekleştirilir. Stratified split ham saldırı isimlerine göre değil, oluşturulan ikili `0/1` hedefe göre çalışır.
