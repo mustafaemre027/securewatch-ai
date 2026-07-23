@@ -14,7 +14,13 @@ from sklearn.metrics import (
 )
 
 from app.core.exceptions import AppException
-from app.services.preprocessing_service import SplitDataResult
+from app.services.preprocessing_service import (
+    SplitDataResult,
+    TrainingDataResult,
+    build_sklearn_preprocessing_pipeline,
+    prepare_training_data,
+    split_and_transform_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -420,3 +426,159 @@ def train_logistic_regression(
         predictions=predictions_tuple,
         metrics=metrics
     )
+
+
+@dataclass(frozen=True)
+class BaselineTrainingReport:
+    """
+    Immutable report containing the full baseline training evaluation results.
+
+    Note: The ``estimator`` objects inside the nested ``ModelTrainingResult``
+    instances are scikit-learn models and are intrinsically mutable. Deep
+    immutability of the estimators is not guaranteed.
+
+    This report is descriptive only; it does not declare a winner or final
+    model, and must not be interpreted as a model selection decision.
+    """
+    initial_row_count: int
+    dropped_duplicate_count: int
+    final_row_count: int
+    feature_count: int
+    train_row_count: int
+    test_row_count: int
+    train_class_distribution: tuple
+    test_class_distribution: tuple
+    dummy_result: ModelTrainingResult
+    logistic_result: ModelTrainingResult
+
+
+def train_baseline_models(df: pd.DataFrame) -> BaselineTrainingReport:
+    """
+    Runs the full end-to-end baseline training workflow.
+
+    Workflow (in order):
+      1. Validate and prepare training data via prepare_training_data.
+      2. Encode raw Label strings to binary 0/1 targets (BENIGN=0, attack=1).
+      3. Construct a binary-label TrainingDataResult (no mutation of originals).
+      4. Build an unfitted sklearn preprocessor.
+      5. Split and transform data (stratified on binary target, leakage-safe).
+      6. Train DummyClassifier baseline.
+      7. Train LogisticRegression with balanced class weights.
+      8. Return a BaselineTrainingReport with both results.
+
+    Args:
+        df: Raw CIC-IDS2017 DataFrame with all 78 feature columns + Label.
+
+    Returns:
+        BaselineTrainingReport: Full evaluation results for both models.
+
+    Raises:
+        AppException: If any validation step fails.
+    """
+    # Step 1: Validate schema and prepare raw training data
+    raw_result = prepare_training_data(df)
+
+    # Step 2: Encode raw attack labels to binary targets BEFORE split
+    binary_targets = encode_binary_labels(raw_result.targets)
+
+    # Step 3: Build an independent TrainingDataResult with binary targets
+    binary_result = TrainingDataResult(
+        features=raw_result.features.copy(deep=True),
+        targets=binary_targets,
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+    )
+
+    # Step 4: Build a fresh unfitted preprocessor
+    preprocessor = build_sklearn_preprocessing_pipeline()
+
+    # Step 5: Stratified split and leakage-safe transform (binary target used)
+    split_data = split_and_transform_data(binary_result, preprocessor)
+
+    # Compute class distributions from the binary split targets
+    train_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_train.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+    test_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_test.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+
+    # Step 6: Train DummyClassifier baseline
+    dummy_result = train_dummy_classifier(split_data)
+
+    # Step 7: Train LogisticRegression with balanced class weights
+    logistic_result = train_logistic_regression(split_data, class_weight="balanced")
+
+    feature_count = binary_result.features.shape[1]
+
+    return BaselineTrainingReport(
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+        feature_count=feature_count,
+        train_row_count=len(split_data.X_train),
+        test_row_count=len(split_data.X_test),
+        train_class_distribution=train_dist,
+        test_class_distribution=test_dist,
+        dummy_result=dummy_result,
+        logistic_result=logistic_result,
+    )
+
+
+def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) -> dict:
+    """Converts a ModelTrainingResult to a JSON-safe dictionary."""
+    m = result.metrics
+    sample = list(result.predictions[:max_sample])
+    return {
+        "model_name": str(result.model_name),
+        "prediction_count": int(len(result.predictions)),
+        "prediction_sample": [int(p) for p in sample],
+        "accuracy": float(m.accuracy),
+        "precision": float(m.precision),
+        "recall": float(m.recall),
+        "f1_score": float(m.f1_score),
+        "confusion_matrix": [
+            [int(m.tn), int(m.fp)],
+            [int(m.fn), int(m.tp)]
+        ],
+        "tn": int(m.tn),
+        "fp": int(m.fp),
+        "fn": int(m.fn),
+        "tp": int(m.tp),
+    }
+
+
+def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
+    """
+    Converts a BaselineTrainingReport to a JSON-safe dictionary.
+
+    No estimator objects, raw data rows, or feature values are included.
+    All numeric values are converted to Python-native int/float types.
+    """
+    return {
+        "dataset": {
+            "initial_row_count": int(report.initial_row_count),
+            "dropped_duplicate_count": int(report.dropped_duplicate_count),
+            "final_row_count": int(report.final_row_count),
+            "feature_count": int(report.feature_count),
+            "train_row_count": int(report.train_row_count),
+            "test_row_count": int(report.test_row_count),
+            "train_class_distribution": {
+                str(k): int(v) for k, v in report.train_class_distribution
+            },
+            "test_class_distribution": {
+                str(k): int(v) for k, v in report.test_class_distribution
+            },
+        },
+        "models": {
+            "dummy_classifier": _model_result_to_dict(report.dummy_result),
+            "logistic_regression": _model_result_to_dict(report.logistic_result),
+        },
+    }

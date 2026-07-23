@@ -42,6 +42,10 @@ from app.services.model_service import (
     evaluate_binary_classification,
     ModelTrainingResult,
     train_dummy_classifier,
+    train_logistic_regression,
+    BaselineTrainingReport,
+    train_baseline_models,
+    baseline_report_to_dict,
 )
 
 __all__ = [
@@ -78,4 +82,8 @@ __all__ = [
     "evaluate_binary_classification",
     "ModelTrainingResult",
     "train_dummy_classifier",
+    "train_logistic_regression",
+    "BaselineTrainingReport",
+    "train_baseline_models",
+    "baseline_report_to_dict",
 ]
