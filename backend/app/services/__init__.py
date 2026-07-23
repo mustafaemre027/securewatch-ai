@@ -36,6 +36,7 @@ from app.services.preprocessing_service import (
     SplitDataResult,
     split_and_transform_data,
 )
+from app.services.model_service import encode_binary_labels
 
 __all__ = [
     "get_user_by_id",
@@ -66,4 +67,5 @@ __all__ = [
     "build_sklearn_preprocessing_pipeline",
     "SplitDataResult",
     "split_and_transform_data",
+    "encode_binary_labels",
 ]
