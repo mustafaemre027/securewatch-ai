@@ -29,6 +29,7 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | `day-05.md` | Gün 5 kaydı — Authentication (JWT, bcrypt), RBAC rolleri ve denetim günlükleri (Audit Logging) |
 | `day-06.md` | Gün 6 kaydı: Güvenli CSV yükleme, CIC-IDS2017 şema doğrulaması ve AnalysisJob durum takibi |
 | `day-07.md` | Gün 7 kaydı — Ön işleme pipeline'ı, scikit-learn transformer, sızıntı korumalı train/test ayrımı ve defensive-copy yalıtımı |
+| `day-08.md` | Gün 8 kaydı — İkili etiket kodlaması, DummyClassifier, LogisticRegression baseline modelleri, metrikler ve CLI eğitim iş akışı |
 
 ## Format
 
