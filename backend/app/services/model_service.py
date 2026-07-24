@@ -423,7 +423,11 @@ def train_logistic_regression(
         random_state=42
     )
 
+    t0 = time.perf_counter()
+
     model.fit(X_train_clean, y_train_clean)
+    t1 = time.perf_counter()
+    training_duration_seconds = float(t1 - t0)
 
     preds_arr = model.predict(X_test_clean)
     predictions_tuple = tuple(int(p) for p in preds_arr)
@@ -434,7 +438,8 @@ def train_logistic_regression(
         model_name="logistic_regression",
         estimator=model,
         predictions=predictions_tuple,
-        metrics=metrics
+        metrics=metrics,
+        training_duration_seconds=training_duration_seconds
     )
 
 
@@ -623,6 +628,85 @@ def run_random_forest_experiments(split_data: SplitDataResult) -> tuple[RandomFo
         results.append(RandomForestExperimentResult(config=config, training_result=result))
 
     return tuple(results)
+
+
+@dataclass(frozen=True)
+class ModelComparisonRow:
+    model_name: str
+    variant_name: str
+    hyperparameters: tuple[tuple[str, Any], ...]
+    training_duration_seconds: float
+    accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
+    confusion_matrix: tuple[tuple[int, int], tuple[int, int]]
+
+
+@dataclass(frozen=True)
+class ModelComparisonReport:
+    rows: tuple[ModelComparisonRow, ...]
+
+
+def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
+    """
+    Compares a LogisticRegression baseline against predefined Random Forest configurations.
+    Returns exactly five comparison rows in a deterministic order.
+    """
+    rows = []
+
+    # 1. Logistic Regression
+    lr_result = train_logistic_regression(split_data)
+    lr_params = (
+        ("class_weight", "balanced"),
+        ("max_iter", 1000),
+        ("solver", "lbfgs"),
+        ("random_state", 42),
+    )
+    lr_metrics = lr_result.metrics
+    rows.append(
+        ModelComparisonRow(
+            model_name="logistic_regression",
+            variant_name="lr_baseline",
+            hyperparameters=lr_params,
+            training_duration_seconds=float(lr_result.training_duration_seconds) if lr_result.training_duration_seconds is not None else 0.0,
+            accuracy=lr_metrics.accuracy,
+            precision=lr_metrics.precision,
+            recall=lr_metrics.recall,
+            f1_score=lr_metrics.f1_score,
+            confusion_matrix=((lr_metrics.tn, lr_metrics.fp), (lr_metrics.fn, lr_metrics.tp)),
+        )
+    )
+
+    # 2. Random Forest Experiments
+    rf_experiments = run_random_forest_experiments(split_data)
+    for exp in rf_experiments:
+        cfg = exp.config
+        rf_params = (
+            ("n_estimators", cfg.n_estimators),
+            ("max_depth", cfg.max_depth),
+            ("min_samples_split", cfg.min_samples_split),
+            ("min_samples_leaf", cfg.min_samples_leaf),
+            ("class_weight", cfg.class_weight),
+            ("random_state", cfg.random_state),
+            ("n_jobs", cfg.n_jobs),
+        )
+        rf_metrics = exp.training_result.metrics
+        rows.append(
+            ModelComparisonRow(
+                model_name="random_forest",
+                variant_name=cfg.experiment_name,
+                hyperparameters=rf_params,
+                training_duration_seconds=float(exp.training_result.training_duration_seconds) if exp.training_result.training_duration_seconds is not None else 0.0,
+                accuracy=rf_metrics.accuracy,
+                precision=rf_metrics.precision,
+                recall=rf_metrics.recall,
+                f1_score=rf_metrics.f1_score,
+                confusion_matrix=((rf_metrics.tn, rf_metrics.fp), (rf_metrics.fn, rf_metrics.tp)),
+            )
+        )
+
+    return ModelComparisonReport(rows=tuple(rows))
 
 
 @dataclass(frozen=True)

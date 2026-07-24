@@ -18,6 +18,9 @@ from app.services.model_service import (
     RandomForestExperimentConfig,
     RandomForestExperimentResult,
     run_random_forest_experiments,
+    ModelComparisonRow,
+    ModelComparisonReport,
+    compare_models,
 )
 from app.services.preprocessing_service import SplitDataResult
 
@@ -877,6 +880,139 @@ def test_rf_rejects_invalid_data(synthetic_split_data):
     single_class_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 0, 0, 0]))
     with pytest.raises(AppException):
         train_random_forest(single_class_split)
+
+
+# =============================================================================
+# Model Comparison Tests
+# =============================================================================
+
+def test_compare_models_structure_and_count(synthetic_split_data):
+    """Test 42: Servisin tam olarak 5 satır döndürmesi ve belirlenen deterministik sırada olması."""
+    report = compare_models(synthetic_split_data)
+    assert isinstance(report, ModelComparisonReport)
+    assert len(report.rows) == 5
+
+    expected_variants = ["lr_baseline", "rf_baseline", "rf_deeper", "rf_unweighted", "rf_compact"]
+    actual_variants = [r.variant_name for r in report.rows]
+    assert actual_variants == expected_variants
+
+    assert report.rows[0].model_name == "logistic_regression"
+    for r in report.rows[1:]:
+        assert r.model_name == "random_forest"
+
+    # Check no 'best_model' or 'winner' field exists
+    assert not hasattr(report, "best_model")
+    assert not hasattr(report, "winner")
+    for r in report.rows:
+        assert not hasattr(r, "is_best")
+
+
+def test_compare_models_row_content(synthetic_split_data):
+    """Test 43: Her satırda metrik, confusion_matrix ve negatif olmayan eğitim süresi bulunması.
+       Ayrıca, estimator, ham veri veya tahmin dizisinin saklanmaması."""
+    report = compare_models(synthetic_split_data)
+    for r in report.rows:
+        assert isinstance(r.training_duration_seconds, float)
+        assert r.training_duration_seconds >= 0.0
+
+        assert isinstance(r.accuracy, float)
+        assert isinstance(r.precision, float)
+        assert isinstance(r.recall, float)
+        assert isinstance(r.f1_score, float)
+
+        assert isinstance(r.confusion_matrix, tuple)
+        assert len(r.confusion_matrix) == 2
+        assert len(r.confusion_matrix[0]) == 2
+        assert len(r.confusion_matrix[1]) == 2
+
+        # Check exclusion of large/mutable objects
+        assert not hasattr(r, "estimator")
+        assert not hasattr(r, "predictions")
+        assert not hasattr(r, "metrics")
+
+
+def test_compare_models_hyperparameters(synthetic_split_data):
+    """Test 44: Hiperparametrelerin deterministik ve beklenen konfigürasyonlarla eşleşmesi."""
+    report = compare_models(synthetic_split_data)
+
+    lr_row = report.rows[0]
+    assert isinstance(lr_row.hyperparameters, tuple)
+    lr_params_dict = dict(lr_row.hyperparameters)
+    assert lr_params_dict["class_weight"] == "balanced"
+    assert lr_params_dict["max_iter"] == 1000
+    assert lr_params_dict["solver"] == "lbfgs"
+
+    rf_baseline_row = report.rows[1]
+    rf_params_dict = dict(rf_baseline_row.hyperparameters)
+    assert rf_params_dict["n_estimators"] == 100
+    assert rf_params_dict["max_depth"] == 10
+    assert rf_params_dict["class_weight"] == "balanced"
+
+    rf_deeper_row = report.rows[2]
+    rf_deeper_dict = dict(rf_deeper_row.hyperparameters)
+    assert rf_deeper_dict["max_depth"] == 20
+
+
+def test_compare_models_defensive_copy(synthetic_split_data):
+    """Test 45: Kaynak verilerin değiştirilmemesi."""
+    X_train_clean = synthetic_split_data.X_train.copy(deep=True)
+    y_train_clean = synthetic_split_data.y_train.copy(deep=True)
+    X_test_clean = synthetic_split_data.X_test.copy(deep=True)
+
+    compare_models(synthetic_split_data)
+
+    pd.testing.assert_frame_equal(synthetic_split_data.X_train, X_train_clean)
+    pd.testing.assert_series_equal(synthetic_split_data.y_train, y_train_clean)
+    pd.testing.assert_frame_equal(synthetic_split_data.X_test, X_test_clean)
+
+
+def test_compare_models_determinism(synthetic_split_data):
+    """Test 46: Aynı girdiyle sıra ve metriklerin deterministik olması."""
+    report1 = compare_models(synthetic_split_data)
+    report2 = compare_models(synthetic_split_data)
+
+    assert len(report1.rows) == len(report2.rows)
+    for r1, r2 in zip(report1.rows, report2.rows):
+        assert r1.model_name == r2.model_name
+        assert r1.variant_name == r2.variant_name
+        assert r1.hyperparameters == r2.hyperparameters
+        assert r1.accuracy == r2.accuracy
+        assert r1.precision == r2.precision
+        assert r1.recall == r2.recall
+        assert r1.f1_score == r2.f1_score
+        assert r1.confusion_matrix == r2.confusion_matrix
+
+
+def test_compare_models_bubbles_up_errors(synthetic_split_data):
+    """Test 47: Alt model hatalarının sessizce yutulmaması."""
+    import dataclasses
+    invalid_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 1, 2, 0]))
+    with pytest.raises(AppException) as excinfo:
+        compare_models(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_lr_timing_mock(synthetic_split_data):
+    """Test 48: Lojistik Regreşın eğitim süresinin yalnızca fit çağrısını kapsadığının mock ile doğrulanması."""
+    import time
+    from unittest.mock import patch
+
+    def fake_fit(self, X, y):
+        time.sleep(0.1)
+        return self
+
+    def fake_predict(self, X):
+        return np.zeros(len(synthetic_split_data.y_test))
+
+    with patch("sklearn.linear_model.LogisticRegression.fit", new=fake_fit), \
+         patch("sklearn.linear_model.LogisticRegression.predict", new=fake_predict):
+        res = train_logistic_regression(synthetic_split_data)
+
+        assert res.training_duration_seconds is not None
+        assert res.training_duration_seconds >= 0.1
+        # It shouldn't take much more than the sleep, allowing generous buffer for CI
+        assert res.training_duration_seconds < 0.5
 
 
 # =============================================================================
