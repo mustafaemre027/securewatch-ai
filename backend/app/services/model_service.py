@@ -641,11 +641,25 @@ class ModelComparisonRow:
     recall: float
     f1_score: float
     confusion_matrix: tuple[tuple[int, int], tuple[int, int]]
+    feature_importances: tuple[FeatureImportanceRecord, ...] | None = None
 
 
 @dataclass(frozen=True)
 class ModelComparisonReport:
     rows: tuple[ModelComparisonRow, ...]
+
+
+@dataclass(frozen=True)
+class FullModelComparisonReport:
+    initial_row_count: int
+    dropped_duplicate_count: int
+    final_row_count: int
+    feature_count: int
+    train_row_count: int
+    test_row_count: int
+    train_class_distribution: tuple
+    test_class_distribution: tuple
+    comparison: ModelComparisonReport
 
 
 def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
@@ -675,6 +689,7 @@ def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
             recall=lr_metrics.recall,
             f1_score=lr_metrics.f1_score,
             confusion_matrix=((lr_metrics.tn, lr_metrics.fp), (lr_metrics.fn, lr_metrics.tp)),
+            feature_importances=None,
         )
     )
 
@@ -692,6 +707,9 @@ def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
             ("n_jobs", cfg.n_jobs),
         )
         rf_metrics = exp.training_result.metrics
+        fi = exp.training_result.feature_importances
+        top_10_fi = fi[:10] if fi is not None else None
+
         rows.append(
             ModelComparisonRow(
                 model_name="random_forest",
@@ -703,10 +721,57 @@ def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
                 recall=rf_metrics.recall,
                 f1_score=rf_metrics.f1_score,
                 confusion_matrix=((rf_metrics.tn, rf_metrics.fp), (rf_metrics.fn, rf_metrics.tp)),
+                feature_importances=top_10_fi,
             )
         )
 
     return ModelComparisonReport(rows=tuple(rows))
+
+
+def run_model_comparison(df: pd.DataFrame) -> FullModelComparisonReport:
+    """
+    Runs the full end-to-end model comparison workflow for Logistic Regression and Random Forest.
+    """
+    raw_result = prepare_training_data(df)
+    binary_targets = encode_binary_labels(raw_result.targets)
+
+    binary_result = TrainingDataResult(
+        features=raw_result.features.copy(deep=True),
+        targets=binary_targets,
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+    )
+
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    split_data = split_and_transform_data(binary_result, preprocessor)
+
+    train_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_train.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+    test_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_test.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+
+    comparison_rows = compare_models(split_data)
+
+    return FullModelComparisonReport(
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+        feature_count=len(split_data.X_train.columns),
+        train_row_count=len(split_data.X_train),
+        test_row_count=len(split_data.X_test),
+        train_class_distribution=train_dist,
+        test_class_distribution=test_dist,
+        comparison=comparison_rows,
+    )
 
 
 @dataclass(frozen=True)
@@ -870,4 +935,47 @@ def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
             "dummy_classifier": _model_result_to_dict(report.dummy_result),
             "logistic_regression": _model_result_to_dict(report.logistic_result),
         },
+    }
+
+
+def comparison_report_to_dict(report: FullModelComparisonReport) -> dict:
+    """
+    Converts a FullModelComparisonReport into a JSON-serializable dictionary.
+    """
+    return {
+        "dataset": {
+            "initial_row_count": int(report.initial_row_count),
+            "dropped_duplicate_count": int(report.dropped_duplicate_count),
+            "final_row_count": int(report.final_row_count),
+            "feature_count": int(report.feature_count),
+            "train_row_count": int(report.train_row_count),
+            "test_row_count": int(report.test_row_count),
+            "train_class_distribution": {
+                str(k): int(v) for k, v in report.train_class_distribution
+            },
+            "test_class_distribution": {
+                str(k): int(v) for k, v in report.test_class_distribution
+            },
+        },
+        "rows": [
+            {
+                "model_name": str(row.model_name),
+                "variant_name": str(row.variant_name),
+                "hyperparameters": dict(row.hyperparameters),
+                "training_duration_seconds": float(row.training_duration_seconds),
+                "accuracy": float(row.accuracy),
+                "precision": float(row.precision),
+                "recall": float(row.recall),
+                "f1_score": float(row.f1_score),
+                "confusion_matrix": [
+                    [int(row.confusion_matrix[0][0]), int(row.confusion_matrix[0][1])],
+                    [int(row.confusion_matrix[1][0]), int(row.confusion_matrix[1][1])]
+                ],
+                "feature_importances": [
+                    {"feature_name": r.feature_name, "importance": float(r.importance)}
+                    for r in row.feature_importances
+                ] if row.feature_importances is not None else []
+            }
+            for row in report.comparison.rows
+        ]
     }

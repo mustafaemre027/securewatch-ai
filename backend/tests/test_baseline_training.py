@@ -368,3 +368,39 @@ def test_cli_no_model_files_created(tmp_path):
         # Filter out venv
         matches = [m for m in matches if ".venv" not in m.parts]
         assert len(matches) == 0, f"Unexpected model artifact found: {matches}"
+
+
+def test_cli_compare_random_forest_success(tmp_path):
+    """Test 27: --compare-random-forest bayrağının başarılı çalışması ve JSON formatında 5 model satırı dönmesi."""
+    import json
+    df = _make_synthetic_df()
+    csv_file = tmp_path / "train.csv"
+    df.to_csv(csv_file, index=False)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "scripts.train_baseline_models", "--input", str(csv_file), "--compare-random-forest"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    parsed = json.loads(result.stdout)
+    assert "dataset" in parsed
+    assert "rows" in parsed
+
+    rows = parsed["rows"]
+    assert len(rows) == 5
+
+    expected_variants = ["lr_baseline", "rf_baseline", "rf_deeper", "rf_unweighted", "rf_compact"]
+    actual_variants = [r["variant_name"] for r in rows]
+    assert actual_variants == expected_variants
+
+    # LR feature_importances must be empty list
+    assert len(rows[0]["feature_importances"]) == 0
+
+    # RF feature_importances must exist and be <= 10
+    for r in rows[1:]:
+        assert "feature_importances" in r
+        assert len(r["feature_importances"]) <= 10
+        assert "estimator" not in r
+        assert "predictions" not in r

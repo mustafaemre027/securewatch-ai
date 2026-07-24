@@ -20,7 +20,10 @@ from app.services.model_service import (
     run_random_forest_experiments,
     ModelComparisonRow,
     ModelComparisonReport,
+    FullModelComparisonReport,
     compare_models,
+    run_model_comparison,
+    comparison_report_to_dict,
 )
 from app.services.preprocessing_service import SplitDataResult
 
@@ -1013,6 +1016,50 @@ def test_lr_timing_mock(synthetic_split_data):
         assert res.training_duration_seconds >= 0.1
         # It shouldn't take much more than the sleep, allowing generous buffer for CI
         assert res.training_duration_seconds < 0.5
+
+
+def test_run_model_comparison_end_to_end():
+    """Test 49: End to end preprocessing and run comparison."""
+    from app.services.csv_validation_service import CICIDS2017_FEATURE_COLUMNS, CICIDS2017_OPTIONAL_LABEL
+    rng = np.random.default_rng(0)
+    data = {col: rng.uniform(0, 100, size=6).tolist() for col in CICIDS2017_FEATURE_COLUMNS}
+    data[CICIDS2017_OPTIONAL_LABEL] = ["BENIGN", "BENIGN", "Attack", "BENIGN", "Attack", "Attack"]
+    df = pd.DataFrame(data)
+
+    report = run_model_comparison(df)
+
+    assert isinstance(report, FullModelComparisonReport)
+    assert report.initial_row_count == 6
+    assert report.final_row_count == 6
+    assert report.feature_count == 77
+    assert len(report.comparison.rows) == 5
+
+    # Check feature importances for RF
+    for row in report.comparison.rows:
+        if row.model_name == "random_forest":
+            assert row.feature_importances is not None
+            assert len(row.feature_importances) <= 10
+        else:
+            assert row.feature_importances is None
+
+
+def test_comparison_report_to_dict():
+    """Test 50: Serialize report to dict, allow_nan=False safe."""
+    import json
+    from app.services.csv_validation_service import CICIDS2017_FEATURE_COLUMNS, CICIDS2017_OPTIONAL_LABEL
+    rng = np.random.default_rng(0)
+    data = {col: rng.uniform(0, 100, size=6).tolist() for col in CICIDS2017_FEATURE_COLUMNS}
+    data[CICIDS2017_OPTIONAL_LABEL] = ["BENIGN", "BENIGN", "Attack", "BENIGN", "Attack", "Attack"]
+    df = pd.DataFrame(data)
+
+    report = run_model_comparison(df)
+    report_dict = comparison_report_to_dict(report)
+
+    # Should not throw any exception when serialized
+    json_str = json.dumps(report_dict, allow_nan=False)
+    assert "logistic_regression" in json_str
+    assert "random_forest" in json_str
+    assert "feature_importances" in json_str
 
 
 # =============================================================================
