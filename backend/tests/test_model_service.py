@@ -15,6 +15,9 @@ from app.services.model_service import (
     train_dummy_classifier,
     train_logistic_regression,
     train_random_forest,
+    RandomForestExperimentConfig,
+    RandomForestExperimentResult,
+    run_random_forest_experiments,
 )
 from app.services.preprocessing_service import SplitDataResult
 
@@ -874,3 +877,97 @@ def test_rf_rejects_invalid_data(synthetic_split_data):
     single_class_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 0, 0, 0]))
     with pytest.raises(AppException):
         train_random_forest(single_class_split)
+
+
+# =============================================================================
+# Random Forest Experiments Tests
+# =============================================================================
+
+def test_rf_experiments_count_and_names(synthetic_split_data):
+    """Test 36: Servisin tam olarak dört deney sonucu döndürmesi ve isimlerinin deterministik olması."""
+    results = run_random_forest_experiments(synthetic_split_data)
+    assert len(results) == 4
+    expected_names = ["rf_baseline", "rf_deeper", "rf_unweighted", "rf_compact"]
+    actual_names = [res.config.experiment_name for res in results]
+    assert actual_names == expected_names
+
+
+def test_rf_experiments_hyperparameters(synthetic_split_data):
+    """Test 37: Her adayın beklenen hiperparametrelerle çalışması ve Random Forest estimator içermesi."""
+    results = run_random_forest_experiments(synthetic_split_data)
+
+    # baseline
+    assert results[0].training_result.estimator.n_estimators == 100
+    assert results[0].training_result.estimator.max_depth == 10
+    assert results[0].training_result.estimator.class_weight == "balanced"
+
+    # deeper
+    assert results[1].training_result.estimator.max_depth == 20
+
+    # unweighted
+    assert results[2].training_result.estimator.class_weight is None
+
+    # compact
+    assert results[3].training_result.estimator.n_estimators == 50
+    assert results[3].training_result.estimator.max_depth == 5
+
+
+def test_rf_experiments_result_structure(synthetic_split_data):
+    """Test 38: Her sonuçta tahmin, metrik, eğitim süresi ve feature importance bulunması."""
+    results = run_random_forest_experiments(synthetic_split_data)
+    for res in results:
+        tr = res.training_result
+        assert isinstance(tr.estimator, RandomForestClassifier)
+        assert len(tr.predictions) == len(synthetic_split_data.y_test)
+        assert isinstance(tr.metrics, ClassificationMetrics)
+
+        assert isinstance(tr.training_duration_seconds, float)
+        assert tr.training_duration_seconds >= 0.0
+
+        assert tr.feature_importances is not None
+        assert len(tr.feature_importances) == len(synthetic_split_data.X_train.columns)
+        total_imp = sum(f.importance for f in tr.feature_importances)
+        assert np.isclose(total_imp, 1.0)
+
+        # Check ordering of feature importances
+        for i in range(len(tr.feature_importances) - 1):
+            curr = tr.feature_importances[i]
+            nxt = tr.feature_importances[i+1]
+            if np.isclose(curr.importance, nxt.importance):
+                assert curr.feature_name <= nxt.feature_name
+            else:
+                assert curr.importance >= nxt.importance
+
+
+def test_rf_experiments_determinism(synthetic_split_data):
+    """Test 39: Aynı veriyle iki çalıştırmada deney sırasının ve tahminlerin aynı olması."""
+    results1 = run_random_forest_experiments(synthetic_split_data)
+    results2 = run_random_forest_experiments(synthetic_split_data)
+
+    assert len(results1) == len(results2)
+    for r1, r2 in zip(results1, results2):
+        assert r1.config.experiment_name == r2.config.experiment_name
+        assert r1.training_result.predictions == r2.training_result.predictions
+
+
+def test_rf_experiments_defensive_copy(synthetic_split_data):
+    """Test 40: Girdi SplitDataResult nesnesinin değiştirilmemesi."""
+    X_train_clean = synthetic_split_data.X_train.copy(deep=True)
+    y_train_clean = synthetic_split_data.y_train.copy(deep=True)
+    X_test_clean = synthetic_split_data.X_test.copy(deep=True)
+
+    run_random_forest_experiments(synthetic_split_data)
+
+    pd.testing.assert_frame_equal(synthetic_split_data.X_train, X_train_clean)
+    pd.testing.assert_series_equal(synthetic_split_data.y_train, y_train_clean)
+    pd.testing.assert_frame_equal(synthetic_split_data.X_test, X_test_clean)
+
+
+def test_rf_experiments_bubbles_up_errors(synthetic_split_data):
+    """Test 41: Deneylerden birinde hata oluşursa hatanın sessizce yutulmaması."""
+    import dataclasses
+    invalid_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 1, 2, 0]))
+    with pytest.raises(AppException) as excinfo:
+        run_random_forest_experiments(invalid_split)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"

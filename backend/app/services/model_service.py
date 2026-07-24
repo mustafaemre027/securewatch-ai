@@ -544,6 +544,88 @@ def train_random_forest(
 
 
 @dataclass(frozen=True)
+class RandomForestExperimentConfig:
+    experiment_name: str
+    n_estimators: int
+    max_depth: int | None
+    min_samples_split: int
+    min_samples_leaf: int
+    class_weight: Any
+    random_state: int
+    n_jobs: int
+
+
+@dataclass(frozen=True)
+class RandomForestExperimentResult:
+    config: RandomForestExperimentConfig
+    training_result: ModelTrainingResult
+
+
+def run_random_forest_experiments(split_data: SplitDataResult) -> tuple[RandomForestExperimentResult, ...]:
+    """
+    Runs four predefined Random Forest experiments.
+    """
+    configs = [
+        RandomForestExperimentConfig(
+            experiment_name="rf_baseline",
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_deeper",
+            n_estimators=100,
+            max_depth=20,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_unweighted",
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight=None,
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_compact",
+            n_estimators=50,
+            max_depth=5,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+    ]
+
+    results = []
+    for config in configs:
+        result = train_random_forest(
+            split_data=split_data,
+            n_estimators=config.n_estimators,
+            max_depth=config.max_depth,
+            min_samples_split=config.min_samples_split,
+            min_samples_leaf=config.min_samples_leaf,
+            class_weight=config.class_weight,
+            random_state=config.random_state,
+            n_jobs=config.n_jobs,
+        )
+        results.append(RandomForestExperimentResult(config=config, training_result=result))
+
+    return tuple(results)
+
+
+@dataclass(frozen=True)
 class BaselineTrainingReport:
     """
     Immutable report containing the full baseline training evaluation results.
