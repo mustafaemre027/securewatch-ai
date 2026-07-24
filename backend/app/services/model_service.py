@@ -1,9 +1,11 @@
 import logging
+import time
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from typing import Any
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -201,6 +203,12 @@ def evaluate_binary_classification(y_true, y_pred) -> ClassificationMetrics:
 
 
 @dataclass(frozen=True)
+class FeatureImportanceRecord:
+    feature_name: str
+    importance: float
+
+
+@dataclass(frozen=True)
 class ModelTrainingResult:
     """
     Immutable structure for storing model training and evaluation results.
@@ -213,6 +221,8 @@ class ModelTrainingResult:
     estimator: Any
     predictions: tuple[int, ...]
     metrics: ClassificationMetrics
+    training_duration_seconds: float | None = None
+    feature_importances: tuple[FeatureImportanceRecord, ...] | None = None
 
 
 def _validate_training_data(split_data: SplitDataResult):
@@ -413,7 +423,11 @@ def train_logistic_regression(
         random_state=42
     )
 
+    t0 = time.perf_counter()
+
     model.fit(X_train_clean, y_train_clean)
+    t1 = time.perf_counter()
+    training_duration_seconds = float(t1 - t0)
 
     preds_arr = model.predict(X_test_clean)
     predictions_tuple = tuple(int(p) for p in preds_arr)
@@ -424,7 +438,339 @@ def train_logistic_regression(
         model_name="logistic_regression",
         estimator=model,
         predictions=predictions_tuple,
-        metrics=metrics
+        metrics=metrics,
+        training_duration_seconds=training_duration_seconds
+    )
+
+
+def train_random_forest(
+    split_data: SplitDataResult,
+    n_estimators: int = 100,
+    max_depth: int | None = 10,
+    min_samples_split: int = 2,
+    min_samples_leaf: int = 1,
+    class_weight: Any = "balanced",
+    random_state: int = 42,
+    n_jobs: int = -1,
+) -> ModelTrainingResult:
+    """
+    Trains and evaluates a RandomForestClassifier model.
+    """
+    _validate_training_data(split_data)
+    _validate_class_weight(class_weight)
+
+    if not isinstance(n_estimators, int) or isinstance(n_estimators, bool) or n_estimators <= 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="n_estimators must be a positive integer."
+        )
+
+    if max_depth is None:
+        pass
+    elif not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth <= 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_depth must be None or a positive integer."
+        )
+
+    if not isinstance(min_samples_split, int) or isinstance(min_samples_split, bool) or min_samples_split < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_samples_split must be an integer >= 2."
+        )
+
+    if not isinstance(min_samples_leaf, int) or isinstance(min_samples_leaf, bool) or min_samples_leaf < 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_samples_leaf must be an integer >= 1."
+        )
+
+    if not isinstance(random_state, int) or isinstance(random_state, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="random_state must be an integer."
+        )
+
+    if not isinstance(n_jobs, int) or isinstance(n_jobs, bool) or n_jobs == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="n_jobs must be a non-zero integer."
+        )
+
+    X_train_clean = split_data.X_train.copy(deep=True)
+    y_train_clean = split_data.y_train.copy(deep=True)
+    X_test_clean = split_data.X_test.copy(deep=True)
+
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
+        class_weight=class_weight,
+        random_state=random_state,
+        n_jobs=n_jobs,
+    )
+
+    t0 = time.perf_counter()
+    model.fit(X_train_clean, y_train_clean)
+    t1 = time.perf_counter()
+
+    training_duration_seconds = float(t1 - t0)
+
+    preds_arr = model.predict(X_test_clean)
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    metrics = evaluate_binary_classification(split_data.y_test, preds_arr)
+
+    feature_names = X_train_clean.columns.tolist()
+    importances = [float(v) for v in model.feature_importances_]
+
+    feature_records = [
+        FeatureImportanceRecord(feature_name=str(name), importance=val)
+        for name, val in zip(feature_names, importances)
+    ]
+    # Sort descending by importance, then alphabetically by name for determinism
+    feature_records.sort(key=lambda x: (-x.importance, x.feature_name))
+
+    return ModelTrainingResult(
+        model_name="random_forest",
+        estimator=model,
+        predictions=predictions_tuple,
+        metrics=metrics,
+        training_duration_seconds=training_duration_seconds,
+        feature_importances=tuple(feature_records)
+    )
+
+
+@dataclass(frozen=True)
+class RandomForestExperimentConfig:
+    experiment_name: str
+    n_estimators: int
+    max_depth: int | None
+    min_samples_split: int
+    min_samples_leaf: int
+    class_weight: Any
+    random_state: int
+    n_jobs: int
+
+
+@dataclass(frozen=True)
+class RandomForestExperimentResult:
+    config: RandomForestExperimentConfig
+    training_result: ModelTrainingResult
+
+
+def run_random_forest_experiments(split_data: SplitDataResult) -> tuple[RandomForestExperimentResult, ...]:
+    """
+    Runs four predefined Random Forest experiments.
+    """
+    configs = [
+        RandomForestExperimentConfig(
+            experiment_name="rf_baseline",
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_deeper",
+            n_estimators=100,
+            max_depth=20,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_unweighted",
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight=None,
+            random_state=42,
+            n_jobs=-1,
+        ),
+        RandomForestExperimentConfig(
+            experiment_name="rf_compact",
+            n_estimators=50,
+            max_depth=5,
+            min_samples_split=2,
+            min_samples_leaf=1,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        ),
+    ]
+
+    results = []
+    for config in configs:
+        result = train_random_forest(
+            split_data=split_data,
+            n_estimators=config.n_estimators,
+            max_depth=config.max_depth,
+            min_samples_split=config.min_samples_split,
+            min_samples_leaf=config.min_samples_leaf,
+            class_weight=config.class_weight,
+            random_state=config.random_state,
+            n_jobs=config.n_jobs,
+        )
+        results.append(RandomForestExperimentResult(config=config, training_result=result))
+
+    return tuple(results)
+
+
+@dataclass(frozen=True)
+class ModelComparisonRow:
+    model_name: str
+    variant_name: str
+    hyperparameters: tuple[tuple[str, Any], ...]
+    training_duration_seconds: float
+    accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
+    confusion_matrix: tuple[tuple[int, int], tuple[int, int]]
+    feature_importances: tuple[FeatureImportanceRecord, ...] | None = None
+
+
+@dataclass(frozen=True)
+class ModelComparisonReport:
+    rows: tuple[ModelComparisonRow, ...]
+
+
+@dataclass(frozen=True)
+class FullModelComparisonReport:
+    initial_row_count: int
+    dropped_duplicate_count: int
+    final_row_count: int
+    feature_count: int
+    train_row_count: int
+    test_row_count: int
+    train_class_distribution: tuple
+    test_class_distribution: tuple
+    comparison: ModelComparisonReport
+
+
+def compare_models(split_data: SplitDataResult) -> ModelComparisonReport:
+    """
+    Compares a LogisticRegression baseline against predefined Random Forest configurations.
+    Returns exactly five comparison rows in a deterministic order.
+    """
+    rows = []
+
+    # 1. Logistic Regression
+    lr_result = train_logistic_regression(split_data)
+    lr_params = (
+        ("class_weight", "balanced"),
+        ("max_iter", 1000),
+        ("solver", "lbfgs"),
+        ("random_state", 42),
+    )
+    lr_metrics = lr_result.metrics
+    rows.append(
+        ModelComparisonRow(
+            model_name="logistic_regression",
+            variant_name="lr_baseline",
+            hyperparameters=lr_params,
+            training_duration_seconds=float(lr_result.training_duration_seconds) if lr_result.training_duration_seconds is not None else 0.0,
+            accuracy=lr_metrics.accuracy,
+            precision=lr_metrics.precision,
+            recall=lr_metrics.recall,
+            f1_score=lr_metrics.f1_score,
+            confusion_matrix=((lr_metrics.tn, lr_metrics.fp), (lr_metrics.fn, lr_metrics.tp)),
+            feature_importances=None,
+        )
+    )
+
+    # 2. Random Forest Experiments
+    rf_experiments = run_random_forest_experiments(split_data)
+    for exp in rf_experiments:
+        cfg = exp.config
+        rf_params = (
+            ("n_estimators", cfg.n_estimators),
+            ("max_depth", cfg.max_depth),
+            ("min_samples_split", cfg.min_samples_split),
+            ("min_samples_leaf", cfg.min_samples_leaf),
+            ("class_weight", cfg.class_weight),
+            ("random_state", cfg.random_state),
+            ("n_jobs", cfg.n_jobs),
+        )
+        rf_metrics = exp.training_result.metrics
+        fi = exp.training_result.feature_importances
+        top_10_fi = fi[:10] if fi is not None else None
+
+        rows.append(
+            ModelComparisonRow(
+                model_name="random_forest",
+                variant_name=cfg.experiment_name,
+                hyperparameters=rf_params,
+                training_duration_seconds=float(exp.training_result.training_duration_seconds) if exp.training_result.training_duration_seconds is not None else 0.0,
+                accuracy=rf_metrics.accuracy,
+                precision=rf_metrics.precision,
+                recall=rf_metrics.recall,
+                f1_score=rf_metrics.f1_score,
+                confusion_matrix=((rf_metrics.tn, rf_metrics.fp), (rf_metrics.fn, rf_metrics.tp)),
+                feature_importances=top_10_fi,
+            )
+        )
+
+    return ModelComparisonReport(rows=tuple(rows))
+
+
+def run_model_comparison(df: pd.DataFrame) -> FullModelComparisonReport:
+    """
+    Runs the full end-to-end model comparison workflow for Logistic Regression and Random Forest.
+    """
+    raw_result = prepare_training_data(df)
+    binary_targets = encode_binary_labels(raw_result.targets)
+
+    binary_result = TrainingDataResult(
+        features=raw_result.features.copy(deep=True),
+        targets=binary_targets,
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+    )
+
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    split_data = split_and_transform_data(binary_result, preprocessor)
+
+    train_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_train.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+    test_dist = tuple(
+        sorted(
+            [(int(k), int(v)) for k, v in split_data.y_test.value_counts().items()],
+            key=lambda x: x[0]
+        )
+    )
+
+    comparison_rows = compare_models(split_data)
+
+    return FullModelComparisonReport(
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+        feature_count=len(split_data.X_train.columns),
+        train_row_count=len(split_data.X_train),
+        test_row_count=len(split_data.X_test),
+        train_class_distribution=train_dist,
+        test_class_distribution=test_dist,
+        comparison=comparison_rows,
     )
 
 
@@ -536,7 +882,7 @@ def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) 
     """Converts a ModelTrainingResult to a JSON-safe dictionary."""
     m = result.metrics
     sample = list(result.predictions[:max_sample])
-    return {
+    out = {
         "model_name": str(result.model_name),
         "prediction_count": int(len(result.predictions)),
         "prediction_sample": [int(p) for p in sample],
@@ -553,6 +899,14 @@ def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) 
         "fn": int(m.fn),
         "tp": int(m.tp),
     }
+    if result.training_duration_seconds is not None:
+        out["training_duration_seconds"] = float(result.training_duration_seconds)
+    if result.feature_importances is not None:
+        out["feature_importances"] = [
+            {"feature_name": r.feature_name, "importance": float(r.importance)}
+            for r in result.feature_importances
+        ]
+    return out
 
 
 def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
@@ -581,4 +935,47 @@ def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
             "dummy_classifier": _model_result_to_dict(report.dummy_result),
             "logistic_regression": _model_result_to_dict(report.logistic_result),
         },
+    }
+
+
+def comparison_report_to_dict(report: FullModelComparisonReport) -> dict:
+    """
+    Converts a FullModelComparisonReport into a JSON-serializable dictionary.
+    """
+    return {
+        "dataset": {
+            "initial_row_count": int(report.initial_row_count),
+            "dropped_duplicate_count": int(report.dropped_duplicate_count),
+            "final_row_count": int(report.final_row_count),
+            "feature_count": int(report.feature_count),
+            "train_row_count": int(report.train_row_count),
+            "test_row_count": int(report.test_row_count),
+            "train_class_distribution": {
+                str(k): int(v) for k, v in report.train_class_distribution
+            },
+            "test_class_distribution": {
+                str(k): int(v) for k, v in report.test_class_distribution
+            },
+        },
+        "rows": [
+            {
+                "model_name": str(row.model_name),
+                "variant_name": str(row.variant_name),
+                "hyperparameters": dict(row.hyperparameters),
+                "training_duration_seconds": float(row.training_duration_seconds),
+                "accuracy": float(row.accuracy),
+                "precision": float(row.precision),
+                "recall": float(row.recall),
+                "f1_score": float(row.f1_score),
+                "confusion_matrix": [
+                    [int(row.confusion_matrix[0][0]), int(row.confusion_matrix[0][1])],
+                    [int(row.confusion_matrix[1][0]), int(row.confusion_matrix[1][1])]
+                ],
+                "feature_importances": [
+                    {"feature_name": r.feature_name, "importance": float(r.importance)}
+                    for r in row.feature_importances
+                ] if row.feature_importances is not None else []
+            }
+            for row in report.comparison.rows
+        ]
     }

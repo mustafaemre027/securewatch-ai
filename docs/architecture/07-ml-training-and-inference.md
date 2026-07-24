@@ -129,12 +129,59 @@ python -m scripts.train_baseline_models --input path/to/training.csv
 
 ---
 
-## 4. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
+## 4. Random Forest Eğitim ve Model Karşılaştırması (Gün 9)
 
-Aşağıdaki bileşenler Gün 8 itibarıyla **uygulanmamıştır** ve sonraki günlerin geliştirme planında yer almaktadır:
+Gün 9 kapsamında Lojistik Regresyon baseline modeline ek olarak, karmaşık ve non-linear ilişkileri yakalamak üzere `RandomForestClassifier` altyapısı ve model karşılaştırma sistemi uygulanmıştır.
 
-- **RandomForestClassifier:** Karmaşık ve non-linear ilişkileri yakalayan gelişmiş sınıflandırıcı.
-- **Kontrollü Parametre Denemeleri & Feature Importance:** Özellik önem derecelerinin çıkarılması.
+### 4.1. Random Forest Eğitim Servisi
+
+Random Forest modeli, veri setindeki non-linear desenleri ve özellik etkileşimlerini öğrenmek üzere tasarlanmıştır:
+- Yalnızca `X_train` ve `y_train` üzerinde `fit` edilir.
+- `X_test` üzerinde kesinlikle `fit` işlemi yapılmaz, yalnızca `predict` metoduyla tahmin alınır.
+- Eğitim süresi (saniye cinsinden) kesin olarak yalnızca `model.fit()` metodunun etrafında ölçülür.
+- Model eğitildikten sonra elde edilen *Gini tabanlı* özellik önem dereceleri (feature importances), 77 giriş özelliğiyle doğru biçimde eşleştirilir ve önem derecesine göre büyükten küçüğe deterministik biçimde sıralanır. **Sınırlama:** Gini importance, yüksek kardinaliteli veya sürekli (continuous) değişkenlere eğilim gösterebilir.
+
+Varsayılan parametreler:
+- `n_estimators=100`
+- `max_depth=10`
+- `min_samples_split=2`
+- `min_samples_leaf=1`
+- `class_weight="balanced"`
+- `random_state=42`
+- `n_jobs=-1`
+
+### 4.2. Kontrollü Random Forest Deneyleri
+
+Dışarıdan sonsuz grid search veya sınırsız parametre akışına izin verilmemektedir. Bunun yerine kod içine gömülü (hardcoded), dört sabit ve kontrollü deney (variant) mevcuttur:
+1. `rf_baseline`: 100 ağaç, derinlik 10, dengeli (balanced) sınıf ağırlığı.
+2. `rf_deeper`: 100 ağaç, derinlik 20, dengeli (balanced) sınıf ağırlığı.
+3. `rf_unweighted`: 100 ağaç, derinlik 10, sınıf ağırlığı yok (None).
+4. `rf_compact`: 50 ağaç, derinlik 5, dengeli (balanced) sınıf ağırlığı.
+
+Bu deneyler her çağrıda aynı sırada çalıştırılır ve deterministik sonuçlar döndürür.
+
+### 4.3. Model Karşılaştırması
+
+Farklı modelleri izole değerlendirmek yerine ortak test/train kümeleri üzerinde tek raporda birleştiren immutable bir karşılaştırma raporu (`FullModelComparisonReport`) üretilir:
+- 1 Lojistik Regresyon ve 4 Random Forest (toplam 5 model satırı) içerir.
+- Her model için **accuracy, precision, recall, F1-score, confusion matrix** ve **eğitim süresi** raporlanır.
+- Yalnızca Random Forest modellerinde (eğer mevcutsa) en yüksek öneme sahip **ilk 10 özellik** gösterilir.
+- Karşılaştırma altyapısı objektif metrikleri sergiler; sistemde hiçbir modeli otomatik "kazanan" veya "best model" olarak atamaz. ROC-AUC ve nihai model seçimi Gün 10 kapsamında yapılacaktır.
+
+### 4.4. CLI ve Güvenlik
+Eğitim betiği komut satırından `python -m scripts.train_baseline_models --input <csv> --compare-random-forest` opsiyonu ile çalıştırıldığında:
+- Eski CLI kullanımı `--compare-random-forest` bayrağı verilmediğinde bozulmadan çalışmaya devam eder.
+- Çıktı JSON dökümü güvenlidir: Estimator (model nesnesi), ham veri matrisleri veya test tahmin (predict) dizileri asla dışa sızdırılmaz.
+- `allow_nan=False` kullanılarak geçersiz JSON (NaN, +inf, -inf) üretimi engellenir.
+- Kullanıcıya yansıyan hatalarda mutlak sistem yolları, traceback detayları veya hassas veri gizlenmiştir.
+- Komut satırı hiçbir koşulda Joblib model dosyası, PKL kalıntısı veya rapor dosyası diske kaydetmez. Sadece stdout üzerinden çıktı döndürür.
+
+---
+
+## 5. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
+
+Aşağıdaki bileşenler Gün 9 itibarıyla **uygulanmamıştır** ve sonraki günlerin geliştirme planında yer almaktadır:
+
 - **Gelişmiş Değerlendirme:** ROC-AUC, Precision-Recall Eğrisi ve False Positive Rate (FPR) analizi.
 - **Model Seçimi:** Baseline ve gelişmiş modellerin karşılaştırılıp nihai modelin seçilmesi.
 - **Risk Eşiklerinin Kesinleştirilmesi:** İş gereksinimlerine göre FPR/FNR tolerans sınırlarının ayarlanması.
@@ -144,13 +191,13 @@ Aşağıdaki bileşenler Gün 8 itibarıyla **uygulanmamıştır** ve sonraki g�
 
 ---
 
-## 5. Risk Skorlama ve Eşik (Threshold) Yönetimi
+## 6. Risk Skorlama ve Eşik (Threshold) Yönetimi
 
 Modelin ürettiği saldırı olasılığı (`p`), risk skoru ve risk seviyelerine aşağıdaki kuralla dönüştürülür:
 
 $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
-### 5.1. Başlangıç (Provisional) Risk Eşikleri
+### 6.1. Başlangıç (Provisional) Risk Eşikleri
 
 | Risk Seviyesi (`risk_level`) | Risk Skoru Aralığı | Açıklama |
 | :--- | :--- | :--- |

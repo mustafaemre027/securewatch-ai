@@ -31,6 +31,11 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="CSV_PATH",
         help="Path to the CIC-IDS2017 CSV training file.",
     )
+    parser.add_argument(
+        "--compare-random-forest",
+        action="store_true",
+        help="Run model comparison with Logistic Regression and Random Forest variants.",
+    )
     return parser
 
 
@@ -60,7 +65,12 @@ def _validate_input_path(raw_path: str) -> Path:
 def main() -> None:
     """Entry point for the baseline training CLI."""
     import pandas as pd
-    from app.services.model_service import baseline_report_to_dict, train_baseline_models
+    from app.services.model_service import (
+        baseline_report_to_dict,
+        train_baseline_models,
+        comparison_report_to_dict,
+        run_model_comparison
+    )
 
     parser = _build_parser()
     args = parser.parse_args()
@@ -74,7 +84,10 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        report = train_baseline_models(df)
+        if args.compare_random_forest:
+            report = run_model_comparison(df)
+        else:
+            report = train_baseline_models(df)
     except Exception as exc:
         # Emit only the exception message, never a traceback or raw data
         short_msg = str(exc)
@@ -85,7 +98,10 @@ def main() -> None:
         sys.exit(2)
 
     try:
-        report_dict = baseline_report_to_dict(report)
+        if args.compare_random_forest:
+            report_dict = comparison_report_to_dict(report)
+        else:
+            report_dict = baseline_report_to_dict(report)
         json.dump(report_dict, sys.stdout, indent=2, allow_nan=False)
         print()  # Trailing newline after JSON
     except Exception:
