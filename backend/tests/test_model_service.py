@@ -14,6 +14,7 @@ from app.services.model_service import (
     ModelTrainingResult,
     train_dummy_classifier,
     train_logistic_regression,
+    train_random_forest,
 )
 from app.services.preprocessing_service import SplitDataResult
 
@@ -724,3 +725,152 @@ def test_lr_no_warnings(synthetic_split_data):
     """Test 27: Eğitim sırasında hiçbir warning oluşmaması (ConvergenceWarning vs)."""
     # -W error parametresiyle test edildiği için warning oluşursa test doğrudan patlar
     train_logistic_regression(synthetic_split_data)
+
+
+# =============================================================================
+# Random Forest Classifier Tests
+# =============================================================================
+from sklearn.ensemble import RandomForestClassifier
+
+
+def test_rf_successful_training(synthetic_split_data):
+    """Test 28: Başarılı Random Forest eğitimi ve doğru yapılandırma."""
+    result = train_random_forest(synthetic_split_data)
+
+    assert result.model_name == "random_forest"
+    assert isinstance(result.estimator, RandomForestClassifier)
+    assert isinstance(result.predictions, tuple)
+    assert set(result.predictions).issubset({0, 1})
+
+    assert isinstance(result.training_duration_seconds, float)
+    assert result.training_duration_seconds >= 0.0
+
+    # Varsayılan hiperparametrelerin doğrulanması
+    assert result.estimator.n_estimators == 100
+    assert result.estimator.max_depth == 10
+    assert result.estimator.min_samples_split == 2
+    assert result.estimator.min_samples_leaf == 1
+    assert result.estimator.class_weight == "balanced"
+    assert result.estimator.random_state == 42
+    assert result.estimator.n_jobs == -1
+
+
+def test_rf_feature_importances(synthetic_split_data):
+    """Test 29: Feature importance altyapısı ve sıralama doğrulaması."""
+    result = train_random_forest(synthetic_split_data)
+
+    assert result.feature_importances is not None
+    assert isinstance(result.feature_importances, tuple)
+
+    expected_count = len(synthetic_split_data.X_train.columns)
+    assert len(result.feature_importances) == expected_count
+
+    total_importance = sum(record.importance for record in result.feature_importances)
+    assert np.isclose(total_importance, 1.0)
+
+    for i in range(len(result.feature_importances) - 1):
+        curr = result.feature_importances[i]
+        nxt = result.feature_importances[i+1]
+        assert isinstance(curr.feature_name, str)
+        assert isinstance(curr.importance, float)
+        assert curr.importance >= 0.0
+        # Sıralama doğrulaması: önce importance (azalan), sonra isim (artan)
+        if np.isclose(curr.importance, nxt.importance):
+            assert curr.feature_name <= nxt.feature_name
+        else:
+            assert curr.importance >= nxt.importance
+
+
+def test_rf_metrics_match(synthetic_split_data):
+    """Test 30: Metriklerin mevcut evaluate_binary_classification fonksiyonuyla eşleşmesi."""
+    result = train_random_forest(synthetic_split_data)
+    expected_metrics = evaluate_binary_classification(
+        synthetic_split_data.y_test,
+        result.predictions
+    )
+    assert result.metrics == expected_metrics
+
+
+def test_rf_deterministic(synthetic_split_data):
+    """Test 31: Aynı girdi ve random_state ile sonuçların birebir aynı (deterministik) olması."""
+    result1 = train_random_forest(synthetic_split_data, random_state=42)
+    result2 = train_random_forest(synthetic_split_data, random_state=42)
+
+    assert result1.predictions == result2.predictions
+    assert result1.feature_importances == result2.feature_importances
+    assert result1.metrics == result2.metrics
+
+
+def test_rf_defensive_copy(synthetic_split_data):
+    """Test 32: Eğitim ve test girdilerinin hiçbir şekilde değiştirilmemesi."""
+    X_train_clean = synthetic_split_data.X_train.copy(deep=True)
+    y_train_clean = synthetic_split_data.y_train.copy(deep=True)
+    X_test_clean = synthetic_split_data.X_test.copy(deep=True)
+
+    train_random_forest(synthetic_split_data)
+
+    pd.testing.assert_frame_equal(synthetic_split_data.X_train, X_train_clean)
+    pd.testing.assert_series_equal(synthetic_split_data.y_train, y_train_clean)
+    pd.testing.assert_frame_equal(synthetic_split_data.X_test, X_test_clean)
+
+
+def test_rf_rejects_invalid_hyperparameters(synthetic_split_data):
+    """Test 33: Geçersiz RF hiperparametrelerinin reddedilmesi."""
+    invalid_cases = [
+        {"n_estimators": 0},
+        {"n_estimators": -5},
+        {"n_estimators": 50.5},
+        {"n_estimators": True},
+        {"max_depth": -1},
+        {"max_depth": 0},
+        {"max_depth": "10"},
+        {"min_samples_split": 1},
+        {"min_samples_split": -2},
+        {"min_samples_leaf": 0},
+        {"min_samples_leaf": -1},
+        {"random_state": "42"},
+        {"random_state": None},
+        {"n_jobs": 0},
+        {"n_jobs": "1"},
+    ]
+
+    for kwargs in invalid_cases:
+        with pytest.raises(AppException) as excinfo:
+            train_random_forest(synthetic_split_data, **kwargs)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_rf_rejects_invalid_class_weight(synthetic_split_data):
+    """Test 34: Geçersiz sınıf ağırlığının reddedilmesi (mevcut doğrulama tekrarı)."""
+    invalid_weights = [
+        "unbalanced",
+        {0: 1.0},
+        {0: -1.0, 1: 1.0},
+        {0: "a", 1: "b"}
+    ]
+    for cw in invalid_weights:
+        with pytest.raises(AppException) as excinfo:
+            train_random_forest(synthetic_split_data, class_weight=cw)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_rf_rejects_invalid_data(synthetic_split_data):
+    """Test 35: Boş küme, tek sınıflı hedef veya non-binary hedeflerin _validate_training_data üzerinden reddedilmesi."""
+    import dataclasses
+
+    # 1. Boş split
+    empty_split = dataclasses.replace(synthetic_split_data, X_train=pd.DataFrame())
+    with pytest.raises(AppException):
+        train_random_forest(empty_split)
+
+    # 2. Non-binary hedefler
+    non_binary_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 1, 2, 0]))
+    with pytest.raises(AppException):
+        train_random_forest(non_binary_split)
+
+    # 3. Tek sınıflı hedefler
+    single_class_split = dataclasses.replace(synthetic_split_data, y_train=pd.Series([0, 0, 0, 0]))
+    with pytest.raises(AppException):
+        train_random_forest(single_class_split)

@@ -1,9 +1,11 @@
 import logging
+import time
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from typing import Any
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -201,6 +203,12 @@ def evaluate_binary_classification(y_true, y_pred) -> ClassificationMetrics:
 
 
 @dataclass(frozen=True)
+class FeatureImportanceRecord:
+    feature_name: str
+    importance: float
+
+
+@dataclass(frozen=True)
 class ModelTrainingResult:
     """
     Immutable structure for storing model training and evaluation results.
@@ -213,6 +221,8 @@ class ModelTrainingResult:
     estimator: Any
     predictions: tuple[int, ...]
     metrics: ClassificationMetrics
+    training_duration_seconds: float | None = None
+    feature_importances: tuple[FeatureImportanceRecord, ...] | None = None
 
 
 def _validate_training_data(split_data: SplitDataResult):
@@ -428,6 +438,111 @@ def train_logistic_regression(
     )
 
 
+def train_random_forest(
+    split_data: SplitDataResult,
+    n_estimators: int = 100,
+    max_depth: int | None = 10,
+    min_samples_split: int = 2,
+    min_samples_leaf: int = 1,
+    class_weight: Any = "balanced",
+    random_state: int = 42,
+    n_jobs: int = -1,
+) -> ModelTrainingResult:
+    """
+    Trains and evaluates a RandomForestClassifier model.
+    """
+    _validate_training_data(split_data)
+    _validate_class_weight(class_weight)
+
+    if not isinstance(n_estimators, int) or isinstance(n_estimators, bool) or n_estimators <= 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="n_estimators must be a positive integer."
+        )
+
+    if max_depth is None:
+        pass
+    elif not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth <= 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_depth must be None or a positive integer."
+        )
+
+    if not isinstance(min_samples_split, int) or isinstance(min_samples_split, bool) or min_samples_split < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_samples_split must be an integer >= 2."
+        )
+
+    if not isinstance(min_samples_leaf, int) or isinstance(min_samples_leaf, bool) or min_samples_leaf < 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_samples_leaf must be an integer >= 1."
+        )
+
+    if not isinstance(random_state, int) or isinstance(random_state, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="random_state must be an integer."
+        )
+
+    if not isinstance(n_jobs, int) or isinstance(n_jobs, bool) or n_jobs == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="n_jobs must be a non-zero integer."
+        )
+
+    X_train_clean = split_data.X_train.copy(deep=True)
+    y_train_clean = split_data.y_train.copy(deep=True)
+    X_test_clean = split_data.X_test.copy(deep=True)
+
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
+        class_weight=class_weight,
+        random_state=random_state,
+        n_jobs=n_jobs,
+    )
+
+    t0 = time.perf_counter()
+    model.fit(X_train_clean, y_train_clean)
+    t1 = time.perf_counter()
+
+    training_duration_seconds = float(t1 - t0)
+
+    preds_arr = model.predict(X_test_clean)
+    predictions_tuple = tuple(int(p) for p in preds_arr)
+
+    metrics = evaluate_binary_classification(split_data.y_test, preds_arr)
+
+    feature_names = X_train_clean.columns.tolist()
+    importances = [float(v) for v in model.feature_importances_]
+
+    feature_records = [
+        FeatureImportanceRecord(feature_name=str(name), importance=val)
+        for name, val in zip(feature_names, importances)
+    ]
+    # Sort descending by importance, then alphabetically by name for determinism
+    feature_records.sort(key=lambda x: (-x.importance, x.feature_name))
+
+    return ModelTrainingResult(
+        model_name="random_forest",
+        estimator=model,
+        predictions=predictions_tuple,
+        metrics=metrics,
+        training_duration_seconds=training_duration_seconds,
+        feature_importances=tuple(feature_records)
+    )
+
+
 @dataclass(frozen=True)
 class BaselineTrainingReport:
     """
@@ -536,7 +651,7 @@ def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) 
     """Converts a ModelTrainingResult to a JSON-safe dictionary."""
     m = result.metrics
     sample = list(result.predictions[:max_sample])
-    return {
+    out = {
         "model_name": str(result.model_name),
         "prediction_count": int(len(result.predictions)),
         "prediction_sample": [int(p) for p in sample],
@@ -553,6 +668,14 @@ def _model_result_to_dict(result: ModelTrainingResult, *, max_sample: int = 10) 
         "fn": int(m.fn),
         "tp": int(m.tp),
     }
+    if result.training_duration_seconds is not None:
+        out["training_duration_seconds"] = float(result.training_duration_seconds)
+    if result.feature_importances is not None:
+        out["feature_importances"] = [
+            {"feature_name": r.feature_name, "importance": float(r.importance)}
+            for r in result.feature_importances
+        ]
+    return out
 
 
 def baseline_report_to_dict(report: BaselineTrainingReport) -> dict:
