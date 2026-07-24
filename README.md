@@ -14,7 +14,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
 - **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
 - **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
-- **Makine Öğrenmesi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı (imputer + scaler), ikili etiket kodlaması (`BENIGN → 0`, saldırı → `1`), sızıntı korumalı (leakage-safe) train/test ayrımı, `DummyClassifier` ve `LogisticRegression` (dengeli sınıf ağırlıklı) baseline model eğitimi, performans metrikleri (accuracy, precision, recall, F1-score, confusion matrix) ve uçtan uca CLI eğitim betiği uygulandı (bkz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md) ve [docs/model-evaluation/day-08-baseline-report.md](docs/model-evaluation/day-08-baseline-report.md)).
+- **Makine Öğrenmesi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı, ikili etiket kodlaması, sızıntı korumalı (leakage-safe) train/test ayrımı uygulandı. `DummyClassifier` ve `LogisticRegression` baseline modellerine ek olarak Random Forest eğitim ve karşılaştırma altyapısı geliştirildi. Lojistik Regresyon ile dört kontrollü Random Forest deneyi aynı veri seti üzerinde karşılaştırılabilir hâle getirildi (eğitim süresi ve özellik önem derecesi - feature importance raporlaması dâhil). Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 8 Raporu](docs/model-evaluation/day-08-baseline-report.md) ve [Gün 9 Raporu](docs/model-evaluation/day-09-random-forest-report.md).
 - **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi (planlandı).
 - **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
 - **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
@@ -137,6 +137,18 @@ Backend test suitini (birim, entegrasyon ve güvenlik testleri) çalıştırmak 
 
 ```powershell
 python -m pytest -q
+```
+
+#### 6. Makine Öğrenmesi Eğitim CLI Betiği
+
+CIC-IDS2017 veri seti kullanılarak model değerlendirmelerini uçtan uca komut satırından çalıştırabilirsiniz:
+
+```powershell
+# Sadece baseline (Lojistik Regresyon) model çalıştırma
+python -m scripts.train_baseline_models --input path/to/training.csv
+
+# Random Forest deneylerini ve Lojistik Regresyon karşılaştırmasını (Feature Importance ile) çalıştırma
+python -m scripts.train_baseline_models --input path/to/training.csv --compare-random-forest
 ```
 
 ### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
