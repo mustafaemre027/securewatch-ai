@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
+import dataclasses
 import pytest
 
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.compose import ColumnTransformer
 
@@ -11,6 +13,11 @@ from app.services.model_service import (
     encode_binary_labels,
     evaluate_binary_classification,
     ClassificationMetrics,
+    RocCurvePoint,
+    PrecisionRecallCurvePoint,
+    ProbabilityEvaluationMetrics,
+    extract_positive_probabilities,
+    evaluate_probability_metrics,
     ModelTrainingResult,
     train_dummy_classifier,
     train_logistic_regression,
@@ -1154,3 +1161,344 @@ def test_rf_experiments_bubbles_up_errors(synthetic_split_data):
         run_random_forest_experiments(invalid_split)
     assert excinfo.value.status_code == 422
     assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+# --- Probability Extraction Tests ---
+
+def test_extract_probabilities_logistic_regression():
+    """Test 42: Lojistik Regresyondan olasılık çıkarılması."""
+    X = pd.DataFrame({"feat1": [0.1, 0.5, 0.9, 0.2], "feat2": [1.0, 2.0, 3.0, 1.5]})
+    y = pd.Series([0, 1, 1, 0])
+    clf = LogisticRegression()
+    clf.fit(X, y)
+    probs = extract_positive_probabilities(clf, X)
+    assert isinstance(probs, tuple)
+    assert len(probs) == len(X)
+    assert all(isinstance(p, float) for p in probs)
+    assert all(0.0 <= p <= 1.0 for p in probs)
+
+
+def test_extract_probabilities_random_forest():
+    """Test 43: Random Forest’tan olasılık çıkarılması."""
+    X = pd.DataFrame({"feat1": [0.1, 0.5, 0.9, 0.2], "feat2": [1.0, 2.0, 3.0, 1.5]})
+    y = pd.Series([0, 1, 1, 0])
+    clf = RandomForestClassifier(n_estimators=5, random_state=42)
+    clf.fit(X, y)
+    probs = extract_positive_probabilities(clf, X)
+    assert isinstance(probs, tuple)
+    assert len(probs) == len(X)
+    assert all(isinstance(p, float) for p in probs)
+    assert all(0.0 <= p <= 1.0 for p in probs)
+
+
+def test_extract_probabilities_reverse_classes():
+    """Test 44: Ters classes_ sıralamasında pozitif sınıfın doğru bulunması."""
+    class DummyRevModel:
+        classes_ = np.array([1, 0])
+        def predict_proba(self, X):
+            # Column 0 corresponds to class 1, column 1 corresponds to class 0
+            return np.array([[0.8, 0.2], [0.3, 0.7]])
+
+    probs = extract_positive_probabilities(DummyRevModel(), [[1], [2]])
+    assert probs == (0.8, 0.3)
+    assert all(type(p) is float for p in probs)
+
+
+def test_extract_probabilities_rejects_no_predict_proba():
+    """Test 45: predict_proba bulunmayan estimatorın reddedilmesi."""
+    class DummyNoProba:
+        classes_ = np.array([0, 1])
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyNoProba(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "predict_proba" in excinfo.value.message
+
+
+def test_extract_probabilities_rejects_invalid_classes():
+    """Test 46: Geçersiz veya eksik classes_ değerlerinin reddedilmesi."""
+    class DummyMissingClasses:
+        def predict_proba(self, X): return np.array([[0.5, 0.5]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyMissingClasses(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummySingleClass:
+        classes_ = np.array([0])
+        def predict_proba(self, X): return np.array([[1.0]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummySingleClass(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyThreeClasses:
+        classes_ = np.array([0, 1, 2])
+        def predict_proba(self, X): return np.array([[0.3, 0.3, 0.4]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyThreeClasses(), [[1]])
+    assert excinfo.value.status_code == 422
+
+
+def test_extract_probabilities_rejects_invalid_proba_shape():
+    """Test 47: Hatalı predict_proba boyutunun reddedilmesi."""
+    class DummyBadCols:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5], [0.5]])  # 1 col instead of 2
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyBadCols(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+
+    class DummyBadRows:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, 0.5]])  # 1 row for 2 inputs
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyBadRows(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+
+
+def test_extract_probabilities_rejects_nan_inf_out_of_range():
+    """Test 48: NaN, inf ve aralık dışı olasılıkların reddedilmesi."""
+    class DummyNaN:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, np.nan]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyNaN(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyInf:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, np.inf]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyInf(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyOutRange:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[-0.1, 1.1]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyOutRange(), [[1]])
+    assert excinfo.value.status_code == 422
+
+
+# --- Probability Metrics Evaluation Tests ---
+
+def test_evaluate_probability_metrics_correct_roc_auc():
+    """Test 49: Bilinen örnek üzerinde doğru ROC-AUC."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.roc_auc == 1.0
+    assert type(res.roc_auc) is float
+
+    y_true_mixed = [0, 1, 0, 1]
+    probs_mixed = [0.2, 0.5, 0.6, 0.8] # 1 incorrect ranking out of 4 pairs -> AUC 0.75
+    res_mixed = evaluate_probability_metrics(y_true_mixed, probs_mixed)
+    assert abs(res_mixed.roc_auc - 0.75) < 1e-6
+
+
+def test_evaluate_probability_metrics_correct_ap():
+    """Test 50: Bilinen örnek üzerinde doğru Average Precision."""
+    y_true = [0, 1, 0, 1]
+    probs = [0.1, 0.9, 0.2, 0.8] # perfect ranking for positives
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.average_precision == 1.0
+    assert type(res.average_precision) is float
+
+
+def test_evaluate_probability_metrics_curve_structures():
+    """Test 51: ROC ve Precision-Recall noktalarının doğru yapıda olması."""
+    y_true = [0, 1, 0, 1]
+    probs = [0.1, 0.4, 0.35, 0.8]
+    res = evaluate_probability_metrics(y_true, probs)
+
+    assert isinstance(res.roc_curve, tuple)
+    assert len(res.roc_curve) > 0
+    for pt in res.roc_curve:
+        assert isinstance(pt, RocCurvePoint)
+        assert 0.0 <= pt.false_positive_rate <= 1.0
+        assert 0.0 <= pt.true_positive_rate <= 1.0
+        assert pt.threshold is None or (0.0 <= pt.threshold <= 1.0)
+
+    assert isinstance(res.precision_recall_curve, tuple)
+    assert len(res.precision_recall_curve) > 0
+    for pt in res.precision_recall_curve:
+        assert isinstance(pt, PrecisionRecallCurvePoint)
+        assert 0.0 <= pt.precision <= 1.0
+        assert 0.0 <= pt.recall <= 1.0
+        assert pt.threshold is None or (0.0 <= pt.threshold <= 1.0)
+
+
+def test_evaluate_probability_metrics_roc_initial_threshold_none():
+    """Test 52: ROC başlangıç sonsuz threshold değerinin None olması."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.roc_curve[0].threshold is None
+
+
+def test_evaluate_probability_metrics_pr_final_threshold_none():
+    """Test 53: PR eğrisinin son threshold değerinin None olması."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.precision_recall_curve[-1].threshold is None
+
+
+def test_evaluate_probability_metrics_fpr_formula_matches_cm():
+    """Test 54: FPR formülünün confusion matrix ile eşleşmesi (FP / (FP + TN))."""
+    y_true = [0, 0, 0, 0, 1, 1]
+    probs = [0.6, 0.7, 0.2, 0.1, 0.8, 0.9] # threshold 0.5 -> FP is 2, TN is 2
+    res = evaluate_probability_metrics(y_true, probs, threshold=0.5)
+    cm = res.classification_metrics.confusion_matrix
+    tn, fp = cm[0][0], cm[0][1]
+    expected_fpr = fp / (fp + tn)
+    assert abs(res.false_positive_rate - expected_fpr) < 1e-9
+    assert abs(res.false_positive_rate - 0.5) < 1e-9
+
+
+def test_evaluate_probability_metrics_score_gte_threshold_boundary():
+    """Test 55: score >= threshold sınır davranışı."""
+    y_true = [0, 1]
+    probs = [0.5, 0.5]
+    # At threshold 0.5, score >= 0.5 should predict 1 for both
+    res = evaluate_probability_metrics(y_true, probs, threshold=0.5)
+    assert res.classification_metrics.tp == 1
+    assert res.classification_metrics.fp == 1
+
+    # At threshold 0.51, score >= 0.51 should predict 0 for both
+    res_high = evaluate_probability_metrics(y_true, probs, threshold=0.51)
+    assert res_high.classification_metrics.tp == 0
+    assert res_high.classification_metrics.fn == 1
+
+
+def test_evaluate_probability_metrics_rejects_single_class_target():
+    """Test 56: Tek sınıflı hedeflerin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 0, 0], [0.1, 0.2, 0.3])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "both 0 and 1" in excinfo.value.message
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([1, 1, 1], [0.8, 0.9, 0.7])
+    assert excinfo.value.status_code == 422
+
+
+def test_evaluate_probability_metrics_rejects_length_mismatch():
+    """Test 57: Farklı uzunluktaki girişlerin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.5, 0.6, 0.7])
+    assert excinfo.value.status_code == 422
+    assert "same length" in excinfo.value.message
+
+
+def test_evaluate_probability_metrics_rejects_invalid_threshold():
+    """Test 58: Geçersiz karar eşiğinin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=-0.1)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=1.1)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=np.nan)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold="invalid")
+    assert excinfo.value.status_code == 422
+
+
+def test_evaluate_probability_metrics_returns_python_native_types():
+    """Test 59: NumPy scalar yerine Python-native değerlerin dönmesi."""
+    y_true = np.array([0, 1, 0, 1], dtype=np.int64)
+    probs = np.array([0.1, 0.9, 0.2, 0.8], dtype=np.float64)
+    res = evaluate_probability_metrics(y_true, probs, threshold=np.float64(0.5))
+
+    assert type(res.roc_auc) is float
+    assert type(res.average_precision) is float
+    assert type(res.threshold) is float
+    assert type(res.false_positive_rate) is float
+    assert type(res.classification_metrics.accuracy) is float
+    assert type(res.classification_metrics.tp) is int
+
+    for pt in res.roc_curve:
+        assert type(pt.false_positive_rate) is float
+        assert type(pt.true_positive_rate) is float
+        assert pt.threshold is None or type(pt.threshold) is float
+
+    for pt in res.precision_recall_curve:
+        assert type(pt.precision) is float
+        assert type(pt.recall) is float
+        assert pt.threshold is None or type(pt.threshold) is float
+
+
+def test_evaluate_probability_metrics_immutability():
+    """Test 60: Sonuç dataclasslarının ve tuple alanlarının immutable olması."""
+    y_true = [0, 1]
+    probs = [0.2, 0.8]
+    res = evaluate_probability_metrics(y_true, probs)
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.roc_auc = 0.5
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.roc_curve[0].false_positive_rate = 1.0
+
+    assert isinstance(res.roc_curve, tuple)
+    assert isinstance(res.precision_recall_curve, tuple)
+
+
+def test_evaluate_probability_metrics_no_input_mutation():
+    """Test 61: Girdi dizilerinin ve DataFrame’in değişmemesi."""
+    y_true = pd.Series([0, 1, 0, 1], name="target")
+    probs = pd.Series([0.1, 0.9, 0.2, 0.8], name="probs")
+    y_copy = y_true.copy(deep=True)
+    p_copy = probs.copy(deep=True)
+
+    evaluate_probability_metrics(y_true, probs)
+
+    pd.testing.assert_series_equal(y_true, y_copy)
+    pd.testing.assert_series_equal(probs, p_copy)
+
+    X = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    X_copy = X.copy(deep=True)
+    clf = LogisticRegression()
+    clf.fit(X, [0, 1])
+    extract_positive_probabilities(clf, X)
+    pd.testing.assert_frame_equal(X, X_copy)
+
+
+def test_probability_services_422_validation_error_contract():
+    """Test 62: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([], [])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(None, [[1]])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_probability_services_no_leakage():
+    """Test 63: Hata mesajlarında ham veri, mutlak yol veya estimator içeriği bulunmaması."""
+    class VerboseBadModel:
+        def __str__(self): return "SECRET_INTERNAL_MODEL_PATH_c:/Projects/securewatch-ai/model"
+        def __repr__(self): return "SECRET_INTERNAL_MODEL_PATH_c:/Projects/securewatch-ai/model"
+        def predict_proba(self, X): raise ValueError("Internal db error at c:/Projects/securewatch-ai/db.sqlite")
+
+    verbose_model = VerboseBadModel()
+    verbose_model.classes_ = np.array([0, 1])
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(verbose_model, [[1.0]])
+
+    msg = excinfo.value.message
+    assert "c:/" not in msg.lower()
+    assert "securewatch" not in msg.lower()
+    assert "secret" not in msg.lower()
+    assert "db.sqlite" not in msg.lower()

@@ -13,6 +13,10 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     confusion_matrix,
+    roc_auc_score,
+    roc_curve,
+    average_precision_score,
+    precision_recall_curve,
 )
 
 from app.core.exceptions import AppException
@@ -199,6 +203,351 @@ def evaluate_binary_classification(y_true, y_pred) -> ClassificationMetrics:
         fp=fp,
         fn=fn,
         tp=tp
+    )
+
+
+@dataclass(frozen=True)
+class RocCurvePoint:
+    """Immutable struct representing a point on the ROC curve."""
+    false_positive_rate: float
+    true_positive_rate: float
+    threshold: float | None
+
+
+@dataclass(frozen=True)
+class PrecisionRecallCurvePoint:
+    """Immutable struct representing a point on the Precision-Recall curve."""
+    precision: float
+    recall: float
+    threshold: float | None
+
+
+@dataclass(frozen=True)
+class ProbabilityEvaluationMetrics:
+    """Immutable struct for probability-based evaluation results."""
+    roc_auc: float
+    average_precision: float
+    threshold: float
+    classification_metrics: ClassificationMetrics
+    false_positive_rate: float
+    roc_curve: tuple[RocCurvePoint, ...]
+    precision_recall_curve: tuple[PrecisionRecallCurvePoint, ...]
+
+
+def extract_positive_probabilities(estimator: Any, X: Any) -> tuple[float, ...]:
+    """
+    Safely extracts positive class (1) probabilities from a trained estimator.
+
+    Args:
+        estimator: A trained classification model supporting predict_proba.
+        X: Input features for prediction.
+
+    Returns:
+        tuple[float, ...]: Immutable tuple of positive class probabilities as native floats.
+
+    Raises:
+        AppException: If validation fails or estimator does not support probability extraction.
+    """
+    if estimator is None:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator cannot be None."
+        )
+
+    if not hasattr(estimator, "predict_proba") or not callable(getattr(estimator, "predict_proba", None)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator does not support predict_proba."
+        )
+
+    if not hasattr(estimator, "classes_"):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator does not have classes_ attribute."
+        )
+
+    try:
+        classes_arr = np.asarray(estimator.classes_)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator classes_ attribute is invalid."
+        )
+
+    if classes_arr.ndim != 1 or len(classes_arr) != 2 or set(classes_arr) != {0, 1}:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator classes_ must contain exactly binary classes 0 and 1."
+        )
+
+    if X is None:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Input features cannot be None."
+        )
+
+    try:
+        if hasattr(X, "empty") and X.empty:
+            raise AppException(status_code=422, code="VALIDATION_ERROR", message="Input features cannot be empty.")
+        elif hasattr(X, "size") and X.size == 0:
+            raise AppException(status_code=422, code="VALIDATION_ERROR", message="Input features cannot be empty.")
+        elif len(X) == 0:
+            raise AppException(status_code=422, code="VALIDATION_ERROR", message="Input features cannot be empty.")
+    except TypeError:
+        raise AppException(status_code=422, code="VALIDATION_ERROR", message="Invalid input features structure.")
+    except AppException:
+        raise
+
+    try:
+        proba = estimator.predict_proba(X)
+    except AppException:
+        raise
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Failed to predict probabilities with estimator."
+        )
+
+    try:
+        proba_arr = np.asarray(proba)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities cannot be converted to array."
+        )
+
+    if proba_arr.ndim != 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities must be a 2-dimensional array."
+        )
+
+    if proba_arr.shape[1] != 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities must contain exactly 2 class columns."
+        )
+
+    try:
+        expected_len = len(X)
+    except TypeError:
+        expected_len = proba_arr.shape[0]
+
+    if proba_arr.shape[0] != expected_len:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities row count does not match input features row count."
+        )
+
+    if proba_arr.shape[0] == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities cannot be empty."
+        )
+
+    pos_idx = int(np.where(classes_arr == 1)[0][0])
+    pos_probs = proba_arr[:, pos_idx]
+
+    if np.isnan(pos_probs).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities cannot contain NaN."
+        )
+
+    if np.isinf(pos_probs).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities cannot contain infinite values."
+        )
+
+    if (pos_probs < 0.0).any() or (pos_probs > 1.0).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Predicted probabilities must be between 0.0 and 1.0 inclusive."
+        )
+
+    return tuple(float(val) for val in pos_probs)
+
+
+def evaluate_probability_metrics(
+    y_true: Any,
+    probabilities: Any,
+    threshold: float = 0.5,
+) -> ProbabilityEvaluationMetrics:
+    """
+    Evaluates binary classification probability predictions and calculates advanced metrics.
+
+    Args:
+        y_true: Array-like true binary targets (0 and 1).
+        probabilities: Array-like positive class probabilities.
+        threshold: Decision threshold in [0.0, 1.0]. Rule: score >= threshold -> 1.
+
+    Returns:
+        ProbabilityEvaluationMetrics: Immutable evaluation metrics including ROC and PR curves.
+
+    Raises:
+        AppException: If validation fails.
+    """
+    try:
+        thresh_val = float(threshold)
+    except (TypeError, ValueError):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold must be a numeric value."
+        )
+
+    if np.isnan(thresh_val) or np.isinf(thresh_val):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold must be a finite number."
+        )
+
+    if thresh_val < 0.0 or thresh_val > 1.0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold must be between 0.0 and 1.0 inclusive."
+        )
+
+    try:
+        y_true_arr = np.asarray(y_true)
+        probs_arr = np.asarray(probabilities)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs must be array-like."
+        )
+
+    if y_true_arr.size == 0 or probs_arr.size == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot be empty."
+        )
+
+    if y_true_arr.ndim != 1 or probs_arr.ndim != 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs must be 1-dimensional."
+        )
+
+    if y_true_arr.shape[0] != probs_arr.shape[0]:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="y_true and probabilities must have the same length."
+        )
+
+    if y_true_arr.dtype.kind not in {'i', 'u', 'f'} or probs_arr.dtype.kind not in {'i', 'u', 'f'}:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain text or non-numeric values."
+        )
+
+    if np.isnan(y_true_arr).any() or np.isnan(probs_arr).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain NaN."
+        )
+
+    if np.isinf(y_true_arr).any() or np.isinf(probs_arr).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Inputs cannot contain infinite values."
+        )
+
+    if not np.isin(y_true_arr, [0, 1]).all():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain only 0 and 1."
+        )
+
+    unique_classes = np.unique(y_true_arr)
+    if len(unique_classes) < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain both 0 and 1 classes to evaluate ROC-AUC."
+        )
+
+    if (probs_arr < 0.0).any() or (probs_arr > 1.0).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Probabilities must be between 0.0 and 1.0 inclusive."
+        )
+
+    y_pred_arr = (probs_arr >= thresh_val).astype(int)
+    class_metrics = evaluate_binary_classification(y_true_arr, y_pred_arr)
+
+    denom = class_metrics.fp + class_metrics.tn
+    fpr_val = float(class_metrics.fp / denom) if denom > 0 else 0.0
+
+    roc_auc_val = float(roc_auc_score(y_true_arr, probs_arr))
+
+    fpr_array, tpr_array, roc_thresholds = roc_curve(y_true_arr, probs_arr)
+    roc_points = []
+    for i in range(len(fpr_array)):
+        f_val = float(fpr_array[i])
+        t_val = float(tpr_array[i])
+        th_val = roc_thresholds[i]
+        if i == 0 or np.isinf(th_val) or np.isnan(th_val) or th_val > 1.0:
+            th_clean = None
+        else:
+            th_clean = float(th_val)
+        roc_points.append(RocCurvePoint(false_positive_rate=f_val, true_positive_rate=t_val, threshold=th_clean))
+    roc_curve_tuple = tuple(roc_points)
+
+    ap_val = float(average_precision_score(y_true_arr, probs_arr))
+
+    prec_array, rec_array, pr_thresholds = precision_recall_curve(y_true_arr, probs_arr)
+    pr_points = []
+    n_thresh = len(pr_thresholds)
+    for i in range(len(prec_array)):
+        p_val = float(prec_array[i])
+        r_val = float(rec_array[i])
+        if i < n_thresh:
+            th_val = pr_thresholds[i]
+            if np.isinf(th_val) or np.isnan(th_val):
+                th_clean = None
+            else:
+                th_clean = float(th_val)
+        else:
+            th_clean = None
+        pr_points.append(PrecisionRecallCurvePoint(precision=p_val, recall=r_val, threshold=th_clean))
+    pr_curve_tuple = tuple(pr_points)
+
+    return ProbabilityEvaluationMetrics(
+        roc_auc=roc_auc_val,
+        average_precision=ap_val,
+        threshold=thresh_val,
+        classification_metrics=class_metrics,
+        false_positive_rate=fpr_val,
+        roc_curve=roc_curve_tuple,
+        precision_recall_curve=pr_curve_tuple,
     )
 
 
