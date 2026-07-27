@@ -1441,7 +1441,6 @@ def select_final_model(
                 float(c.validation_false_positive_rate if c.validation_false_positive_rate is not None else 2.0),
                 -float(c.validation_f1_score if c.validation_f1_score is not None else -1.0),
                 -float(c.validation_average_precision),
-                float(c.training_duration_seconds),
                 str(c.variant_name),
             ),
         )
@@ -2402,12 +2401,11 @@ def final_model_selection_report_to_dict(
         "max_fpr": float(selection_result.max_false_positive_rate),
         "cv_splits": int(cv_splits),
         "tie_break_order": [
-            "highest_validation_recall",
-            "lowest_validation_fpr",
-            "highest_validation_f1",
-            "highest_validation_ap",
-            "lowest_training_duration",
-            "alphabetical_variant_name",
+            "validation_recall descending",
+            "validation_false_positive_rate ascending",
+            "validation_f1_score descending",
+            "validation_average_precision descending",
+            "variant_name ascending",
         ],
         "note": "Selection is based strictly on validation results without looking at test metrics or test data.",
     }
