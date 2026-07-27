@@ -18,6 +18,13 @@ from app.services.model_service import (
     ProbabilityEvaluationMetrics,
     extract_positive_probabilities,
     evaluate_probability_metrics,
+    DEFAULT_THRESHOLD_CANDIDATES,
+    OutOfFoldProbabilityResult,
+    ThresholdEvaluationResult,
+    ThresholdSelectionResult,
+    generate_out_of_fold_probabilities,
+    validate_threshold_candidates,
+    select_decision_threshold,
     ModelTrainingResult,
     train_dummy_classifier,
     train_logistic_regression,
@@ -1502,3 +1509,240 @@ def test_probability_services_no_leakage():
     assert "securewatch" not in msg.lower()
     assert "secret" not in msg.lower()
     assert "db.sqlite" not in msg.lower()
+
+
+def test_generate_oof_probabilities_five_folds_success():
+    """Test 64: Beş fold ile başarılı out-of-fold olasılık üretimi."""
+    X = pd.DataFrame({
+        "feat1": np.linspace(0, 10, 50),
+        "feat2": np.linspace(10, 20, 50)
+    })
+    y = pd.Series([0] * 25 + [1] * 25)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=5, random_state=42)
+
+    assert isinstance(res, OutOfFoldProbabilityResult)
+    assert len(res.probabilities) == 50
+    assert len(res.fold_ids) == 50
+    assert res.n_splits == 5
+    assert res.random_state == 42
+    assert all(0.0 <= p <= 1.0 for p in res.probabilities)
+    assert all(0 <= fid < 5 for fid in res.fold_ids)
+
+
+def test_generate_oof_probabilities_every_row_exactly_once():
+    """Test 65: Her satırın tam olarak bir validation fold’unda bulunması."""
+    X = np.random.RandomState(42).randn(30, 3)
+    y = np.array([0] * 15 + [1] * 15)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=3, random_state=42)
+
+    fold_counts = pd.Series(res.fold_ids).value_counts()
+    assert len(fold_counts) == 3
+    assert sum(fold_counts) == 30
+    assert all(count > 0 for count in fold_counts)
+
+
+def test_generate_oof_probabilities_original_order_preserved():
+    """Test 66: Olasılıkların orijinal satır sırasını koruması."""
+    X = np.vstack([np.zeros((10, 2)), np.ones((10, 2)) * 10.0])
+    y = np.array([0] * 10 + [1] * 10)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+
+    for i in range(10):
+        assert res.probabilities[i] < 0.5
+    for i in range(10, 20):
+        assert res.probabilities[i] > 0.5
+
+
+def test_generate_oof_probabilities_estimator_cloning_and_no_mutation():
+    """Test 67: Estimator clone edilmesi, şablonun fit edilmemesi ve girdilerin değişmemesi."""
+    X = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [2.0, 3.0, 4.0, 5.0]})
+    y = pd.Series([0, 0, 1, 1])
+    X_copy = X.copy(deep=True)
+    y_copy = y.copy(deep=True)
+
+    clf = LogisticRegression()
+    assert not hasattr(clf, "coef_")
+
+    generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+
+    assert not hasattr(clf, "coef_")
+    pd.testing.assert_frame_equal(X, X_copy)
+    pd.testing.assert_series_equal(y, y_copy)
+
+
+def test_generate_oof_probabilities_random_state_determinism():
+    """Test 68: Aynı random state ile deterministik, farklı random state ile farklı davranış."""
+    X = np.random.RandomState(42).randn(20, 2)
+    y = np.array([0] * 10 + [1] * 10)
+    clf = LogisticRegression()
+
+    res1 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+    res2 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+    res3 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=99)
+
+    assert res1.probabilities == res2.probabilities
+    assert res1.fold_ids == res2.fold_ids
+    assert res1.probabilities != res3.probabilities or res1.fold_ids != res3.fold_ids
+
+
+def test_generate_oof_probabilities_invalid_targets():
+    """Test 69: Tek sınıflı hedefin veya sınıf örneği fold sayısından az olduğunda reddedilmesi."""
+    X = np.ones((10, 2))
+    clf = LogisticRegression()
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, [0] * 10, n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "both 0 and 1" in excinfo.value.message
+
+    y_imbalanced = [0] * 9 + [1]
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, y_imbalanced, n_splits=5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "less than n_splits" in excinfo.value.message
+
+
+def test_generate_oof_probabilities_invalid_inputs():
+    """Test 70: Geçersiz fold sayısı, özellik veya hedef girdilerinin reddedilmesi."""
+    clf = LogisticRegression()
+    X = np.ones((10, 2))
+    y = np.array([0] * 5 + [1] * 5)
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, y, n_splits=1)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, [], y, n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, [0, 1], n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_default_threshold_candidates():
+    """Test 71: Varsayılan 17 eşik değerinin doğru oluşması."""
+    expected = tuple(round(0.10 + i * 0.05, 2) for i in range(17))
+    assert DEFAULT_THRESHOLD_CANDIDATES == expected
+    assert len(DEFAULT_THRESHOLD_CANDIDATES) == 17
+    assert DEFAULT_THRESHOLD_CANDIDATES[0] == 0.10
+    assert DEFAULT_THRESHOLD_CANDIDATES[-1] == 0.90
+    assert validate_threshold_candidates(None) == DEFAULT_THRESHOLD_CANDIDATES
+
+
+def test_custom_threshold_candidates_validation():
+    """Test 72: Özel eşiklerin sıralama ve tekrar doğrulaması."""
+    assert validate_threshold_candidates([0.2, 0.5, 0.8]) == (0.2, 0.5, 0.8)
+
+    with pytest.raises(AppException) as excinfo:
+        validate_threshold_candidates([0.3, 0.5, 0.5])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "duplicate" in excinfo.value.message
+
+    with pytest.raises(AppException) as excinfo:
+        validate_threshold_candidates([0.8, 0.2])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "strictly increasing" in excinfo.value.message
+
+
+def test_select_decision_threshold_metrics_and_fpr():
+    """Test 73: Her eşikte metrik/FPR hesaplanması ve score == threshold kuralı."""
+    y_val = [0, 0, 1, 1]
+    probs = [0.2, 0.4, 0.5, 0.8]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.3, 0.5, 0.7], max_false_positive_rate=0.50)
+
+    assert len(res.evaluations) == 3
+    eval_05 = [ev for ev in res.evaluations if ev.threshold == 0.5][0]
+    assert eval_05.metrics.recall == 1.0
+    assert eval_05.false_positive_rate == 0.0
+
+
+def test_select_decision_threshold_tie_break_rules():
+    """Test 74: FPR sınırı altında en yüksek recall seçimi ve tie-break kuralları."""
+    y_val = [0, 0, 0, 0, 1, 1, 1, 1]
+    probs = [0.1, 0.1, 0.3, 0.3, 0.6, 0.7, 0.8, 0.9]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.2, 0.5, 0.8], max_false_positive_rate=0.25)
+    assert res.constraint_satisfied is True
+    assert res.selected_threshold == 0.5
+
+    res_tie = select_decision_threshold(y_val, probs, thresholds=[0.5, 0.55], max_false_positive_rate=0.25)
+    assert res_tie.selected_threshold == 0.55
+
+
+def test_select_decision_threshold_no_candidate_satisfies_constraint():
+    """Test 75: Hiçbir eşik kısıtı sağlamadığında selected_threshold=None dönmesi."""
+    y_val = [0, 0, 1, 1]
+    probs = [0.9, 0.9, 0.9, 0.9]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.3, 0.5], max_false_positive_rate=0.05)
+
+    assert res.constraint_satisfied is False
+    assert res.selected_threshold is None
+    assert res.selected_metrics is None
+    assert "No threshold candidate satisfied" in res.selection_reason
+
+
+def test_threshold_and_oof_no_test_data_mutation_or_access():
+    """Test 76: Test verisinin hiçbir fonksiyona verilmemesi ve mutasyona uğramaması."""
+    import inspect
+    oof_params = inspect.signature(generate_out_of_fold_probabilities).parameters
+    assert "X_test" not in oof_params
+    assert "y_test" not in oof_params
+
+    sel_params = inspect.signature(select_decision_threshold).parameters
+    assert "X_test" not in sel_params
+    assert "y_test" not in sel_params
+    assert "test" not in str(sel_params).lower()
+
+
+def test_threshold_and_oof_immutability_and_native_types():
+    """Test 77: Sonuç yapılarının immutable olması ve Python-native değerler dönmesi."""
+    X = np.array([[1.0], [2.0], [3.0], [4.0]])
+    y = np.array([0, 0, 1, 1])
+    clf = LogisticRegression()
+    oof_res = generate_out_of_fold_probabilities(clf, X, y, n_splits=2)
+
+    assert dataclasses.is_dataclass(oof_res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        oof_res.random_state = 123
+    assert isinstance(oof_res.probabilities, tuple)
+    assert isinstance(oof_res.probabilities[0], float)
+    assert type(oof_res.probabilities[0]) is float
+    assert isinstance(oof_res.fold_ids[0], int)
+    assert type(oof_res.fold_ids[0]) is int
+
+    sel_res = select_decision_threshold(y, oof_res.probabilities, thresholds=[0.5], max_false_positive_rate=0.5)
+    assert dataclasses.is_dataclass(sel_res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        sel_res.constraint_satisfied = False
+    assert isinstance(sel_res.evaluations, tuple)
+    assert type(sel_res.max_false_positive_rate) is float
+
+
+def test_threshold_and_oof_422_contract():
+    """Test 78: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        select_decision_threshold([], [], max_false_positive_rate=0.05)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_decision_threshold([0, 1], [0.1, 0.9], max_false_positive_rate=1.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"

@@ -4,9 +4,11 @@ import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 from typing import Any
+from sklearn.base import clone
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -548,6 +550,345 @@ def evaluate_probability_metrics(
         false_positive_rate=fpr_val,
         roc_curve=roc_curve_tuple,
         precision_recall_curve=pr_curve_tuple,
+    )
+
+
+DEFAULT_THRESHOLD_CANDIDATES: tuple[float, ...] = tuple(round(0.10 + i * 0.05, 2) for i in range(17))
+
+
+@dataclass(frozen=True)
+class OutOfFoldProbabilityResult:
+    """Out-of-fold olasılık üretimi sonuç yapısı (immutable)."""
+    probabilities: tuple[float, ...]
+    fold_ids: tuple[int, ...]
+    n_splits: int
+    random_state: int
+
+
+@dataclass(frozen=True)
+class ThresholdEvaluationResult:
+    """Karar eşiği adayının değerlendirme sonucu (immutable)."""
+    threshold: float
+    metrics: ClassificationMetrics
+    false_positive_rate: float
+
+
+@dataclass(frozen=True)
+class ThresholdSelectionResult:
+    """Karar eşiği seçim politikası sonuç yapısı (immutable)."""
+    evaluations: tuple[ThresholdEvaluationResult, ...]
+    selected_threshold: float | None
+    selected_metrics: ClassificationMetrics | None
+    max_false_positive_rate: float
+    constraint_satisfied: bool
+    selection_reason: str
+
+
+def generate_out_of_fold_probabilities(
+    estimator: Any,
+    X_train: Any,
+    y_train: Any,
+    n_splits: int = 5,
+    random_state: int = 42,
+) -> OutOfFoldProbabilityResult:
+    """
+    Eğitim verisi üzerinde Stratified K-Fold ile out-of-fold olasılık tahminleri üretir.
+    Test verisine veya X_test/y_test'e asla erişmez.
+    """
+    if estimator is None:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator cannot be None."
+        )
+    if not hasattr(estimator, "predict_proba") or not callable(getattr(estimator, "predict_proba", None)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Estimator does not support predict_proba."
+        )
+
+    if not isinstance(n_splits, int) or isinstance(n_splits, bool) or n_splits < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="n_splits must be an integer greater than or equal to 2."
+        )
+
+    if not isinstance(random_state, int) or isinstance(random_state, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="random_state must be an integer."
+        )
+
+    try:
+        y_arr = np.asarray(y_train)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must be array-like."
+        )
+
+    if y_arr.size == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets cannot be empty."
+        )
+
+    if y_arr.ndim != 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must be 1-dimensional."
+        )
+
+    if y_arr.dtype.kind not in {'i', 'u', 'f', 'b'}:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets cannot contain text or non-numeric values."
+        )
+
+    if np.isnan(y_arr).any() or np.isinf(y_arr).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets cannot contain NaN or infinite values."
+        )
+
+    unique_classes = np.unique(y_arr)
+    if not np.array_equal(unique_classes, [0, 1]):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain both 0 and 1 classes and no other values."
+        )
+
+    class_counts = pd.Series(y_arr).value_counts()
+    if any(count < n_splits for count in class_counts):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Number of samples in each class cannot be less than n_splits."
+        )
+
+    try:
+        if isinstance(X_train, pd.DataFrame):
+            if X_train.empty:
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features cannot be empty.")
+            if not all(dtype.kind in {'i', 'u', 'f', 'b'} for dtype in X_train.dtypes):
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features must be numeric.")
+            X_check = X_train.to_numpy()
+        elif isinstance(X_train, pd.Series):
+            if X_train.empty:
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features cannot be empty.")
+            if X_train.dtype.kind not in {'i', 'u', 'f', 'b'}:
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features must be numeric.")
+            X_check = X_train.to_numpy().reshape(-1, 1)
+        else:
+            X_check = np.asarray(X_train)
+            if X_check.size == 0:
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features cannot be empty.")
+            if X_check.dtype.kind not in {'i', 'u', 'f', 'b'}:
+                raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features must be numeric.")
+    except AppException:
+        raise
+    except Exception:
+        raise AppException(status_code=422, code="VALIDATION_ERROR", message="Invalid features input.")
+
+    if X_check.ndim not in (1, 2):
+        raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features must be 1D or 2D array.")
+
+    if len(X_check) != len(y_arr):
+        raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features and targets row counts must be equal.")
+
+    if np.isnan(X_check).any() or np.isinf(X_check).any():
+        raise AppException(status_code=422, code="VALIDATION_ERROR", message="Features must be finite and cannot contain NaN or inf.")
+
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    n_samples = len(y_arr)
+    oof_probs = [0.0] * n_samples
+    oof_fold_ids = [0] * n_samples
+
+    try:
+        for fold_id, (train_idx, val_idx) in enumerate(skf.split(X_check, y_arr)):
+            fold_estimator = clone(estimator)
+
+            if isinstance(X_train, (pd.DataFrame, pd.Series)):
+                X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+            else:
+                X_tr, X_val = X_check[train_idx], X_check[val_idx]
+
+            if isinstance(y_train, pd.Series):
+                y_tr = y_train.iloc[train_idx]
+            else:
+                y_tr = y_arr[train_idx]
+
+            fold_estimator.fit(X_tr, y_tr)
+            val_probs = extract_positive_probabilities(fold_estimator, X_val)
+
+            for idx, prob in zip(val_idx, val_probs):
+                oof_probs[int(idx)] = float(prob)
+                oof_fold_ids[int(idx)] = int(fold_id)
+    except AppException:
+        raise
+    except Exception as e:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=f"Error during out-of-fold probability generation: {str(e)}"
+        )
+
+    return OutOfFoldProbabilityResult(
+        probabilities=tuple(oof_probs),
+        fold_ids=tuple(oof_fold_ids),
+        n_splits=int(n_splits),
+        random_state=int(random_state),
+    )
+
+
+def validate_threshold_candidates(thresholds: Any = None) -> tuple[float, ...]:
+    """
+    Karar eşiği adaylarını doğrular, tekrarsız ve kesin biçimde artan sırada olmasını kontrol eder.
+    """
+    if thresholds is None:
+        return DEFAULT_THRESHOLD_CANDIDATES
+
+    try:
+        thresh_list = list(thresholds)
+    except Exception:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold candidates must be an iterable sequence."
+        )
+
+    if len(thresh_list) == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold candidates cannot be empty."
+        )
+
+    for t in thresh_list:
+        if not isinstance(t, (int, float)) or isinstance(t, bool):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="All threshold candidates must be numeric."
+            )
+        if np.isnan(t) or np.isinf(t):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Threshold candidates must be finite."
+            )
+        if not (0.0 <= float(t) <= 1.0):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Threshold candidates must be in [0, 1] range."
+            )
+
+    float_list = [float(t) for t in thresh_list]
+    if len(set(float_list)) != len(float_list):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold candidates cannot contain duplicate values."
+        )
+    if float_list != sorted(float_list):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Threshold candidates must be in strictly increasing order."
+        )
+
+    return tuple(float_list)
+
+
+def select_decision_threshold(
+    y_val: Any,
+    val_probabilities: Any,
+    thresholds: Any = None,
+    max_false_positive_rate: float = 0.05,
+) -> ThresholdSelectionResult:
+    """
+    Validation hedefleri ve olasılıkları üzerinden karar eşiğini seçer.
+    Test verisine asla erişmez.
+    """
+    if not isinstance(max_false_positive_rate, (int, float)) or isinstance(max_false_positive_rate, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be numeric."
+        )
+    if np.isnan(max_false_positive_rate) or np.isinf(max_false_positive_rate):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be finite."
+        )
+    if not (0.0 <= float(max_false_positive_rate) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be in [0, 1] range."
+        )
+
+    valid_thresholds = validate_threshold_candidates(thresholds)
+
+    evaluations: list[ThresholdEvaluationResult] = []
+    for thresh in valid_thresholds:
+        res = evaluate_probability_metrics(y_val, val_probabilities, threshold=thresh)
+        eval_record = ThresholdEvaluationResult(
+            threshold=float(thresh),
+            metrics=res.classification_metrics,
+            false_positive_rate=float(res.false_positive_rate),
+        )
+        evaluations.append(eval_record)
+
+    feasible = [ev for ev in evaluations if ev.false_positive_rate <= float(max_false_positive_rate)]
+
+    if len(feasible) > 0:
+        best = max(
+            feasible,
+            key=lambda ev: (
+                ev.metrics.recall,
+                ev.metrics.f1_score,
+                ev.metrics.precision,
+                -ev.false_positive_rate,
+                ev.threshold,
+            ),
+        )
+        selected_threshold = best.threshold
+        selected_metrics = best.metrics
+        constraint_satisfied = True
+        selection_reason = (
+            f"Selected threshold {best.threshold:.2f} satisfying max FPR constraint "
+            f"({best.false_positive_rate:.4f} <= {float(max_false_positive_rate):.4f}) "
+            f"with recall {best.metrics.recall:.4f}, f1 {best.metrics.f1_score:.4f}, "
+            f"precision {best.metrics.precision:.4f}."
+        )
+    else:
+        selected_threshold = None
+        selected_metrics = None
+        constraint_satisfied = False
+        selection_reason = (
+            f"No threshold candidate satisfied the maximum false positive rate constraint "
+            f"(max_false_positive_rate={float(max_false_positive_rate):.4f})."
+        )
+
+    return ThresholdSelectionResult(
+        evaluations=tuple(evaluations),
+        selected_threshold=selected_threshold,
+        selected_metrics=selected_metrics,
+        max_false_positive_rate=float(max_false_positive_rate),
+        constraint_satisfied=constraint_satisfied,
+        selection_reason=selection_reason,
     )
 
 
