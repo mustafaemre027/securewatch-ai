@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import dataclasses
 import pytest
+import unittest.mock
 
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -25,6 +26,15 @@ from app.services.model_service import (
     generate_out_of_fold_probabilities,
     validate_threshold_candidates,
     select_decision_threshold,
+    ModelCandidateConfig,
+    ModelEvaluationCandidateResult,
+    FinalModelSelectionResult,
+    EXPECTED_DAY10_VARIANTS,
+    get_day10_model_candidates,
+    validate_model_candidates,
+    evaluate_model_candidates,
+    select_final_model,
+    run_final_model_selection,
     ModelTrainingResult,
     train_dummy_classifier,
     train_logistic_regression,
@@ -1746,3 +1756,347 @@ def test_threshold_and_oof_422_contract():
         select_decision_threshold([0, 1], [0.1, 0.9], max_false_positive_rate=1.5)
     assert excinfo.value.status_code == 422
     assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+# --- Day 10 Work Block 4: Deterministik Nihai Model Seçimi Birim Testleri ---
+
+def test_day10_candidates_exact_count_and_fixed_order():
+    """Test 79: Beş adayın tam sayısı ve sabit sırası."""
+    candidates = get_day10_model_candidates()
+    assert len(candidates) == 5
+    variants = tuple(c.variant_name for c in candidates)
+    assert variants == EXPECTED_DAY10_VARIANTS == ("lr_baseline", "rf_baseline", "rf_deeper", "rf_unweighted", "rf_compact")
+
+
+def test_day10_candidates_correct_models_and_hyperparameters():
+    """Test 80: Her adayın doğru model ve hiperparametrelerle oluşturulması."""
+    candidates = get_day10_model_candidates()
+    c_dict = {c.variant_name: c for c in candidates}
+    assert c_dict["lr_baseline"].model_name == "LogisticRegression"
+    assert dict(c_dict["lr_baseline"].hyperparameters)["solver"] == "lbfgs"
+    assert c_dict["rf_deeper"].model_name == "RandomForestClassifier"
+    assert dict(c_dict["rf_deeper"].hyperparameters)["max_depth"] == 20
+    assert dict(c_dict["rf_unweighted"].hyperparameters)["class_weight"] is None
+    assert dict(c_dict["rf_compact"].hyperparameters)["n_estimators"] == 50
+
+
+def test_day10_candidates_dummy_classifier_excluded():
+    """Test 81: DummyClassifier modelinin adaylara dahil edilmemesi."""
+    candidates = get_day10_model_candidates()
+    for c in candidates:
+        assert "dummy" not in c.model_name.lower()
+        assert not isinstance(c.estimator, DummyClassifier)
+
+
+def test_evaluate_model_candidates_oof_probability_generated():
+    """Test 82: Her aday için OOF validation olasılığı üretilmesi."""
+    X_train = np.random.RandomState(42).randn(30, 4)
+    y_train = np.array([0]*15 + [1]*15)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=3)
+    assert len(res) == 5
+    for r in res:
+        assert r.threshold_selection is not None
+        assert len(r.threshold_selection.evaluations) > 0
+        assert 0.0 <= r.validation_roc_auc <= 1.0
+        assert 0.0 <= r.validation_average_precision <= 1.0
+
+
+def test_evaluate_model_candidates_threshold_selected_on_validation():
+    """Test 83: Her adayın karar eşiğinin validation verisiyle seçilmesi."""
+    X_train = np.random.RandomState(42).randn(40, 4)
+    y_train = np.array([0]*20 + [1]*20)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=3, max_false_positive_rate=0.5, min_recall=0.0)
+    for r in res:
+        if r.is_eligible:
+            assert r.selected_threshold is not None
+            assert r.validation_false_positive_rate <= 0.5
+            assert r.validation_recall >= 0.0
+
+
+def test_evaluate_model_candidates_no_test_data_in_threshold_selection():
+    """Test 84: Test verisinin eşik seçimine girmemesi."""
+    X_train = np.random.RandomState(42).randn(40, 4)
+    y_train = np.array([0]*20 + [1]*20)
+    X_test1 = np.zeros((10, 4))
+    y_test1 = np.array([0]*5 + [1]*5)
+    X_test2 = np.ones((10, 4)) * 100.0
+    y_test2 = np.array([0]*5 + [1]*5)
+
+    res1 = evaluate_model_candidates(X_train, y_train, X_test1, y_test1, n_splits=3)
+    res2 = evaluate_model_candidates(X_train, y_train, X_test2, y_test2, n_splits=3)
+    for r1, r2 in zip(res1, res2):
+        assert r1.selected_threshold == r2.selected_threshold
+        assert r1.validation_roc_auc == r2.validation_roc_auc
+        assert r1.validation_recall == r2.validation_recall
+
+
+def test_select_final_model_test_metrics_ignored():
+    """Test 85: Test metriklerinin model seçimini etkilememesi."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0 = ModelEvaluationCandidateResult(
+        model_name="LogisticRegression", variant_name="lr_baseline", hyperparameters=(),
+        validation_roc_auc=0.8, validation_average_precision=0.8, threshold_selection=dummy_thresh,
+        validation_recall=0.95, validation_precision=0.8, validation_f1_score=0.86, validation_false_positive_rate=0.04,
+        selected_threshold=0.5, test_roc_auc=1.0, test_average_precision=1.0, test_accuracy=1.0, test_precision=1.0,
+        test_recall=1.0, test_f1_score=1.0, test_false_positive_rate=0.0, test_confusion_matrix=((5, 0), (0, 5)),
+        training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+    )
+    c1 = ModelEvaluationCandidateResult(
+        model_name="RandomForestClassifier", variant_name="rf_baseline", hyperparameters=(),
+        validation_roc_auc=0.9, validation_average_precision=0.9, threshold_selection=dummy_thresh,
+        validation_recall=0.98, validation_precision=0.8, validation_f1_score=0.88, validation_false_positive_rate=0.04,
+        selected_threshold=0.5, test_roc_auc=0.5, test_average_precision=0.5, test_accuracy=0.5, test_precision=0.5,
+        test_recall=0.5, test_f1_score=0.5, test_false_positive_rate=0.5, test_confusion_matrix=((2, 3), (2, 3)),
+        training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+    )
+    c_rest = tuple(
+        ModelEvaluationCandidateResult(
+            model_name="RandomForestClassifier", variant_name=v, hyperparameters=(),
+            validation_roc_auc=0.5, validation_average_precision=0.5, threshold_selection=dummy_thresh,
+            validation_recall=0.5, validation_precision=0.5, validation_f1_score=0.5, validation_false_positive_rate=0.5,
+            selected_threshold=None, test_roc_auc=0.5, test_average_precision=0.5, test_accuracy=None, test_precision=None,
+            test_recall=None, test_f1_score=None, test_false_positive_rate=None, test_confusion_matrix=None,
+            training_duration_seconds=0.1, is_eligible=False, ineligibility_reason="Failed"
+        )
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel = select_final_model((c0, c1) + c_rest, min_recall=0.90, max_false_positive_rate=0.10)
+    assert sel.is_selected is True
+    assert sel.selected_variant_name == "rf_baseline"
+
+
+def test_select_final_model_min_recall_enforced():
+    """Test 86: Validation Recall alt sınırının uygulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c_list = []
+    for idx, v in enumerate(EXPECTED_DAY10_VARIANTS):
+        c_list.append(ModelEvaluationCandidateResult(
+            model_name="M", variant_name=v, hyperparameters=(), validation_roc_auc=0.8, validation_average_precision=0.8,
+            threshold_selection=dummy_thresh, validation_recall=0.90, validation_precision=0.8, validation_f1_score=0.85,
+            validation_false_positive_rate=0.03, selected_threshold=0.5, test_roc_auc=0.8, test_average_precision=0.8,
+            test_accuracy=0.8, test_precision=0.8, test_recall=0.8, test_f1_score=0.8, test_false_positive_rate=0.05,
+            test_confusion_matrix=None, training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+        ))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+
+
+def test_select_final_model_max_fpr_enforced():
+    """Test 87: Validation FPR üst sınırının uygulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c_list = []
+    for idx, v in enumerate(EXPECTED_DAY10_VARIANTS):
+        c_list.append(ModelEvaluationCandidateResult(
+            model_name="M", variant_name=v, hyperparameters=(), validation_roc_auc=0.8, validation_average_precision=0.8,
+            threshold_selection=dummy_thresh, validation_recall=0.96, validation_precision=0.8, validation_f1_score=0.87,
+            validation_false_positive_rate=0.08, selected_threshold=0.5, test_roc_auc=0.8, test_average_precision=0.8,
+            test_accuracy=0.8, test_precision=0.8, test_recall=0.8, test_f1_score=0.8, test_false_positive_rate=0.05,
+            test_confusion_matrix=None, training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+        ))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+
+
+def test_select_final_model_tie_break_rules():
+    """Test 88: Tie-break kurallarının sırayla doğrulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0 = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c1 = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.02, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel = select_final_model((c0, c1) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+    assert sel.selected_variant_name == "rf_baseline"
+
+
+def test_select_final_model_no_eligible_candidate():
+    """Test 89: Hiçbir aday uygun değilse seçim yapılmaması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, False, "Failed")
+    c_list = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, None, None, None, None, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "Ineligible")
+        for v in EXPECTED_DAY10_VARIANTS
+    )
+    sel = select_final_model(c_list)
+    assert sel.is_selected is False
+    assert sel.selected_model_name is None
+    assert sel.selected_variant_name is None
+    assert sel.selected_threshold is None
+
+
+def test_select_final_model_no_silent_fallback():
+    """Test 90: Sessiz fallback olmaması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, False, "Failed")
+    c_list = []
+    for v in EXPECTED_DAY10_VARIANTS:
+        c_list.append(ModelEvaluationCandidateResult("M", v, (), 0.6, 0.6, dummy_thresh, 0.80, 0.8, 0.8, 0.20, None, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.01, None, 0.1, False, "No"))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+    assert "No candidate model satisfied" in sel.selection_reason
+
+
+def test_run_final_model_selection_determinism():
+    """Test 91: Aynı girdilerle deterministik sonuç alınması."""
+    X_train = np.random.RandomState(100).randn(30, 4)
+    y_train = np.array([0]*15 + [1]*15)
+    X_test = np.random.RandomState(101).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=[0.0, 0.1]*5):
+        res1 = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=3, min_recall=0.0, max_false_positive_rate=1.0)
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=[0.0, 0.1]*5):
+        res2 = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=3, min_recall=0.0, max_false_positive_rate=1.0)
+
+    assert res1.selected_variant_name == res2.selected_variant_name
+    assert res1.selected_threshold == res2.selected_threshold
+    assert res1.selection_reason == res2.selection_reason
+
+
+def test_evaluate_model_candidates_training_duration_measured():
+    """Test 92: Eğitim süresinde yalnızca fit() çağrısının ölçülmesi."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    mock_times = [10.0, 10.5, 20.0, 21.2, 30.0, 30.1, 40.0, 43.0, 50.0, 50.8]
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=mock_times):
+        res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    assert res[0].training_duration_seconds == pytest.approx(0.5)
+    assert res[1].training_duration_seconds == pytest.approx(1.2)
+    assert res[2].training_duration_seconds == pytest.approx(0.1)
+    assert res[3].training_duration_seconds == pytest.approx(3.0)
+    assert res[4].training_duration_seconds == pytest.approx(0.8)
+
+
+def test_final_selection_structures_immutability():
+    """Test 93: Sonuç veri yapılarının immutable olması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert dataclasses.is_dataclass(res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.is_selected = True
+    assert dataclasses.is_dataclass(res.candidates[0])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.candidates[0].validation_roc_auc = 1.0
+    assert isinstance(res.candidates, tuple)
+    assert isinstance(res.candidates[0].hyperparameters, tuple)
+
+
+def test_final_selection_native_types():
+    """Test 94: JSON uyumlu Python-native değerlerin kullanılması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert type(res.min_recall) is float
+    assert type(res.max_false_positive_rate) is float
+    assert type(res.is_selected) is bool
+    assert type(res.selection_reason) is str
+    for c in res.candidates:
+        assert type(c.validation_roc_auc) is float
+        assert type(c.validation_average_precision) is float
+        assert type(c.training_duration_seconds) is float
+        assert type(c.is_eligible) is bool
+        if c.selected_threshold is not None:
+            assert type(c.selected_threshold) is float
+            assert type(c.validation_recall) is float
+            assert type(c.test_roc_auc) is float
+
+
+def test_final_selection_no_leakage_in_results():
+    """Test 95: Estimator, ham veri veya tam probability array'lerinin sonuçlara sızmaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    for field in dataclasses.fields(res):
+        val = getattr(res, field.name)
+        assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+        assert not hasattr(val, "predict")
+    for c in res.candidates:
+        for field in dataclasses.fields(c):
+            val = getattr(c, field.name)
+            assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+            assert not hasattr(val, "predict")
+            if field.name == "hyperparameters":
+                assert isinstance(val, tuple)
+
+
+def test_evaluate_model_candidates_no_input_mutation():
+    """Test 96: Girdilerin mutasyona uğramaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    X_train_copy = X_train.copy()
+    y_train_copy = y_train.copy()
+    X_test_copy = X_test.copy()
+    y_test_copy = y_test.copy()
+
+    evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    np.testing.assert_array_equal(X_train, X_train_copy)
+    np.testing.assert_array_equal(y_train, y_train_copy)
+    np.testing.assert_array_equal(X_test, X_test_copy)
+    np.testing.assert_array_equal(y_test, y_test_copy)
+
+
+def test_final_selection_422_contract():
+    """Test 97: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection(None, [], [], [])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection([[1, 2], [3, 4]], [0, 1], [[1, 2], [3, 4]], [0, 2])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=1.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=0.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_select_final_model_mutation_of_test_metrics_does_not_change_winner():
+    """Test 98: Test metrikleri değiştirilse bile seçilen variant'ın aynı kalması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0_base = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c1_base = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel1 = select_final_model((c0_base, c1_base) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    c1_mutated = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, ((10,0),(0,10)), 0.1, True, None)
+    sel2 = select_final_model((c0_base, c1_mutated) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    assert sel1.selected_variant_name == sel2.selected_variant_name == "lr_baseline"
+    assert sel1.selected_threshold == sel2.selected_threshold

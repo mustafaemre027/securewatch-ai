@@ -3,7 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 from sklearn.base import clone
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -815,11 +815,31 @@ def select_decision_threshold(
     val_probabilities: Any,
     thresholds: Any = None,
     max_false_positive_rate: float = 0.05,
+    min_recall: float = 0.0,
 ) -> ThresholdSelectionResult:
     """
     Validation hedefleri ve olasılıkları üzerinden karar eşiğini seçer.
     Test verisine asla erişmez.
     """
+    if not isinstance(min_recall, (int, float)) or isinstance(min_recall, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be numeric."
+        )
+    if np.isnan(min_recall) or np.isinf(min_recall):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be finite."
+        )
+    if not (0.0 <= float(min_recall) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be in [0, 1] range."
+        )
+
     if not isinstance(max_false_positive_rate, (int, float)) or isinstance(max_false_positive_rate, bool):
         raise AppException(
             status_code=422,
@@ -851,7 +871,10 @@ def select_decision_threshold(
         )
         evaluations.append(eval_record)
 
-    feasible = [ev for ev in evaluations if ev.false_positive_rate <= float(max_false_positive_rate)]
+    feasible = [
+        ev for ev in evaluations
+        if ev.false_positive_rate <= float(max_false_positive_rate) and ev.metrics.recall >= float(min_recall)
+    ]
 
     if len(feasible) > 0:
         best = max(
@@ -879,7 +902,7 @@ def select_decision_threshold(
         constraint_satisfied = False
         selection_reason = (
             f"No threshold candidate satisfied the maximum false positive rate constraint "
-            f"(max_false_positive_rate={float(max_false_positive_rate):.4f})."
+            f"(max_false_positive_rate={float(max_false_positive_rate):.4f}, min_recall={float(min_recall):.4f})."
         )
 
     return ThresholdSelectionResult(
@@ -889,6 +912,600 @@ def select_decision_threshold(
         max_false_positive_rate=float(max_false_positive_rate),
         constraint_satisfied=constraint_satisfied,
         selection_reason=selection_reason,
+    )
+
+
+@dataclass(frozen=True)
+class ModelCandidateConfig:
+    """Gün 10 kapsamındaki bir model adayının yapılandırma kaydı (immutable)."""
+    variant_name: str
+    model_name: str
+    hyperparameters: tuple[tuple[str, Any], ...]
+    estimator: Any
+
+
+@dataclass(frozen=True)
+class ModelEvaluationCandidateResult:
+    """Gün 10 kapsamındaki bir model adayının validation ve test değerlendirme sonucu (immutable)."""
+    model_name: str
+    variant_name: str
+    hyperparameters: tuple[tuple[str, Any], ...]
+    validation_roc_auc: float
+    validation_average_precision: float
+    threshold_selection: ThresholdSelectionResult
+    validation_recall: float | None
+    validation_precision: float | None
+    validation_f1_score: float | None
+    validation_false_positive_rate: float | None
+    selected_threshold: float | None
+    test_roc_auc: float
+    test_average_precision: float
+    test_accuracy: float | None
+    test_precision: float | None
+    test_recall: float | None
+    test_f1_score: float | None
+    test_false_positive_rate: float | None
+    test_confusion_matrix: tuple[tuple[int, ...], ...] | None
+    training_duration_seconds: float
+    is_eligible: bool
+    ineligibility_reason: str | None
+
+
+@dataclass(frozen=True)
+class FinalModelSelectionResult:
+    """Gün 10 kapsamındaki deterministik nihai model seçim politikası sonucu (immutable)."""
+    candidates: tuple[ModelEvaluationCandidateResult, ...]
+    selected_model_name: str | None
+    selected_variant_name: str | None
+    selected_threshold: float | None
+    min_recall: float
+    max_false_positive_rate: float
+    is_selected: bool
+    selection_reason: str
+
+
+EXPECTED_DAY10_VARIANTS: tuple[str, ...] = (
+    "lr_baseline",
+    "rf_baseline",
+    "rf_deeper",
+    "rf_unweighted",
+    "rf_compact",
+)
+
+
+def get_day10_model_candidates() -> tuple[ModelCandidateConfig, ...]:
+    """Gün 10 kapsamındaki kesin ve deterministik beş model adayını sabit sırada döndürür."""
+    lr_base = LogisticRegression(class_weight="balanced", max_iter=1000, solver="lbfgs", random_state=42)
+    rf_base = RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=2, min_samples_leaf=1, class_weight="balanced", random_state=42, n_jobs=-1)
+    rf_deep = RandomForestClassifier(n_estimators=100, max_depth=20, min_samples_split=2, min_samples_leaf=1, class_weight="balanced", random_state=42, n_jobs=-1)
+    rf_unw = RandomForestClassifier(n_estimators=100, max_depth=10, min_samples_split=2, min_samples_leaf=1, class_weight=None, random_state=42, n_jobs=-1)
+    rf_comp = RandomForestClassifier(n_estimators=50, max_depth=5, min_samples_split=2, min_samples_leaf=1, class_weight="balanced", random_state=42, n_jobs=-1)
+
+    return (
+        ModelCandidateConfig(
+            variant_name="lr_baseline",
+            model_name="LogisticRegression",
+            hyperparameters=(
+                ("class_weight", "balanced"),
+                ("max_iter", 1000),
+                ("random_state", 42),
+                ("solver", "lbfgs"),
+            ),
+            estimator=lr_base,
+        ),
+        ModelCandidateConfig(
+            variant_name="rf_baseline",
+            model_name="RandomForestClassifier",
+            hyperparameters=(
+                ("class_weight", "balanced"),
+                ("max_depth", 10),
+                ("min_samples_leaf", 1),
+                ("min_samples_split", 2),
+                ("n_estimators", 100),
+                ("n_jobs", -1),
+                ("random_state", 42),
+            ),
+            estimator=rf_base,
+        ),
+        ModelCandidateConfig(
+            variant_name="rf_deeper",
+            model_name="RandomForestClassifier",
+            hyperparameters=(
+                ("class_weight", "balanced"),
+                ("max_depth", 20),
+                ("min_samples_leaf", 1),
+                ("min_samples_split", 2),
+                ("n_estimators", 100),
+                ("n_jobs", -1),
+                ("random_state", 42),
+            ),
+            estimator=rf_deep,
+        ),
+        ModelCandidateConfig(
+            variant_name="rf_unweighted",
+            model_name="RandomForestClassifier",
+            hyperparameters=(
+                ("class_weight", None),
+                ("max_depth", 10),
+                ("min_samples_leaf", 1),
+                ("min_samples_split", 2),
+                ("n_estimators", 100),
+                ("n_jobs", -1),
+                ("random_state", 42),
+            ),
+            estimator=rf_unw,
+        ),
+        ModelCandidateConfig(
+            variant_name="rf_compact",
+            model_name="RandomForestClassifier",
+            hyperparameters=(
+                ("class_weight", "balanced"),
+                ("max_depth", 5),
+                ("min_samples_leaf", 1),
+                ("min_samples_split", 2),
+                ("n_estimators", 50),
+                ("n_jobs", -1),
+                ("random_state", 42),
+            ),
+            estimator=rf_comp,
+        ),
+    )
+
+
+def validate_model_candidates(candidates: Sequence[Any]) -> tuple[Any, ...]:
+    """Model adayları listesinin Gün 10 sözleşmesiyle tam uyumunu doğrular."""
+    if not isinstance(candidates, (list, tuple)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Candidates must be a list or tuple."
+        )
+    if len(candidates) != 5:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Must provide exactly 5 candidate models."
+        )
+    variant_names: list[str] = []
+    for c in candidates:
+        if not hasattr(c, "variant_name"):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="Candidate missing variant_name attribute."
+            )
+        v_name = getattr(c, "variant_name")
+        if v_name in variant_names:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message=f"Duplicate variant name found: '{v_name}'."
+            )
+        variant_names.append(str(v_name))
+
+        if hasattr(c, "model_name") and "dummy" in str(getattr(c, "model_name")).lower():
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="DummyClassifier cannot be included as a final model candidate."
+            )
+        if hasattr(c, "estimator") and isinstance(getattr(c, "estimator"), DummyClassifier):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="DummyClassifier cannot be included as a final model candidate."
+            )
+
+    if tuple(variant_names) != EXPECTED_DAY10_VARIANTS:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=f"Candidates must match the exact 5 Day 10 variants in fixed order: {EXPECTED_DAY10_VARIANTS}."
+        )
+    return tuple(candidates)
+
+
+def _validate_evaluation_data(X_train: Any, y_train: Any, X_test: Any, y_test: Any) -> tuple[Any, Any, Any, Any]:
+    if X_train is None or y_train is None or X_test is None or y_test is None:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training and test datasets cannot be None."
+        )
+    try:
+        X_tr = np.asarray(X_train, dtype=float)
+        y_tr = np.asarray(y_train, dtype=float)
+        X_te = np.asarray(X_test, dtype=float)
+        y_te = np.asarray(y_test, dtype=float)
+    except (ValueError, TypeError):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Datasets must be numeric array-like structures."
+        )
+    if X_tr.size == 0 or y_tr.size == 0 or X_te.size == 0 or y_te.size == 0:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Training and test datasets cannot be empty."
+        )
+    if X_tr.ndim != 2 or X_te.ndim != 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Features must be 2-dimensional."
+        )
+    if y_tr.ndim != 1 or y_te.ndim != 1:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must be 1-dimensional."
+        )
+    if len(X_tr) != len(y_tr) or len(X_te) != len(y_te):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Row counts for features and targets must match."
+        )
+    if X_tr.shape[1] != X_te.shape[1]:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Feature counts for train and test splits must match."
+        )
+    if np.isnan(X_tr).any() or np.isnan(X_te).any() or np.isnan(y_tr).any() or np.isnan(y_te).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Datasets cannot contain NaN values."
+        )
+    if np.isinf(X_tr).any() or np.isinf(X_te).any() or np.isinf(y_tr).any() or np.isinf(y_te).any():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Datasets cannot contain infinite values."
+        )
+    if not np.isin(y_tr, [0, 1]).all() or not np.isin(y_te, [0, 1]).all():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain only binary values 0 and 1."
+        )
+    if len(np.unique(y_tr)) < 2 or len(np.unique(y_te)) < 2:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Targets must contain both classes (0 and 1)."
+        )
+    return X_train, y_train, X_test, y_test
+
+
+def evaluate_model_candidates(
+    X_train: Any,
+    y_train: Any,
+    X_test: Any,
+    y_test: Any,
+    candidates: Sequence[ModelCandidateConfig] | None = None,
+    n_splits: int = 5,
+    random_state: int = 42,
+    min_recall: float = 0.95,
+    max_false_positive_rate: float = 0.05,
+) -> tuple[ModelEvaluationCandidateResult, ...]:
+    """
+    Beş model adayını validation (OOF) ve test metrikleriyle değerlendiren servis fonksiyonu.
+    Karar eşiği yalnızca validation verisi üzerinde seçilir; test verisine asla bakılmaz.
+    """
+    if not isinstance(min_recall, (int, float)) or isinstance(min_recall, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be numeric."
+        )
+    if np.isnan(min_recall) or np.isinf(min_recall):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be finite."
+        )
+    if not (0.0 <= float(min_recall) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be in [0, 1] range."
+        )
+
+    if not isinstance(max_false_positive_rate, (int, float)) or isinstance(max_false_positive_rate, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be numeric."
+        )
+    if np.isnan(max_false_positive_rate) or np.isinf(max_false_positive_rate):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be finite."
+        )
+    if not (0.0 <= float(max_false_positive_rate) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be in [0, 1] range."
+        )
+
+    X_tr, y_tr, X_te, y_te = _validate_evaluation_data(X_train, y_train, X_test, y_test)
+
+    if candidates is None:
+        cand_list = get_day10_model_candidates()
+    else:
+        cand_list = validate_model_candidates(candidates)
+
+    results: list[ModelEvaluationCandidateResult] = []
+    for cand in cand_list:
+        oof_res = generate_out_of_fold_probabilities(
+            estimator=cand.estimator,
+            X_train=X_tr,
+            y_train=y_tr,
+            n_splits=n_splits,
+            random_state=random_state,
+        )
+
+        thresh_res = select_decision_threshold(
+            y_val=y_tr,
+            val_probabilities=oof_res.probabilities,
+            max_false_positive_rate=max_false_positive_rate,
+            min_recall=min_recall,
+        )
+
+        val_eval_05 = evaluate_probability_metrics(y_tr, oof_res.probabilities, threshold=0.5)
+        val_roc_auc = float(val_eval_05.roc_auc)
+        val_ap = float(val_eval_05.average_precision)
+
+        if thresh_res.selected_threshold is not None:
+            val_eval_sel = evaluate_probability_metrics(y_tr, oof_res.probabilities, threshold=thresh_res.selected_threshold)
+            val_recall: float | None = float(val_eval_sel.classification_metrics.recall)
+            val_precision: float | None = float(val_eval_sel.classification_metrics.precision)
+            val_f1_score: float | None = float(val_eval_sel.classification_metrics.f1_score)
+            val_fpr: float | None = float(val_eval_sel.false_positive_rate)
+            selected_thresh: float | None = float(thresh_res.selected_threshold)
+            is_eligible = True
+            ineligibility_reason = None
+        else:
+            val_recall = None
+            val_precision = None
+            val_f1_score = None
+            val_fpr = None
+            selected_thresh = None
+            is_eligible = False
+            ineligibility_reason = thresh_res.selection_reason
+
+        if is_eligible:
+            if any(v is None or np.isnan(v) or np.isinf(v) for v in (val_roc_auc, val_ap, val_recall, val_precision, val_f1_score, val_fpr)):
+                is_eligible = False
+                ineligibility_reason = "Validation metrics contain NaN or infinite values."
+            elif not (val_recall >= float(min_recall) and val_fpr <= float(max_false_positive_rate)):
+                is_eligible = False
+                ineligibility_reason = f"Validation metrics failed constraints (Recall={val_recall:.4f} >= {float(min_recall):.4f}, FPR={val_fpr:.4f} <= {float(max_false_positive_rate):.4f})."
+
+        model_instance = clone(cand.estimator)
+        t0 = time.perf_counter()
+        model_instance.fit(X_tr, y_tr)
+        t1 = time.perf_counter()
+        duration_sec = float(t1 - t0)
+
+        test_probs = extract_positive_probabilities(model_instance, X_te)
+        test_eval_05 = evaluate_probability_metrics(y_te, test_probs, threshold=0.5)
+        test_roc_auc = float(test_eval_05.roc_auc)
+        test_ap = float(test_eval_05.average_precision)
+
+        if selected_thresh is not None:
+            test_eval_sel = evaluate_probability_metrics(y_te, test_probs, threshold=selected_thresh)
+            test_acc: float | None = float(test_eval_sel.classification_metrics.accuracy)
+            test_prec: float | None = float(test_eval_sel.classification_metrics.precision)
+            test_rec: float | None = float(test_eval_sel.classification_metrics.recall)
+            test_f1: float | None = float(test_eval_sel.classification_metrics.f1_score)
+            test_fpr: float | None = float(test_eval_sel.false_positive_rate)
+            test_cm: tuple[tuple[int, ...], ...] | None = test_eval_sel.classification_metrics.confusion_matrix
+        else:
+            test_acc = None
+            test_prec = None
+            test_rec = None
+            test_f1 = None
+            test_fpr = None
+            test_cm = None
+
+        res_record = ModelEvaluationCandidateResult(
+            model_name=str(cand.model_name),
+            variant_name=str(cand.variant_name),
+            hyperparameters=tuple(cand.hyperparameters),
+            validation_roc_auc=val_roc_auc,
+            validation_average_precision=val_ap,
+            threshold_selection=thresh_res,
+            validation_recall=val_recall,
+            validation_precision=val_precision,
+            validation_f1_score=val_f1_score,
+            validation_false_positive_rate=val_fpr,
+            selected_threshold=selected_thresh,
+            test_roc_auc=test_roc_auc,
+            test_average_precision=test_ap,
+            test_accuracy=test_acc,
+            test_precision=test_prec,
+            test_recall=test_rec,
+            test_f1_score=test_f1,
+            test_false_positive_rate=test_fpr,
+            test_confusion_matrix=test_cm,
+            training_duration_seconds=duration_sec,
+            is_eligible=is_eligible,
+            ineligibility_reason=ineligibility_reason,
+        )
+        results.append(res_record)
+
+    return tuple(results)
+
+
+def select_final_model(
+    candidate_results: Sequence[ModelEvaluationCandidateResult],
+    min_recall: float = 0.95,
+    max_false_positive_rate: float = 0.05,
+) -> FinalModelSelectionResult:
+    """
+    Yalnızca validation sonuçlarından uygun adayları belirleyip deterministik nihai seçimi yapan fonksiyon.
+    Test metriklerine veya test verisine asla bakılmaz.
+    """
+    if not isinstance(min_recall, (int, float)) or isinstance(min_recall, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be numeric."
+        )
+    if np.isnan(min_recall) or np.isinf(min_recall):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be finite."
+        )
+    if not (0.0 <= float(min_recall) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="min_recall must be in [0, 1] range."
+        )
+
+    if not isinstance(max_false_positive_rate, (int, float)) or isinstance(max_false_positive_rate, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be numeric."
+        )
+    if np.isnan(max_false_positive_rate) or np.isinf(max_false_positive_rate):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be finite."
+        )
+    if not (0.0 <= float(max_false_positive_rate) <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="max_false_positive_rate must be in [0, 1] range."
+        )
+
+    if not isinstance(candidate_results, (list, tuple)):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="candidate_results must be a list or tuple."
+        )
+    if len(candidate_results) != 5:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Must provide exactly 5 candidate evaluation results."
+        )
+
+    variant_names: list[str] = []
+    for c in candidate_results:
+        if not isinstance(c, ModelEvaluationCandidateResult):
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="All elements must be ModelEvaluationCandidateResult objects."
+            )
+        if c.variant_name in variant_names:
+            raise AppException(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message=f"Duplicate variant name in results: '{c.variant_name}'."
+            )
+        variant_names.append(c.variant_name)
+
+    if tuple(variant_names) != EXPECTED_DAY10_VARIANTS:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=f"Candidate results must match the exact 5 Day 10 variants in fixed order: {EXPECTED_DAY10_VARIANTS}."
+        )
+
+    eligible = [
+        c for c in candidate_results
+        if c.is_eligible
+        and c.validation_recall is not None and c.validation_recall >= float(min_recall)
+        and c.validation_false_positive_rate is not None and c.validation_false_positive_rate <= float(max_false_positive_rate)
+    ]
+
+    if len(eligible) > 0:
+        best = min(
+            eligible,
+            key=lambda c: (
+                -float(c.validation_recall if c.validation_recall is not None else -1.0),
+                float(c.validation_false_positive_rate if c.validation_false_positive_rate is not None else 2.0),
+                -float(c.validation_f1_score if c.validation_f1_score is not None else -1.0),
+                -float(c.validation_average_precision),
+                float(c.training_duration_seconds),
+                str(c.variant_name),
+            ),
+        )
+        selected_model = str(best.model_name)
+        selected_variant = str(best.variant_name)
+        selected_thresh: float | None = float(best.selected_threshold) if best.selected_threshold is not None else None
+        is_sel = True
+        reason = (
+            f"Selected candidate '{best.variant_name}' ({best.model_name}) satisfying validation constraints "
+            f"(Recall={best.validation_recall:.4f} >= {float(min_recall):.4f}, "
+            f"FPR={best.validation_false_positive_rate:.4f} <= {float(max_false_positive_rate):.4f}) "
+            f"via deterministic tie-break rules."
+        )
+    else:
+        selected_model = None
+        selected_variant = None
+        selected_thresh = None
+        is_sel = False
+        reason = (
+            f"No candidate model satisfied the validation constraints "
+            f"(min_recall={float(min_recall):.4f}, max_false_positive_rate={float(max_false_positive_rate):.4f})."
+        )
+
+    return FinalModelSelectionResult(
+        candidates=tuple(candidate_results),
+        selected_model_name=selected_model,
+        selected_variant_name=selected_variant,
+        selected_threshold=selected_thresh,
+        min_recall=float(min_recall),
+        max_false_positive_rate=float(max_false_positive_rate),
+        is_selected=is_sel,
+        selection_reason=reason,
+    )
+
+
+def run_final_model_selection(
+    X_train: Any,
+    y_train: Any,
+    X_test: Any,
+    y_test: Any,
+    candidates: Sequence[ModelCandidateConfig] | None = None,
+    n_splits: int = 5,
+    random_state: int = 42,
+    min_recall: float = 0.95,
+    max_false_positive_rate: float = 0.05,
+) -> FinalModelSelectionResult:
+    """
+    Değerlendirme ve nihai model seçimi aşamalarını bir araya getiren üst seviye servis fonksiyonu.
+    """
+    evaluated = evaluate_model_candidates(
+        X_train=X_train,
+        y_train=y_train,
+        X_test=X_test,
+        y_test=y_test,
+        candidates=candidates,
+        n_splits=n_splits,
+        random_state=random_state,
+        min_recall=min_recall,
+        max_false_positive_rate=max_false_positive_rate,
+    )
+    return select_final_model(
+        candidate_results=evaluated,
+        min_recall=min_recall,
+        max_false_positive_rate=max_false_positive_rate,
     )
 
 
