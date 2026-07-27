@@ -31,6 +31,7 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | `day-07.md` | Gün 7 kaydı — Ön işleme pipeline'ı, scikit-learn transformer, sızıntı korumalı train/test ayrımı ve defensive-copy yalıtımı |
 | `day-08.md` | Gün 8 kaydı — İkili etiket kodlaması, DummyClassifier, LogisticRegression baseline modelleri, metrikler ve CLI eğitim iş akışı |
 | `day-09.md` | Gün 9 kaydı — Random Forest eğitim servisi, kontrollü deneyler, model karşılaştırması ve özellik önem dereceleri |
+| `day-10.md` | Gün 10 kaydı — Model değerlendirme ve seçim altyapısı, OOF karar eşiği, deterministik seçim, risk seviyeleri ve CLI entegrasyonu |
 
 ## Format
 
