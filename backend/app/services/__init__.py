@@ -75,6 +75,14 @@ from app.services.model_service import (
     BaselineTrainingReport,
     train_baseline_models,
     baseline_report_to_dict,
+    RISK_LEVEL_LOW,
+    RISK_LEVEL_MEDIUM,
+    RISK_LEVEL_HIGH,
+    RISK_LEVEL_CRITICAL,
+    classify_risk_level,
+    get_risk_level_policy_dict,
+    run_final_model_selection_workflow,
+    final_model_selection_report_to_dict,
 )
 
 __all__ = [
@@ -144,4 +152,12 @@ __all__ = [
     "BaselineTrainingReport",
     "train_baseline_models",
     "baseline_report_to_dict",
+    "RISK_LEVEL_LOW",
+    "RISK_LEVEL_MEDIUM",
+    "RISK_LEVEL_HIGH",
+    "RISK_LEVEL_CRITICAL",
+    "classify_risk_level",
+    "get_risk_level_policy_dict",
+    "run_final_model_selection_workflow",
+    "final_model_selection_report_to_dict",
 ]

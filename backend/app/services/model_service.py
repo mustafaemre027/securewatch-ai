@@ -2286,3 +2286,247 @@ def comparison_report_to_dict(report: FullModelComparisonReport) -> dict:
             for row in report.comparison.rows
         ]
     }
+
+
+RISK_LEVEL_LOW: str = "LOW"
+RISK_LEVEL_MEDIUM: str = "MEDIUM"
+RISK_LEVEL_HIGH: str = "HIGH"
+RISK_LEVEL_CRITICAL: str = "CRITICAL"
+
+
+def classify_risk_level(probability: float) -> str:
+    """
+    Classifies a finite probability into an operational risk level category.
+
+    Args:
+        probability: A finite float between 0.0 and 1.0 (inclusive).
+
+    Returns:
+        str: One of 'LOW', 'MEDIUM', 'HIGH', or 'CRITICAL'.
+
+    Raises:
+        AppException: With code VALIDATION_ERROR if probability is not numeric, not finite, or out of [0.0, 1.0].
+    """
+    if not isinstance(probability, (int, float)) or isinstance(probability, bool):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Probability must be numeric."
+        )
+    if np.isnan(probability) or np.isinf(probability):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Probability must be finite."
+        )
+    prob_float = float(probability)
+    if not (0.0 <= prob_float <= 1.0):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Probability must be in [0, 1] range."
+        )
+
+    if prob_float <= 0.30:
+        return RISK_LEVEL_LOW
+    elif prob_float <= 0.60:
+        return RISK_LEVEL_MEDIUM
+    elif prob_float <= 0.85:
+        return RISK_LEVEL_HIGH
+    else:
+        return RISK_LEVEL_CRITICAL
+
+
+def get_risk_level_policy_dict() -> dict:
+    """
+    Returns a JSON-safe dictionary describing the operational risk level classification policy.
+    """
+    return {
+        "low": {"min": 0.0, "max": 0.30, "inclusive_min": True, "inclusive_max": True},
+        "medium": {"min": 0.30, "max": 0.60, "inclusive_min": False, "inclusive_max": True},
+        "high": {"min": 0.60, "max": 0.85, "inclusive_min": False, "inclusive_max": True},
+        "critical": {"min": 0.85, "max": 1.0, "inclusive_min": False, "inclusive_max": True},
+        "note": "Risk levels represent operational importance categories of probability and are independent of the binary model decision threshold."
+    }
+
+
+def run_final_model_selection_workflow(
+    df: pd.DataFrame,
+    min_recall: float = 0.95,
+    max_false_positive_rate: float = 0.05,
+    cv_splits: int = 5,
+) -> tuple[FinalModelSelectionResult, SplitDataResult]:
+    """
+    Runs the end-to-end final model selection workflow on a raw DataFrame.
+    Does not train new models or rewrite logic; uses existing Blok 4 services.
+    """
+    raw_result = prepare_training_data(df)
+    binary_targets = encode_binary_labels(raw_result.targets)
+
+    binary_result = TrainingDataResult(
+        features=raw_result.features.copy(deep=True),
+        targets=binary_targets,
+        initial_row_count=raw_result.initial_row_count,
+        dropped_duplicate_count=raw_result.dropped_duplicate_count,
+        final_row_count=raw_result.final_row_count,
+    )
+
+    preprocessor = build_sklearn_preprocessing_pipeline()
+    split_data = split_and_transform_data(binary_result, preprocessor)
+
+    selection_result = run_final_model_selection(
+        X_train=split_data.X_train,
+        y_train=split_data.y_train,
+        X_test=split_data.X_test,
+        y_test=split_data.y_test,
+        n_splits=cv_splits,
+        min_recall=min_recall,
+        max_false_positive_rate=max_false_positive_rate,
+    )
+
+    return selection_result, split_data
+
+
+def final_model_selection_report_to_dict(
+    selection_result: FinalModelSelectionResult,
+    cv_splits: int = 5,
+    split_data: SplitDataResult | None = None,
+) -> dict:
+    """
+    Converts a FinalModelSelectionResult into a JSON-safe dictionary conforming to Day 10 Block 5 requirements.
+    No estimator objects, raw data rows, or full probability arrays are included.
+    All numeric values are converted to Python-native int/float types.
+    """
+    policy_dict = {
+        "min_recall": float(selection_result.min_recall),
+        "max_fpr": float(selection_result.max_false_positive_rate),
+        "cv_splits": int(cv_splits),
+        "tie_break_order": [
+            "highest_validation_recall",
+            "lowest_validation_fpr",
+            "highest_validation_f1",
+            "highest_validation_ap",
+            "lowest_training_duration",
+            "alphabetical_variant_name",
+        ],
+        "note": "Selection is based strictly on validation results without looking at test metrics or test data.",
+    }
+
+    if selection_result.is_selected:
+        winner: ModelEvaluationCandidateResult | None = None
+        for c in selection_result.candidates:
+            if c.variant_name == selection_result.selected_variant_name:
+                winner = c
+                break
+        if winner is not None:
+            val_metrics = {
+                "roc_auc": float(winner.validation_roc_auc),
+                "average_precision": float(winner.validation_average_precision),
+                "recall": float(winner.validation_recall) if winner.validation_recall is not None else None,
+                "precision": float(winner.validation_precision) if winner.validation_precision is not None else None,
+                "f1_score": float(winner.validation_f1_score) if winner.validation_f1_score is not None else None,
+                "false_positive_rate": float(winner.validation_false_positive_rate) if winner.validation_false_positive_rate is not None else None,
+            }
+            test_metrics = {
+                "roc_auc": float(winner.test_roc_auc) if winner.test_roc_auc is not None else None,
+                "average_precision": float(winner.test_average_precision) if winner.test_average_precision is not None else None,
+                "accuracy": float(winner.test_accuracy) if winner.test_accuracy is not None else None,
+                "precision": float(winner.test_precision) if winner.test_precision is not None else None,
+                "recall": float(winner.test_recall) if winner.test_recall is not None else None,
+                "f1_score": float(winner.test_f1_score) if winner.test_f1_score is not None else None,
+                "false_positive_rate": float(winner.test_false_positive_rate) if winner.test_false_positive_rate is not None else None,
+            }
+            training_dur: float | None = float(winner.training_duration_seconds)
+        else:
+            val_metrics = None
+            test_metrics = None
+            training_dur = None
+
+        selected_model_dict = {
+            "is_selected": True,
+            "model_name": str(selection_result.selected_model_name),
+            "variant_name": str(selection_result.selected_variant_name),
+            "decision_threshold": float(selection_result.selected_threshold) if selection_result.selected_threshold is not None else None,
+            "validation_metrics": val_metrics,
+            "test_metrics": test_metrics,
+            "training_duration_seconds": training_dur,
+            "selection_reason": str(selection_result.selection_reason),
+        }
+    else:
+        selected_model_dict = {
+            "is_selected": False,
+            "model_name": None,
+            "variant_name": None,
+            "decision_threshold": None,
+            "validation_metrics": None,
+            "test_metrics": None,
+            "training_duration_seconds": None,
+            "selection_reason": str(selection_result.selection_reason),
+        }
+
+    order_map = {v: idx for idx, v in enumerate(EXPECTED_DAY10_VARIANTS)}
+    sorted_candidates = sorted(selection_result.candidates, key=lambda c: order_map.get(c.variant_name, 999))
+
+    candidates_list = []
+    for c in sorted_candidates:
+        val_m = {
+            "roc_auc": float(c.validation_roc_auc),
+            "average_precision": float(c.validation_average_precision),
+            "recall": float(c.validation_recall) if c.validation_recall is not None else None,
+            "precision": float(c.validation_precision) if c.validation_precision is not None else None,
+            "f1_score": float(c.validation_f1_score) if c.validation_f1_score is not None else None,
+            "false_positive_rate": float(c.validation_false_positive_rate) if c.validation_false_positive_rate is not None else None,
+        }
+        test_m = {
+            "roc_auc": float(c.test_roc_auc) if c.test_roc_auc is not None else None,
+            "average_precision": float(c.test_average_precision) if c.test_average_precision is not None else None,
+            "accuracy": float(c.test_accuracy) if c.test_accuracy is not None else None,
+            "precision": float(c.test_precision) if c.test_precision is not None else None,
+            "recall": float(c.test_recall) if c.test_recall is not None else None,
+            "f1_score": float(c.test_f1_score) if c.test_f1_score is not None else None,
+            "false_positive_rate": float(c.test_false_positive_rate) if c.test_false_positive_rate is not None else None,
+        }
+        cm_list = (
+            [
+                [int(c.test_confusion_matrix[0][0]), int(c.test_confusion_matrix[0][1])],
+                [int(c.test_confusion_matrix[1][0]), int(c.test_confusion_matrix[1][1])],
+            ]
+            if c.test_confusion_matrix is not None
+            else None
+        )
+        candidates_list.append({
+            "model_name": str(c.model_name),
+            "variant_name": str(c.variant_name),
+            "hyperparameters": dict(c.hyperparameters),
+            "is_eligible": bool(c.is_eligible),
+            "ineligibility_reason": str(c.ineligibility_reason) if c.ineligibility_reason is not None else None,
+            "validation_metrics": val_m,
+            "selected_threshold": float(c.selected_threshold) if c.selected_threshold is not None else None,
+            "test_metrics": test_m,
+            "confusion_matrix": cm_list,
+            "training_duration_seconds": float(c.training_duration_seconds),
+        })
+
+    risk_policy_dict = get_risk_level_policy_dict()
+
+    report_dict = {
+        "mode": "select_final_model",
+        "selection_policy": policy_dict,
+        "selected_model": selected_model_dict,
+        "candidates": candidates_list,
+        "risk_policy": risk_policy_dict,
+    }
+
+    if split_data is not None:
+        report_dict["dataset"] = {
+            "train_row_count": int(len(split_data.y_train)),
+            "test_row_count": int(len(split_data.y_test)),
+            "train_class_distribution": {
+                str(k): int(v) for k, v in split_data.y_train.value_counts().items()
+            },
+            "test_class_distribution": {
+                str(k): int(v) for k, v in split_data.y_test.value_counts().items()
+            },
+        }
+
+    return report_dict

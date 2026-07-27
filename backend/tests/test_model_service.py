@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pandas as pd
 import dataclasses
@@ -48,8 +49,17 @@ from app.services.model_service import (
     compare_models,
     run_model_comparison,
     comparison_report_to_dict,
+    RISK_LEVEL_LOW,
+    RISK_LEVEL_MEDIUM,
+    RISK_LEVEL_HIGH,
+    RISK_LEVEL_CRITICAL,
+    classify_risk_level,
+    get_risk_level_policy_dict,
+    run_final_model_selection_workflow,
+    final_model_selection_report_to_dict,
 )
 from app.services.preprocessing_service import SplitDataResult
+
 
 
 def test_encode_benign():
@@ -2100,3 +2110,99 @@ def test_select_final_model_mutation_of_test_metrics_does_not_change_winner():
 
     assert sel1.selected_variant_name == sel2.selected_variant_name == "lr_baseline"
     assert sel1.selected_threshold == sel2.selected_threshold
+
+
+def test_classify_risk_level_boundaries():
+    """Test 99: Risk seviyesi sınıflandırmasının sınır değerlerinde doğru ve boşluksuz çalışması."""
+    assert classify_risk_level(0.00) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.30) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.300001) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.60) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.600001) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.85) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.850001) == RISK_LEVEL_CRITICAL
+    assert classify_risk_level(1.00) == RISK_LEVEL_CRITICAL
+
+
+def test_classify_risk_level_invalid():
+    """Test 100: Geçersiz olasılık değerlerinin 422 VALIDATION_ERROR ile reddedilmesi."""
+    for val in [-0.01, 1.01, float("nan"), float("inf"), float("-inf"), "0.5", None, True]:
+        with pytest.raises(AppException) as excinfo:
+            classify_risk_level(val)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_get_risk_level_policy_dict():
+    """Test 101: Risk politikası sözlüğünün doğru yapıya sahip olması ve karar eşiğinden bağımsızlık notunu içermesi."""
+    policy = get_risk_level_policy_dict()
+    assert "low" in policy
+    assert "medium" in policy
+    assert "high" in policy
+    assert "critical" in policy
+    assert "note" in policy
+    assert "independent" in policy["note"]
+
+
+@pytest.fixture
+def synthetic_df():
+    from app.services.csv_validation_service import CICIDS2017_FEATURE_COLUMNS, CICIDS2017_OPTIONAL_LABEL
+    rng = np.random.default_rng(0)
+    data = {col: rng.uniform(0, 100, size=10).tolist() for col in CICIDS2017_FEATURE_COLUMNS}
+    data[CICIDS2017_OPTIONAL_LABEL] = ["BENIGN"] * 5 + ["Attack"] * 5
+    return pd.DataFrame(data)
+
+
+def test_run_final_model_selection_workflow(synthetic_df):
+    """Test 102: Sentetik veri ile nihai model seçimi iş akışının başarılı olması."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    assert isinstance(result, FinalModelSelectionResult)
+    assert isinstance(split_data, SplitDataResult)
+    assert len(result.candidates) == 5
+
+
+
+def test_final_model_selection_report_to_dict_selected(synthetic_df):
+    """Test 103: Seçim başarılı olduğunda rapor sözlüğünün tüm zorunlu alanları ve güvenli tipleri içermesi."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    report_dict = final_model_selection_report_to_dict(result, cv_splits=2, split_data=split_data)
+
+    # Validate JSON serialization with allow_nan=False
+    json_str = json.dumps(report_dict, allow_nan=False)
+    assert len(json_str) > 0
+
+    assert report_dict["mode"] == "select_final_model"
+    assert "selection_policy" in report_dict
+    assert "selected_model" in report_dict
+    assert "candidates" in report_dict
+    assert "risk_policy" in report_dict
+    assert "dataset" in report_dict
+
+    sel = report_dict["selected_model"]
+    if sel["is_selected"]:
+        assert sel["model_name"] is not None
+        assert sel["variant_name"] is not None
+        assert isinstance(sel["decision_threshold"], float)
+        assert isinstance(sel["validation_metrics"], dict)
+        assert isinstance(sel["test_metrics"], dict)
+        assert isinstance(sel["training_duration_seconds"], float)
+
+    # Verify no estimators or raw arrays
+    for cand in report_dict["candidates"]:
+        assert "estimator" not in cand
+        assert "predictions" not in cand
+
+
+def test_final_model_selection_report_to_dict_unselected(synthetic_df):
+    """Test 104: Hiçbir aday seçilmediğinde rapor sözlüğünün doğru fallback yapması."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.9999, max_false_positive_rate=0.0001, cv_splits=2)
+    report_dict = final_model_selection_report_to_dict(result, cv_splits=2, split_data=split_data)
+
+    sel = report_dict["selected_model"]
+    assert sel["is_selected"] is False
+    assert sel["model_name"] is None
+    assert sel["variant_name"] is None
+    assert sel["decision_threshold"] is None
+    assert sel["validation_metrics"] is None
+    assert sel["test_metrics"] is None
+    assert sel["training_duration_seconds"] is None
