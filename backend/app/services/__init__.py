@@ -15,6 +15,7 @@ from app.services.storage_service import (
     discard_staged,
     finalise_upload,
     stage_upload,
+    resolve_upload_file,
 )
 from app.services.csv_validation_service import (
     CICIDS2017_FEATURE_COLUMNS,
@@ -96,6 +97,10 @@ from app.services.inference_service import (
     prepare_inference_data,
     run_inference,
 )
+from app.services.analysis_processing_service import (
+    AnalysisProcessingResult,
+    process_analysis_job,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -112,6 +117,7 @@ __all__ = [
     "finalise_upload",
     "discard_staged",
     "delete_finalised",
+    "resolve_upload_file",
     "CICIDS2017_FEATURE_COLUMNS",
     "CICIDS2017_OPTIONAL_LABEL",
     "CsvValidationResult",
@@ -180,4 +186,6 @@ __all__ = [
     "InferenceBatchResult",
     "prepare_inference_data",
     "run_inference",
+    "AnalysisProcessingResult",
+    "process_analysis_job",
 ]

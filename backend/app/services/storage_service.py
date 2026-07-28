@@ -270,3 +270,71 @@ def _safe_delete(path: Path) -> None:
     except Exception:
         # Best-effort: log but do not propagate.
         logger.warning("Could not remove file during cleanup: %s", path.name)
+
+
+def resolve_upload_file(file_hash: str, upload_dir: Path) -> Path:
+    """Resolve and validate the absolute path to a finalised CSV file.
+
+    Args:
+        file_hash (str): The 64-character lowercase SHA-256 hex digest.
+        upload_dir (Path): The configured upload directory.
+
+    Returns:
+        Path: The validated absolute path to the CSV file.
+
+    Raises:
+        AppException: If the file hash is invalid, file not found, or not a regular file.
+    """
+    if not isinstance(file_hash, str) or len(file_hash) != 64:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Invalid file hash. Must be a 64-character string."
+        )
+
+    # Validate lowercase hex
+    try:
+        bytes.fromhex(file_hash)
+    except ValueError:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Invalid file hash format."
+        )
+    if any(c.isupper() for c in file_hash):
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Invalid file hash format. Must be lowercase."
+        )
+
+    if "/" in file_hash or "\\" in file_hash or "." in file_hash:
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Path traversal attempt detected in file hash."
+        )
+
+    file_path = (upload_dir / f"{file_hash}.csv").resolve()
+
+    if file_path.parent != upload_dir.resolve():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Path traversal attempt detected."
+        )
+
+    if not file_path.exists():
+        raise AppException(
+            status_code=404,
+            code="FILE_NOT_FOUND",
+            message="The requested upload file could not be found."
+        )
+    if not file_path.is_file():
+        raise AppException(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="The requested path is not a regular file."
+        )
+
+    return file_path
