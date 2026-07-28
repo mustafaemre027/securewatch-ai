@@ -1,8 +1,12 @@
+import json
 import numpy as np
 import pandas as pd
+import dataclasses
 import pytest
+import unittest.mock
 
 from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.compose import ColumnTransformer
 
@@ -11,6 +15,27 @@ from app.services.model_service import (
     encode_binary_labels,
     evaluate_binary_classification,
     ClassificationMetrics,
+    RocCurvePoint,
+    PrecisionRecallCurvePoint,
+    ProbabilityEvaluationMetrics,
+    extract_positive_probabilities,
+    evaluate_probability_metrics,
+    DEFAULT_THRESHOLD_CANDIDATES,
+    OutOfFoldProbabilityResult,
+    ThresholdEvaluationResult,
+    ThresholdSelectionResult,
+    generate_out_of_fold_probabilities,
+    validate_threshold_candidates,
+    select_decision_threshold,
+    ModelCandidateConfig,
+    ModelEvaluationCandidateResult,
+    FinalModelSelectionResult,
+    EXPECTED_DAY10_VARIANTS,
+    get_day10_model_candidates,
+    validate_model_candidates,
+    evaluate_model_candidates,
+    select_final_model,
+    run_final_model_selection,
     ModelTrainingResult,
     train_dummy_classifier,
     train_logistic_regression,
@@ -24,8 +49,17 @@ from app.services.model_service import (
     compare_models,
     run_model_comparison,
     comparison_report_to_dict,
+    RISK_LEVEL_LOW,
+    RISK_LEVEL_MEDIUM,
+    RISK_LEVEL_HIGH,
+    RISK_LEVEL_CRITICAL,
+    classify_risk_level,
+    get_risk_level_policy_dict,
+    run_final_model_selection_workflow,
+    final_model_selection_report_to_dict,
 )
 from app.services.preprocessing_service import SplitDataResult
+
 
 
 def test_encode_benign():
@@ -1154,3 +1188,1263 @@ def test_rf_experiments_bubbles_up_errors(synthetic_split_data):
         run_random_forest_experiments(invalid_split)
     assert excinfo.value.status_code == 422
     assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+# --- Probability Extraction Tests ---
+
+def test_extract_probabilities_logistic_regression():
+    """Test 42: Lojistik Regresyondan olasılık çıkarılması."""
+    X = pd.DataFrame({"feat1": [0.1, 0.5, 0.9, 0.2], "feat2": [1.0, 2.0, 3.0, 1.5]})
+    y = pd.Series([0, 1, 1, 0])
+    clf = LogisticRegression()
+    clf.fit(X, y)
+    probs = extract_positive_probabilities(clf, X)
+    assert isinstance(probs, tuple)
+    assert len(probs) == len(X)
+    assert all(isinstance(p, float) for p in probs)
+    assert all(0.0 <= p <= 1.0 for p in probs)
+
+
+def test_extract_probabilities_random_forest():
+    """Test 43: Random Forest’tan olasılık çıkarılması."""
+    X = pd.DataFrame({"feat1": [0.1, 0.5, 0.9, 0.2], "feat2": [1.0, 2.0, 3.0, 1.5]})
+    y = pd.Series([0, 1, 1, 0])
+    clf = RandomForestClassifier(n_estimators=5, random_state=42)
+    clf.fit(X, y)
+    probs = extract_positive_probabilities(clf, X)
+    assert isinstance(probs, tuple)
+    assert len(probs) == len(X)
+    assert all(isinstance(p, float) for p in probs)
+    assert all(0.0 <= p <= 1.0 for p in probs)
+
+
+def test_extract_probabilities_reverse_classes():
+    """Test 44: Ters classes_ sıralamasında pozitif sınıfın doğru bulunması."""
+    class DummyRevModel:
+        classes_ = np.array([1, 0])
+        def predict_proba(self, X):
+            # Column 0 corresponds to class 1, column 1 corresponds to class 0
+            return np.array([[0.8, 0.2], [0.3, 0.7]])
+
+    probs = extract_positive_probabilities(DummyRevModel(), [[1], [2]])
+    assert probs == (0.8, 0.3)
+    assert all(type(p) is float for p in probs)
+
+
+def test_extract_probabilities_rejects_no_predict_proba():
+    """Test 45: predict_proba bulunmayan estimatorın reddedilmesi."""
+    class DummyNoProba:
+        classes_ = np.array([0, 1])
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyNoProba(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "predict_proba" in excinfo.value.message
+
+
+def test_extract_probabilities_rejects_invalid_classes():
+    """Test 46: Geçersiz veya eksik classes_ değerlerinin reddedilmesi."""
+    class DummyMissingClasses:
+        def predict_proba(self, X): return np.array([[0.5, 0.5]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyMissingClasses(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummySingleClass:
+        classes_ = np.array([0])
+        def predict_proba(self, X): return np.array([[1.0]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummySingleClass(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyThreeClasses:
+        classes_ = np.array([0, 1, 2])
+        def predict_proba(self, X): return np.array([[0.3, 0.3, 0.4]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyThreeClasses(), [[1]])
+    assert excinfo.value.status_code == 422
+
+
+def test_extract_probabilities_rejects_invalid_proba_shape():
+    """Test 47: Hatalı predict_proba boyutunun reddedilmesi."""
+    class DummyBadCols:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5], [0.5]])  # 1 col instead of 2
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyBadCols(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+
+    class DummyBadRows:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, 0.5]])  # 1 row for 2 inputs
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyBadRows(), [[1], [2]])
+    assert excinfo.value.status_code == 422
+
+
+def test_extract_probabilities_rejects_nan_inf_out_of_range():
+    """Test 48: NaN, inf ve aralık dışı olasılıkların reddedilmesi."""
+    class DummyNaN:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, np.nan]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyNaN(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyInf:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[0.5, np.inf]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyInf(), [[1]])
+    assert excinfo.value.status_code == 422
+
+    class DummyOutRange:
+        classes_ = np.array([0, 1])
+        def predict_proba(self, X): return np.array([[-0.1, 1.1]])
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(DummyOutRange(), [[1]])
+    assert excinfo.value.status_code == 422
+
+
+# --- Probability Metrics Evaluation Tests ---
+
+def test_evaluate_probability_metrics_correct_roc_auc():
+    """Test 49: Bilinen örnek üzerinde doğru ROC-AUC."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.roc_auc == 1.0
+    assert type(res.roc_auc) is float
+
+    y_true_mixed = [0, 1, 0, 1]
+    probs_mixed = [0.2, 0.5, 0.6, 0.8] # 1 incorrect ranking out of 4 pairs -> AUC 0.75
+    res_mixed = evaluate_probability_metrics(y_true_mixed, probs_mixed)
+    assert abs(res_mixed.roc_auc - 0.75) < 1e-6
+
+
+def test_evaluate_probability_metrics_correct_ap():
+    """Test 50: Bilinen örnek üzerinde doğru Average Precision."""
+    y_true = [0, 1, 0, 1]
+    probs = [0.1, 0.9, 0.2, 0.8] # perfect ranking for positives
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.average_precision == 1.0
+    assert type(res.average_precision) is float
+
+
+def test_evaluate_probability_metrics_curve_structures():
+    """Test 51: ROC ve Precision-Recall noktalarının doğru yapıda olması."""
+    y_true = [0, 1, 0, 1]
+    probs = [0.1, 0.4, 0.35, 0.8]
+    res = evaluate_probability_metrics(y_true, probs)
+
+    assert isinstance(res.roc_curve, tuple)
+    assert len(res.roc_curve) > 0
+    for pt in res.roc_curve:
+        assert isinstance(pt, RocCurvePoint)
+        assert 0.0 <= pt.false_positive_rate <= 1.0
+        assert 0.0 <= pt.true_positive_rate <= 1.0
+        assert pt.threshold is None or (0.0 <= pt.threshold <= 1.0)
+
+    assert isinstance(res.precision_recall_curve, tuple)
+    assert len(res.precision_recall_curve) > 0
+    for pt in res.precision_recall_curve:
+        assert isinstance(pt, PrecisionRecallCurvePoint)
+        assert 0.0 <= pt.precision <= 1.0
+        assert 0.0 <= pt.recall <= 1.0
+        assert pt.threshold is None or (0.0 <= pt.threshold <= 1.0)
+
+
+def test_evaluate_probability_metrics_roc_initial_threshold_none():
+    """Test 52: ROC başlangıç sonsuz threshold değerinin None olması."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.roc_curve[0].threshold is None
+
+
+def test_evaluate_probability_metrics_pr_final_threshold_none():
+    """Test 53: PR eğrisinin son threshold değerinin None olması."""
+    y_true = [0, 0, 1, 1]
+    probs = [0.1, 0.2, 0.8, 0.9]
+    res = evaluate_probability_metrics(y_true, probs)
+    assert res.precision_recall_curve[-1].threshold is None
+
+
+def test_evaluate_probability_metrics_fpr_formula_matches_cm():
+    """Test 54: FPR formülünün confusion matrix ile eşleşmesi (FP / (FP + TN))."""
+    y_true = [0, 0, 0, 0, 1, 1]
+    probs = [0.6, 0.7, 0.2, 0.1, 0.8, 0.9] # threshold 0.5 -> FP is 2, TN is 2
+    res = evaluate_probability_metrics(y_true, probs, threshold=0.5)
+    cm = res.classification_metrics.confusion_matrix
+    tn, fp = cm[0][0], cm[0][1]
+    expected_fpr = fp / (fp + tn)
+    assert abs(res.false_positive_rate - expected_fpr) < 1e-9
+    assert abs(res.false_positive_rate - 0.5) < 1e-9
+
+
+def test_evaluate_probability_metrics_score_gte_threshold_boundary():
+    """Test 55: score >= threshold sınır davranışı."""
+    y_true = [0, 1]
+    probs = [0.5, 0.5]
+    # At threshold 0.5, score >= 0.5 should predict 1 for both
+    res = evaluate_probability_metrics(y_true, probs, threshold=0.5)
+    assert res.classification_metrics.tp == 1
+    assert res.classification_metrics.fp == 1
+
+    # At threshold 0.51, score >= 0.51 should predict 0 for both
+    res_high = evaluate_probability_metrics(y_true, probs, threshold=0.51)
+    assert res_high.classification_metrics.tp == 0
+    assert res_high.classification_metrics.fn == 1
+
+
+def test_evaluate_probability_metrics_rejects_single_class_target():
+    """Test 56: Tek sınıflı hedeflerin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 0, 0], [0.1, 0.2, 0.3])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "both 0 and 1" in excinfo.value.message
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([1, 1, 1], [0.8, 0.9, 0.7])
+    assert excinfo.value.status_code == 422
+
+
+def test_evaluate_probability_metrics_rejects_length_mismatch():
+    """Test 57: Farklı uzunluktaki girişlerin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.5, 0.6, 0.7])
+    assert excinfo.value.status_code == 422
+    assert "same length" in excinfo.value.message
+
+
+def test_evaluate_probability_metrics_rejects_invalid_threshold():
+    """Test 58: Geçersiz karar eşiğinin reddedilmesi."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=-0.1)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=1.1)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold=np.nan)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([0, 1], [0.2, 0.8], threshold="invalid")
+    assert excinfo.value.status_code == 422
+
+
+def test_evaluate_probability_metrics_returns_python_native_types():
+    """Test 59: NumPy scalar yerine Python-native değerlerin dönmesi."""
+    y_true = np.array([0, 1, 0, 1], dtype=np.int64)
+    probs = np.array([0.1, 0.9, 0.2, 0.8], dtype=np.float64)
+    res = evaluate_probability_metrics(y_true, probs, threshold=np.float64(0.5))
+
+    assert type(res.roc_auc) is float
+    assert type(res.average_precision) is float
+    assert type(res.threshold) is float
+    assert type(res.false_positive_rate) is float
+    assert type(res.classification_metrics.accuracy) is float
+    assert type(res.classification_metrics.tp) is int
+
+    for pt in res.roc_curve:
+        assert type(pt.false_positive_rate) is float
+        assert type(pt.true_positive_rate) is float
+        assert pt.threshold is None or type(pt.threshold) is float
+
+    for pt in res.precision_recall_curve:
+        assert type(pt.precision) is float
+        assert type(pt.recall) is float
+        assert pt.threshold is None or type(pt.threshold) is float
+
+
+def test_evaluate_probability_metrics_immutability():
+    """Test 60: Sonuç dataclasslarının ve tuple alanlarının immutable olması."""
+    y_true = [0, 1]
+    probs = [0.2, 0.8]
+    res = evaluate_probability_metrics(y_true, probs)
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.roc_auc = 0.5
+
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.roc_curve[0].false_positive_rate = 1.0
+
+    assert isinstance(res.roc_curve, tuple)
+    assert isinstance(res.precision_recall_curve, tuple)
+
+
+def test_evaluate_probability_metrics_no_input_mutation():
+    """Test 61: Girdi dizilerinin ve DataFrame’in değişmemesi."""
+    y_true = pd.Series([0, 1, 0, 1], name="target")
+    probs = pd.Series([0.1, 0.9, 0.2, 0.8], name="probs")
+    y_copy = y_true.copy(deep=True)
+    p_copy = probs.copy(deep=True)
+
+    evaluate_probability_metrics(y_true, probs)
+
+    pd.testing.assert_series_equal(y_true, y_copy)
+    pd.testing.assert_series_equal(probs, p_copy)
+
+    X = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    X_copy = X.copy(deep=True)
+    clf = LogisticRegression()
+    clf.fit(X, [0, 1])
+    extract_positive_probabilities(clf, X)
+    pd.testing.assert_frame_equal(X, X_copy)
+
+
+def test_probability_services_422_validation_error_contract():
+    """Test 62: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        evaluate_probability_metrics([], [])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(None, [[1]])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_probability_services_no_leakage():
+    """Test 63: Hata mesajlarında ham veri, mutlak yol veya estimator içeriği bulunmaması."""
+    class VerboseBadModel:
+        def __str__(self): return "SECRET_INTERNAL_MODEL_PATH_c:/Projects/securewatch-ai/model"
+        def __repr__(self): return "SECRET_INTERNAL_MODEL_PATH_c:/Projects/securewatch-ai/model"
+        def predict_proba(self, X): raise ValueError("Internal db error at c:/Projects/securewatch-ai/db.sqlite")
+
+    verbose_model = VerboseBadModel()
+    verbose_model.classes_ = np.array([0, 1])
+
+    with pytest.raises(AppException) as excinfo:
+        extract_positive_probabilities(verbose_model, [[1.0]])
+
+    msg = excinfo.value.message
+    assert "c:/" not in msg.lower()
+    assert "securewatch" not in msg.lower()
+    assert "secret" not in msg.lower()
+    assert "db.sqlite" not in msg.lower()
+
+
+def test_generate_oof_probabilities_five_folds_success():
+    """Test 64: Beş fold ile başarılı out-of-fold olasılık üretimi."""
+    X = pd.DataFrame({
+        "feat1": np.linspace(0, 10, 50),
+        "feat2": np.linspace(10, 20, 50)
+    })
+    y = pd.Series([0] * 25 + [1] * 25)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=5, random_state=42)
+
+    assert isinstance(res, OutOfFoldProbabilityResult)
+    assert len(res.probabilities) == 50
+    assert len(res.fold_ids) == 50
+    assert res.n_splits == 5
+    assert res.random_state == 42
+    assert all(0.0 <= p <= 1.0 for p in res.probabilities)
+    assert all(0 <= fid < 5 for fid in res.fold_ids)
+
+
+def test_generate_oof_probabilities_every_row_exactly_once():
+    """Test 65: Her satırın tam olarak bir validation fold’unda bulunması."""
+    X = np.random.RandomState(42).randn(30, 3)
+    y = np.array([0] * 15 + [1] * 15)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=3, random_state=42)
+
+    fold_counts = pd.Series(res.fold_ids).value_counts()
+    assert len(fold_counts) == 3
+    assert sum(fold_counts) == 30
+    assert all(count > 0 for count in fold_counts)
+
+
+def test_generate_oof_probabilities_original_order_preserved():
+    """Test 66: Olasılıkların orijinal satır sırasını koruması."""
+    X = np.vstack([np.zeros((10, 2)), np.ones((10, 2)) * 10.0])
+    y = np.array([0] * 10 + [1] * 10)
+    clf = LogisticRegression()
+
+    res = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+
+    for i in range(10):
+        assert res.probabilities[i] < 0.5
+    for i in range(10, 20):
+        assert res.probabilities[i] > 0.5
+
+
+def test_generate_oof_probabilities_estimator_cloning_and_no_mutation():
+    """Test 67: Estimator clone edilmesi, şablonun fit edilmemesi ve girdilerin değişmemesi."""
+    X = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [2.0, 3.0, 4.0, 5.0]})
+    y = pd.Series([0, 0, 1, 1])
+    X_copy = X.copy(deep=True)
+    y_copy = y.copy(deep=True)
+
+    clf = LogisticRegression()
+    assert not hasattr(clf, "coef_")
+
+    generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+
+    assert not hasattr(clf, "coef_")
+    pd.testing.assert_frame_equal(X, X_copy)
+    pd.testing.assert_series_equal(y, y_copy)
+
+
+def test_generate_oof_probabilities_random_state_determinism():
+    """Test 68: Aynı random state ile deterministik, farklı random state ile farklı davranış."""
+    X = np.random.RandomState(42).randn(20, 2)
+    y = np.array([0] * 10 + [1] * 10)
+    clf = LogisticRegression()
+
+    res1 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+    res2 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=42)
+    res3 = generate_out_of_fold_probabilities(clf, X, y, n_splits=2, random_state=99)
+
+    assert res1.probabilities == res2.probabilities
+    assert res1.fold_ids == res2.fold_ids
+    assert res1.probabilities != res3.probabilities or res1.fold_ids != res3.fold_ids
+
+
+def test_generate_oof_probabilities_invalid_targets():
+    """Test 69: Tek sınıflı hedefin veya sınıf örneği fold sayısından az olduğunda reddedilmesi."""
+    X = np.ones((10, 2))
+    clf = LogisticRegression()
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, [0] * 10, n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "both 0 and 1" in excinfo.value.message
+
+    y_imbalanced = [0] * 9 + [1]
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, y_imbalanced, n_splits=5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "less than n_splits" in excinfo.value.message
+
+
+def test_generate_oof_probabilities_invalid_inputs():
+    """Test 70: Geçersiz fold sayısı, özellik veya hedef girdilerinin reddedilmesi."""
+    clf = LogisticRegression()
+    X = np.ones((10, 2))
+    y = np.array([0] * 5 + [1] * 5)
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, y, n_splits=1)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, [], y, n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        generate_out_of_fold_probabilities(clf, X, [0, 1], n_splits=2)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_default_threshold_candidates():
+    """Test 71: Varsayılan 17 eşik değerinin doğru oluşması."""
+    expected = tuple(round(0.10 + i * 0.05, 2) for i in range(17))
+    assert DEFAULT_THRESHOLD_CANDIDATES == expected
+    assert len(DEFAULT_THRESHOLD_CANDIDATES) == 17
+    assert DEFAULT_THRESHOLD_CANDIDATES[0] == 0.10
+    assert DEFAULT_THRESHOLD_CANDIDATES[-1] == 0.90
+    assert validate_threshold_candidates(None) == DEFAULT_THRESHOLD_CANDIDATES
+
+
+def test_custom_threshold_candidates_validation():
+    """Test 72: Özel eşiklerin sıralama ve tekrar doğrulaması."""
+    assert validate_threshold_candidates([0.2, 0.5, 0.8]) == (0.2, 0.5, 0.8)
+
+    with pytest.raises(AppException) as excinfo:
+        validate_threshold_candidates([0.3, 0.5, 0.5])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "duplicate" in excinfo.value.message
+
+    with pytest.raises(AppException) as excinfo:
+        validate_threshold_candidates([0.8, 0.2])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+    assert "strictly increasing" in excinfo.value.message
+
+
+def test_select_decision_threshold_metrics_and_fpr():
+    """Test 73: Her eşikte metrik/FPR hesaplanması ve score == threshold kuralı."""
+    y_val = [0, 0, 1, 1]
+    probs = [0.2, 0.4, 0.5, 0.8]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.3, 0.5, 0.7], max_false_positive_rate=0.50)
+
+    assert len(res.evaluations) == 3
+    eval_05 = [ev for ev in res.evaluations if ev.threshold == 0.5][0]
+    assert eval_05.metrics.recall == 1.0
+    assert eval_05.false_positive_rate == 0.0
+
+
+def test_select_decision_threshold_tie_break_rules():
+    """Test 74: FPR sınırı altında en yüksek recall seçimi ve tie-break kuralları."""
+    y_val = [0, 0, 0, 0, 1, 1, 1, 1]
+    probs = [0.1, 0.1, 0.3, 0.3, 0.6, 0.7, 0.8, 0.9]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.2, 0.5, 0.8], max_false_positive_rate=0.25)
+    assert res.constraint_satisfied is True
+    assert res.selected_threshold == 0.5
+
+    res_tie = select_decision_threshold(y_val, probs, thresholds=[0.5, 0.55], max_false_positive_rate=0.25)
+    assert res_tie.selected_threshold == 0.55
+
+
+def test_select_decision_threshold_no_candidate_satisfies_constraint():
+    """Test 75: Hiçbir eşik kısıtı sağlamadığında selected_threshold=None dönmesi."""
+    y_val = [0, 0, 1, 1]
+    probs = [0.9, 0.9, 0.9, 0.9]
+
+    res = select_decision_threshold(y_val, probs, thresholds=[0.3, 0.5], max_false_positive_rate=0.05)
+
+    assert res.constraint_satisfied is False
+    assert res.selected_threshold is None
+    assert res.selected_metrics is None
+    assert "No threshold candidate satisfied" in res.selection_reason
+
+
+def test_threshold_and_oof_no_test_data_mutation_or_access():
+    """Test 76: Test verisinin hiçbir fonksiyona verilmemesi ve mutasyona uğramaması."""
+    import inspect
+    oof_params = inspect.signature(generate_out_of_fold_probabilities).parameters
+    assert "X_test" not in oof_params
+    assert "y_test" not in oof_params
+
+    sel_params = inspect.signature(select_decision_threshold).parameters
+    assert "X_test" not in sel_params
+    assert "y_test" not in sel_params
+    assert "test" not in str(sel_params).lower()
+
+
+def test_threshold_and_oof_immutability_and_native_types():
+    """Test 77: Sonuç yapılarının immutable olması ve Python-native değerler dönmesi."""
+    X = np.array([[1.0], [2.0], [3.0], [4.0]])
+    y = np.array([0, 0, 1, 1])
+    clf = LogisticRegression()
+    oof_res = generate_out_of_fold_probabilities(clf, X, y, n_splits=2)
+
+    assert dataclasses.is_dataclass(oof_res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        oof_res.random_state = 123
+    assert isinstance(oof_res.probabilities, tuple)
+    assert isinstance(oof_res.probabilities[0], float)
+    assert type(oof_res.probabilities[0]) is float
+    assert isinstance(oof_res.fold_ids[0], int)
+    assert type(oof_res.fold_ids[0]) is int
+
+    sel_res = select_decision_threshold(y, oof_res.probabilities, thresholds=[0.5], max_false_positive_rate=0.5)
+    assert dataclasses.is_dataclass(sel_res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        sel_res.constraint_satisfied = False
+    assert isinstance(sel_res.evaluations, tuple)
+    assert type(sel_res.max_false_positive_rate) is float
+
+
+def test_threshold_and_oof_422_contract():
+    """Test 78: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        select_decision_threshold([], [], max_false_positive_rate=0.05)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_decision_threshold([0, 1], [0.1, 0.9], max_false_positive_rate=1.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+# --- Day 10 Work Block 4: Deterministik Nihai Model Seçimi Birim Testleri ---
+
+def test_day10_candidates_exact_count_and_fixed_order():
+    """Test 79: Beş adayın tam sayısı ve sabit sırası."""
+    candidates = get_day10_model_candidates()
+    assert len(candidates) == 5
+    variants = tuple(c.variant_name for c in candidates)
+    assert variants == EXPECTED_DAY10_VARIANTS == ("lr_baseline", "rf_baseline", "rf_deeper", "rf_unweighted", "rf_compact")
+
+
+def test_day10_candidates_correct_models_and_hyperparameters():
+    """Test 80: Her adayın doğru model ve hiperparametrelerle oluşturulması."""
+    candidates = get_day10_model_candidates()
+    c_dict = {c.variant_name: c for c in candidates}
+    assert c_dict["lr_baseline"].model_name == "LogisticRegression"
+    assert dict(c_dict["lr_baseline"].hyperparameters)["solver"] == "lbfgs"
+    assert c_dict["rf_deeper"].model_name == "RandomForestClassifier"
+    assert dict(c_dict["rf_deeper"].hyperparameters)["max_depth"] == 20
+    assert dict(c_dict["rf_unweighted"].hyperparameters)["class_weight"] is None
+    assert dict(c_dict["rf_compact"].hyperparameters)["n_estimators"] == 50
+
+
+def test_day10_candidates_dummy_classifier_excluded():
+    """Test 81: DummyClassifier modelinin adaylara dahil edilmemesi."""
+    candidates = get_day10_model_candidates()
+    for c in candidates:
+        assert "dummy" not in c.model_name.lower()
+        assert not isinstance(c.estimator, DummyClassifier)
+
+
+def test_evaluate_model_candidates_oof_probability_generated():
+    """Test 82: Her aday için OOF validation olasılığı üretilmesi."""
+    X_train = np.random.RandomState(42).randn(30, 4)
+    y_train = np.array([0]*15 + [1]*15)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=3)
+    assert len(res) == 5
+    for r in res:
+        assert r.threshold_selection is not None
+        assert len(r.threshold_selection.evaluations) > 0
+        assert 0.0 <= r.validation_roc_auc <= 1.0
+        assert 0.0 <= r.validation_average_precision <= 1.0
+
+
+def test_evaluate_model_candidates_threshold_selected_on_validation():
+    """Test 83: Her adayın karar eşiğinin validation verisiyle seçilmesi."""
+    X_train = np.random.RandomState(42).randn(40, 4)
+    y_train = np.array([0]*20 + [1]*20)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=3, max_false_positive_rate=0.5, min_recall=0.0)
+    for r in res:
+        if r.is_eligible:
+            assert r.selected_threshold is not None
+            assert r.validation_false_positive_rate <= 0.5
+            assert r.validation_recall >= 0.0
+
+
+def test_evaluate_model_candidates_no_test_data_in_threshold_selection():
+    """Test 84: Test verisinin eşik seçimine girmemesi."""
+    X_train = np.random.RandomState(42).randn(40, 4)
+    y_train = np.array([0]*20 + [1]*20)
+    X_test1 = np.zeros((10, 4))
+    y_test1 = np.array([0]*5 + [1]*5)
+    X_test2 = np.ones((10, 4)) * 100.0
+    y_test2 = np.array([0]*5 + [1]*5)
+
+    res1 = evaluate_model_candidates(X_train, y_train, X_test1, y_test1, n_splits=3)
+    res2 = evaluate_model_candidates(X_train, y_train, X_test2, y_test2, n_splits=3)
+    for r1, r2 in zip(res1, res2):
+        assert r1.selected_threshold == r2.selected_threshold
+        assert r1.validation_roc_auc == r2.validation_roc_auc
+        assert r1.validation_recall == r2.validation_recall
+
+
+def test_select_final_model_test_metrics_ignored():
+    """Test 85: Test metriklerinin model seçimini etkilememesi."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0 = ModelEvaluationCandidateResult(
+        model_name="LogisticRegression", variant_name="lr_baseline", hyperparameters=(),
+        validation_roc_auc=0.8, validation_average_precision=0.8, threshold_selection=dummy_thresh,
+        validation_recall=0.95, validation_precision=0.8, validation_f1_score=0.86, validation_false_positive_rate=0.04,
+        selected_threshold=0.5, test_roc_auc=1.0, test_average_precision=1.0, test_accuracy=1.0, test_precision=1.0,
+        test_recall=1.0, test_f1_score=1.0, test_false_positive_rate=0.0, test_confusion_matrix=((5, 0), (0, 5)),
+        training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+    )
+    c1 = ModelEvaluationCandidateResult(
+        model_name="RandomForestClassifier", variant_name="rf_baseline", hyperparameters=(),
+        validation_roc_auc=0.9, validation_average_precision=0.9, threshold_selection=dummy_thresh,
+        validation_recall=0.98, validation_precision=0.8, validation_f1_score=0.88, validation_false_positive_rate=0.04,
+        selected_threshold=0.5, test_roc_auc=0.5, test_average_precision=0.5, test_accuracy=0.5, test_precision=0.5,
+        test_recall=0.5, test_f1_score=0.5, test_false_positive_rate=0.5, test_confusion_matrix=((2, 3), (2, 3)),
+        training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+    )
+    c_rest = tuple(
+        ModelEvaluationCandidateResult(
+            model_name="RandomForestClassifier", variant_name=v, hyperparameters=(),
+            validation_roc_auc=0.5, validation_average_precision=0.5, threshold_selection=dummy_thresh,
+            validation_recall=0.5, validation_precision=0.5, validation_f1_score=0.5, validation_false_positive_rate=0.5,
+            selected_threshold=None, test_roc_auc=0.5, test_average_precision=0.5, test_accuracy=None, test_precision=None,
+            test_recall=None, test_f1_score=None, test_false_positive_rate=None, test_confusion_matrix=None,
+            training_duration_seconds=0.1, is_eligible=False, ineligibility_reason="Failed"
+        )
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel = select_final_model((c0, c1) + c_rest, min_recall=0.90, max_false_positive_rate=0.10)
+    assert sel.is_selected is True
+    assert sel.selected_variant_name == "rf_baseline"
+
+
+def test_select_final_model_min_recall_enforced():
+    """Test 86: Validation Recall alt sınırının uygulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c_list = []
+    for idx, v in enumerate(EXPECTED_DAY10_VARIANTS):
+        c_list.append(ModelEvaluationCandidateResult(
+            model_name="M", variant_name=v, hyperparameters=(), validation_roc_auc=0.8, validation_average_precision=0.8,
+            threshold_selection=dummy_thresh, validation_recall=0.90, validation_precision=0.8, validation_f1_score=0.85,
+            validation_false_positive_rate=0.03, selected_threshold=0.5, test_roc_auc=0.8, test_average_precision=0.8,
+            test_accuracy=0.8, test_precision=0.8, test_recall=0.8, test_f1_score=0.8, test_false_positive_rate=0.05,
+            test_confusion_matrix=None, training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+        ))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+
+
+def test_select_final_model_max_fpr_enforced():
+    """Test 87: Validation FPR üst sınırının uygulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c_list = []
+    for idx, v in enumerate(EXPECTED_DAY10_VARIANTS):
+        c_list.append(ModelEvaluationCandidateResult(
+            model_name="M", variant_name=v, hyperparameters=(), validation_roc_auc=0.8, validation_average_precision=0.8,
+            threshold_selection=dummy_thresh, validation_recall=0.96, validation_precision=0.8, validation_f1_score=0.87,
+            validation_false_positive_rate=0.08, selected_threshold=0.5, test_roc_auc=0.8, test_average_precision=0.8,
+            test_accuracy=0.8, test_precision=0.8, test_recall=0.8, test_f1_score=0.8, test_false_positive_rate=0.05,
+            test_confusion_matrix=None, training_duration_seconds=0.1, is_eligible=True, ineligibility_reason=None
+        ))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+
+
+def test_select_final_model_tie_break_rules():
+    """Test 88: Tie-break kurallarının sırayla doğrulanması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0 = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c1 = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.02, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel = select_final_model((c0, c1) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+    assert sel.selected_variant_name == "rf_baseline"
+
+
+def test_select_final_model_no_eligible_candidate():
+    """Test 89: Hiçbir aday uygun değilse seçim yapılmaması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, False, "Failed")
+    c_list = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, None, None, None, None, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "Ineligible")
+        for v in EXPECTED_DAY10_VARIANTS
+    )
+    sel = select_final_model(c_list)
+    assert sel.is_selected is False
+    assert sel.selected_model_name is None
+    assert sel.selected_variant_name is None
+    assert sel.selected_threshold is None
+
+
+def test_select_final_model_no_silent_fallback():
+    """Test 90: Sessiz fallback olmaması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, False, "Failed")
+    c_list = []
+    for v in EXPECTED_DAY10_VARIANTS:
+        c_list.append(ModelEvaluationCandidateResult("M", v, (), 0.6, 0.6, dummy_thresh, 0.80, 0.8, 0.8, 0.20, None, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.01, None, 0.1, False, "No"))
+    sel = select_final_model(c_list, min_recall=0.95, max_false_positive_rate=0.05)
+    assert sel.is_selected is False
+    assert sel.selected_variant_name is None
+    assert "No candidate model satisfied" in sel.selection_reason
+
+
+def test_run_final_model_selection_determinism():
+    """Test 91: Aynı girdilerle deterministik sonuç alınması."""
+    X_train = np.random.RandomState(100).randn(30, 4)
+    y_train = np.array([0]*15 + [1]*15)
+    X_test = np.random.RandomState(101).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=[0.0, 0.1]*5):
+        res1 = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=3, min_recall=0.0, max_false_positive_rate=1.0)
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=[0.0, 0.1]*5):
+        res2 = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=3, min_recall=0.0, max_false_positive_rate=1.0)
+
+    assert res1.selected_variant_name == res2.selected_variant_name
+    assert res1.selected_threshold == res2.selected_threshold
+    assert res1.selection_reason == res2.selection_reason
+
+
+def test_evaluate_model_candidates_training_duration_measured():
+    """Test 92: Eğitim süresinde yalnızca fit() çağrısının ölçülmesi."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    mock_times = [10.0, 10.5, 20.0, 21.2, 30.0, 30.1, 40.0, 43.0, 50.0, 50.8]
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=mock_times):
+        res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    assert res[0].training_duration_seconds == pytest.approx(0.5)
+    assert res[1].training_duration_seconds == pytest.approx(1.2)
+    assert res[2].training_duration_seconds == pytest.approx(0.1)
+    assert res[3].training_duration_seconds == pytest.approx(3.0)
+    assert res[4].training_duration_seconds == pytest.approx(0.8)
+
+
+def test_final_selection_structures_immutability():
+    """Test 93: Sonuç veri yapılarının immutable olması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert dataclasses.is_dataclass(res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.is_selected = True
+    assert dataclasses.is_dataclass(res.candidates[0])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.candidates[0].validation_roc_auc = 1.0
+    assert isinstance(res.candidates, tuple)
+    assert isinstance(res.candidates[0].hyperparameters, tuple)
+
+
+def test_final_selection_native_types():
+    """Test 94: JSON uyumlu Python-native değerlerin kullanılması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert type(res.min_recall) is float
+    assert type(res.max_false_positive_rate) is float
+    assert type(res.is_selected) is bool
+    assert type(res.selection_reason) is str
+    for c in res.candidates:
+        assert type(c.validation_roc_auc) is float
+        assert type(c.validation_average_precision) is float
+        assert type(c.training_duration_seconds) is float
+        assert type(c.is_eligible) is bool
+        if c.selected_threshold is not None:
+            assert type(c.selected_threshold) is float
+            assert type(c.validation_recall) is float
+            assert type(c.test_roc_auc) is float
+
+
+def test_final_selection_no_leakage_in_results():
+    """Test 95: Estimator, ham veri veya tam probability array'lerinin sonuçlara sızmaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    for field in dataclasses.fields(res):
+        val = getattr(res, field.name)
+        assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+        assert not hasattr(val, "predict")
+    for c in res.candidates:
+        for field in dataclasses.fields(c):
+            val = getattr(c, field.name)
+            assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+            assert not hasattr(val, "predict")
+            if field.name == "hyperparameters":
+                assert isinstance(val, tuple)
+
+
+def test_evaluate_model_candidates_no_input_mutation():
+    """Test 96: Girdilerin mutasyona uğramaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    X_train_copy = X_train.copy()
+    y_train_copy = y_train.copy()
+    X_test_copy = X_test.copy()
+    y_test_copy = y_test.copy()
+
+    evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    np.testing.assert_array_equal(X_train, X_train_copy)
+    np.testing.assert_array_equal(y_train, y_train_copy)
+    np.testing.assert_array_equal(X_test, X_test_copy)
+    np.testing.assert_array_equal(y_test, y_test_copy)
+
+
+def test_final_selection_422_contract():
+    """Test 97: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection(None, [], [], [])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection([[1, 2], [3, 4]], [0, 1], [[1, 2], [3, 4]], [0, 2])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=1.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=0.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_select_final_model_mutation_of_test_metrics_does_not_change_winner():
+    """Test 98: Test metrikleri değiştirilse bile seçilen variant'ın aynı kalması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0_base = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c1_base = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel1 = select_final_model((c0_base, c1_base) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    c1_mutated = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, ((10,0),(0,10)), 0.1, True, None)
+    sel2 = select_final_model((c0_base, c1_mutated) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    assert sel1.selected_variant_name == sel2.selected_variant_name == "lr_baseline"
+    assert sel1.selected_threshold == sel2.selected_threshold
+
+
+def test_classify_risk_level_boundaries():
+    """Test 99: Risk seviyesi sınıflandırmasının sınır değerlerinde doğru ve boşluksuz çalışması."""
+    assert classify_risk_level(0.00) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.30) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.300001) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.60) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.600001) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.85) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.850001) == RISK_LEVEL_CRITICAL
+    assert classify_risk_level(1.00) == RISK_LEVEL_CRITICAL
+
+
+def test_classify_risk_level_invalid():
+    """Test 100: Geçersiz olasılık değerlerinin 422 VALIDATION_ERROR ile reddedilmesi."""
+    for val in [-0.01, 1.01, float("nan"), float("inf"), float("-inf"), "0.5", None, True]:
+        with pytest.raises(AppException) as excinfo:
+            classify_risk_level(val)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_get_risk_level_policy_dict():
+    """Test 101: Risk politikası sözlüğünün doğru yapıya sahip olması ve karar eşiğinden bağımsızlık notunu içermesi."""
+    policy = get_risk_level_policy_dict()
+    assert "low" in policy
+    assert "medium" in policy
+    assert "high" in policy
+    assert "critical" in policy
+    assert "note" in policy
+    assert "independent" in policy["note"]
+
+
+@pytest.fixture
+def synthetic_df():
+    from app.services.csv_validation_service import CICIDS2017_FEATURE_COLUMNS, CICIDS2017_OPTIONAL_LABEL
+    rng = np.random.default_rng(0)
+    data = {col: rng.uniform(0, 100, size=10).tolist() for col in CICIDS2017_FEATURE_COLUMNS}
+    data[CICIDS2017_OPTIONAL_LABEL] = ["BENIGN"] * 5 + ["Attack"] * 5
+    return pd.DataFrame(data)
+
+
+def test_run_final_model_selection_workflow(synthetic_df):
+    """Test 102: Sentetik veri ile nihai model seçimi iş akışının başarılı olması."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    assert isinstance(result, FinalModelSelectionResult)
+    assert isinstance(split_data, SplitDataResult)
+    assert len(result.candidates) == 5
+
+
+
+def test_final_model_selection_report_to_dict_selected(synthetic_df):
+    """Test 103: Seçim başarılı olduğunda rapor sözlüğünün tüm zorunlu alanları ve güvenli tipleri içermesi."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    report_dict = final_model_selection_report_to_dict(result, cv_splits=2, split_data=split_data)
+def test_evaluate_model_candidates_training_duration_measured():
+    """Test 92: Eğitim süresinde yalnızca fit() çağrısının ölçülmesi."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    mock_times = [10.0, 10.5, 20.0, 21.2, 30.0, 30.1, 40.0, 43.0, 50.0, 50.8]
+    with unittest.mock.patch("app.services.model_service.time.perf_counter", side_effect=mock_times):
+        res = evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    assert res[0].training_duration_seconds == pytest.approx(0.5)
+    assert res[1].training_duration_seconds == pytest.approx(1.2)
+    assert res[2].training_duration_seconds == pytest.approx(0.1)
+    assert res[3].training_duration_seconds == pytest.approx(3.0)
+    assert res[4].training_duration_seconds == pytest.approx(0.8)
+
+
+def test_final_selection_structures_immutability():
+    """Test 93: Sonuç veri yapılarının immutable olması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert dataclasses.is_dataclass(res)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.is_selected = True
+    assert dataclasses.is_dataclass(res.candidates[0])
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        res.candidates[0].validation_roc_auc = 1.0
+    assert isinstance(res.candidates, tuple)
+    assert isinstance(res.candidates[0].hyperparameters, tuple)
+
+
+def test_final_selection_native_types():
+    """Test 94: JSON uyumlu Python-native değerlerin kullanılması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    assert type(res.min_recall) is float
+    assert type(res.max_false_positive_rate) is float
+    assert type(res.is_selected) is bool
+    assert type(res.selection_reason) is str
+    for c in res.candidates:
+        assert type(c.validation_roc_auc) is float
+        assert type(c.validation_average_precision) is float
+        assert type(c.training_duration_seconds) is float
+        assert type(c.is_eligible) is bool
+        if c.selected_threshold is not None:
+            assert type(c.selected_threshold) is float
+            assert type(c.validation_recall) is float
+            assert type(c.test_roc_auc) is float
+
+
+def test_final_selection_no_leakage_in_results():
+    """Test 95: Estimator, ham veri veya tam probability array'lerinin sonuçlara sızmaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    res = run_final_model_selection(X_train, y_train, X_test, y_test, n_splits=2)
+    for field in dataclasses.fields(res):
+        val = getattr(res, field.name)
+        assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+        assert not hasattr(val, "predict")
+    for c in res.candidates:
+        for field in dataclasses.fields(c):
+            val = getattr(c, field.name)
+            assert not isinstance(val, (np.ndarray, pd.DataFrame, pd.Series))
+            assert not hasattr(val, "predict")
+            if field.name == "hyperparameters":
+                assert isinstance(val, tuple)
+
+
+def test_evaluate_model_candidates_no_input_mutation():
+    """Test 96: Girdilerin mutasyona uğramaması."""
+    X_train = np.random.RandomState(42).randn(20, 4)
+    y_train = np.array([0]*10 + [1]*10)
+    X_test = np.random.RandomState(43).randn(10, 4)
+    y_test = np.array([0]*5 + [1]*5)
+
+    X_train_copy = X_train.copy()
+    y_train_copy = y_train.copy()
+    X_test_copy = X_test.copy()
+    y_test_copy = y_test.copy()
+
+    evaluate_model_candidates(X_train, y_train, X_test, y_test, n_splits=2)
+
+    np.testing.assert_array_equal(X_train, X_train_copy)
+    np.testing.assert_array_equal(y_train, y_train_copy)
+    np.testing.assert_array_equal(X_test, X_test_copy)
+    np.testing.assert_array_equal(y_test, y_test_copy)
+
+
+def test_final_selection_422_contract():
+    """Test 97: Hataların 422 VALIDATION_ERROR sözleşmesine uyması."""
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection(None, [], [], [])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        run_final_model_selection([[1, 2], [3, 4]], [0, 1], [[1, 2], [3, 4]], [0, 2])
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=1.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+    with pytest.raises(AppException) as excinfo:
+        select_final_model([], min_recall=0.5)
+    assert excinfo.value.status_code == 422
+    assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_select_final_model_mutation_of_test_metrics_does_not_change_winner():
+    """Test 98: Test metrikleri değiştirilse bile seçilen variant'ın aynı kalması."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0_base = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c1_base = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+    sel1 = select_final_model((c0_base, c1_base) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    c1_mutated = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.95, 0.8, 0.8, 0.04, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, ((10,0),(0,10)), 0.1, True, None)
+    sel2 = select_final_model((c0_base, c1_mutated) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+
+    assert sel1.selected_variant_name == sel2.selected_variant_name == "lr_baseline"
+    assert sel1.selected_threshold == sel2.selected_threshold
+
+
+def test_classify_risk_level_boundaries():
+    """Test 99: Risk seviyesi sınıflandırmasının sınır değerlerinde doğru ve boşluksuz çalışması."""
+    assert classify_risk_level(0.00) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.30) == RISK_LEVEL_LOW
+    assert classify_risk_level(0.300001) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.60) == RISK_LEVEL_MEDIUM
+    assert classify_risk_level(0.600001) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.85) == RISK_LEVEL_HIGH
+    assert classify_risk_level(0.850001) == RISK_LEVEL_CRITICAL
+    assert classify_risk_level(1.00) == RISK_LEVEL_CRITICAL
+
+
+def test_classify_risk_level_invalid():
+    """Test 100: Geçersiz olasılık değerlerinin 422 VALIDATION_ERROR ile reddedilmesi."""
+    for val in [-0.01, 1.01, float("nan"), float("inf"), float("-inf"), "0.5", None, True]:
+        with pytest.raises(AppException) as excinfo:
+            classify_risk_level(val)
+        assert excinfo.value.status_code == 422
+        assert excinfo.value.code == "VALIDATION_ERROR"
+
+
+def test_get_risk_level_policy_dict():
+    """Test 101: Risk politikası sözlüğünün doğru yapıya sahip olması ve karar eşiğinden bağımsızlık notunu içermesi."""
+    policy = get_risk_level_policy_dict()
+    assert "low" in policy
+    assert "medium" in policy
+    assert "high" in policy
+    assert "critical" in policy
+    assert "note" in policy
+    assert "independent" in policy["note"]
+
+
+@pytest.fixture
+def synthetic_df():
+    from app.services.csv_validation_service import CICIDS2017_FEATURE_COLUMNS, CICIDS2017_OPTIONAL_LABEL
+    rng = np.random.default_rng(0)
+    data = {col: rng.uniform(0, 100, size=10).tolist() for col in CICIDS2017_FEATURE_COLUMNS}
+    data[CICIDS2017_OPTIONAL_LABEL] = ["BENIGN"] * 5 + ["Attack"] * 5
+    return pd.DataFrame(data)
+
+
+def test_run_final_model_selection_workflow(synthetic_df):
+    """Test 102: Sentetik veri ile nihai model seçimi iş akışının başarılı olması."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    assert isinstance(result, FinalModelSelectionResult)
+    assert isinstance(split_data, SplitDataResult)
+    assert len(result.candidates) == 5
+
+
+
+def test_final_model_selection_report_to_dict_selected(synthetic_df):
+    """Test 103: Seçim başarılı olduğunda rapor sözlüğünün tüm zorunlu alanları ve güvenli tipleri içermesi."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.01, max_false_positive_rate=0.99, cv_splits=2)
+    report_dict = final_model_selection_report_to_dict(result, cv_splits=2, split_data=split_data)
+
+    # Validate JSON serialization with allow_nan=False
+    json_str = json.dumps(report_dict, allow_nan=False)
+    assert len(json_str) > 0
+
+    assert report_dict["mode"] == "select_final_model"
+    assert "selection_policy" in report_dict
+    assert report_dict["selection_policy"]["tie_break_order"] == [
+        "validation_recall descending",
+        "validation_false_positive_rate ascending",
+        "validation_f1_score descending",
+        "validation_average_precision descending",
+        "variant_name ascending",
+    ]
+    assert "selected_model" in report_dict
+    assert "candidates" in report_dict
+    assert "risk_policy" in report_dict
+    assert "dataset" in report_dict
+
+    sel = report_dict["selected_model"]
+    if sel["is_selected"]:
+        assert sel["model_name"] is not None
+        assert sel["variant_name"] is not None
+        assert isinstance(sel["decision_threshold"], float)
+        assert isinstance(sel["validation_metrics"], dict)
+        assert isinstance(sel["test_metrics"], dict)
+        assert isinstance(sel["training_duration_seconds"], float)
+
+    # Verify no estimators or raw arrays
+    for cand in report_dict["candidates"]:
+        assert "estimator" not in cand
+        assert "predictions" not in cand
+
+
+def test_final_model_selection_report_to_dict_unselected(synthetic_df):
+    """Test 104: Hiçbir aday seçilmediğinde rapor sözlüğünün doğru fallback yapması."""
+    result, split_data = run_final_model_selection_workflow(synthetic_df, min_recall=0.9999, max_false_positive_rate=0.0001, cv_splits=2)
+    report_dict = final_model_selection_report_to_dict(result, cv_splits=2, split_data=split_data)
+
+    sel = report_dict["selected_model"]
+    assert sel["is_selected"] is False
+    assert sel["model_name"] is None
+    assert sel["variant_name"] is None
+    assert sel["decision_threshold"] is None
+    assert sel["validation_metrics"] is None
+    assert sel["test_metrics"] is None
+    assert sel["training_duration_seconds"] is None
+
+
+def test_select_final_model_determinism_ignoring_duration():
+    """Test 105: Model seçiminde eğitim süresinin (runtime duration) tie-break kararına etki etmemesi ve tam determinizm."""
+    dummy_thresh = ThresholdSelectionResult((), 0.5, None, 0.05, True, "OK")
+    c0 = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 10.0, True, None)
+    c1 = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c_rest = tuple(
+        ModelEvaluationCandidateResult("M", v, (), 0.5, 0.5, dummy_thresh, 0.5, 0.5, 0.5, 0.5, None, 0.5, 0.5, None, None, None, None, None, None, 0.1, False, "No")
+        for v in ("rf_deeper", "rf_unweighted", "rf_compact")
+    )
+
+    # 1 & 4: Eşit metriklerde eğitim süresi farklı olsa bile alfabetik sıra ('lr_baseline' < 'rf_baseline') kazanır
+    sel1 = select_final_model((c0, c1) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+    assert sel1.selected_variant_name == "lr_baseline"
+
+    # 2: Süreler yer değiştirildiğinde (c0=0.1s, c1=10.0s) seçilen variant değişmez
+    c0_fast = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.1, True, None)
+    c1_slow = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 10.0, True, None)
+    sel2 = select_final_model((c0_fast, c1_slow) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+    assert sel2.selected_variant_name == "lr_baseline"
+
+    # 3: Aynı adaylar tamamen farklı mock süreleriyle tekrar değerlendirildiğinde aynı model seçilir
+    c0_diff = ModelEvaluationCandidateResult("M", "lr_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 999.9, True, None)
+    c1_diff = ModelEvaluationCandidateResult("M", "rf_baseline", (), 0.8, 0.8, dummy_thresh, 0.96, 0.8, 0.8, 0.04, 0.5, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.05, None, 0.001, True, None)
+    sel3 = select_final_model((c0_diff, c1_diff) + c_rest, min_recall=0.90, max_false_positive_rate=0.05)
+    assert sel3.selected_variant_name == "lr_baseline"
+
+    # 5 & 6: Eğitim süresinin rapor ve adaylarda kalması, ancak selection_policy içinde tie-break olarak bulunmaması
+    report = final_model_selection_report_to_dict(sel1, cv_splits=5)
+    assert report["selection_policy"]["tie_break_order"] == [
+        "validation_recall descending",
+        "validation_false_positive_rate ascending",
+        "validation_f1_score descending",
+        "validation_average_precision descending",
+        "variant_name ascending",
+    ]
+    assert report["selected_model"]["training_duration_seconds"] == 10.0
+    for cand in report["candidates"]:
+        assert cand["training_duration_seconds"] is not None

@@ -404,3 +404,68 @@ def test_cli_compare_random_forest_success(tmp_path):
         assert len(r["feature_importances"]) <= 10
         assert "estimator" not in r
         assert "predictions" not in r
+
+
+def test_cli_select_final_model_success(tmp_path):
+    """Test 28: --select-final-model bayrağının başarılı çalışması ve JSON formatında geçerli sonuç dönmesi."""
+    import json
+    df = _make_synthetic_df()
+    csv_file = tmp_path / "train.csv"
+    df.to_csv(csv_file, index=False)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "scripts.train_baseline_models", "--input", str(csv_file), "--select-final-model", "--cv-splits", "2", "--min-recall", "0.01", "--max-fpr", "0.99"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    parsed = json.loads(result.stdout)
+    assert parsed.get("mode") == "select_final_model"
+    assert "selection_policy" in parsed
+    assert "selected_model" in parsed
+    assert "candidates" in parsed
+    assert len(parsed["candidates"]) == 5
+    assert "risk_policy" in parsed
+    assert "dataset" in parsed
+
+    # Check that no pkl/joblib files were created in tmp_path or backend dir
+    artifacts = [f for f in tmp_path.iterdir() if f.suffix in {".pkl", ".joblib"}]
+    assert len(artifacts) == 0
+
+
+def test_cli_select_final_model_and_compare_rf_conflict(tmp_path):
+    """Test 29: --select-final-model ile --compare-random-forest bayraklarının birlikte kullanımının reddedilmesi."""
+    df = _make_synthetic_df()
+    csv_file = tmp_path / "train.csv"
+    df.to_csv(csv_file, index=False)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "scripts.train_baseline_models", "--input", str(csv_file), "--select-final-model", "--compare-random-forest"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 1
+    assert "cannot be used together" in result.stderr
+
+
+def test_cli_select_final_model_invalid_args(tmp_path):
+    """Test 30: Geçersiz --min-recall, --max-fpr veya --cv-splits argümanlarının reddedilmesi."""
+    df = _make_synthetic_df()
+    csv_file = tmp_path / "train.csv"
+    df.to_csv(csv_file, index=False)
+
+    for bad_args, expected_msg in [
+        (["--min-recall", "1.5"], "--min-recall must be"),
+        (["--max-fpr", "-0.1"], "--max-fpr must be"),
+        (["--cv-splits", "1"], "--cv-splits must be"),
+    ]:
+        result = subprocess.run(
+            [sys.executable, "-m", "scripts.train_baseline_models", "--input", str(csv_file), "--select-final-model"] + bad_args,
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent,
+        )
+        assert result.returncode == 1
+        assert expected_msg in result.stderr

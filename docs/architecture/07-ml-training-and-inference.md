@@ -178,33 +178,109 @@ Eğitim betiği komut satırından `python -m scripts.train_baseline_models --in
 
 ---
 
-## 5. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
+## 5. Model Değerlendirme, Karar Eşiği Seçimi ve Nihai Model Seçimi Altyapısı (Uygulanan Mimari — Gün 10)
 
-Aşağıdaki bileşenler Gün 9 itibarıyla **uygulanmamıştır** ve sonraki günlerin geliştirme planında yer almaktadır:
+Gün 10 kapsamında, veri sızıntısı engelleyen sızıntısız validation altyapısı üzerinde olasılık çıkarımı, gelişmiş ROC/PR değerlendirmesi, test verisinden yalıtılmış karar eşiği optimizasyonu, deterministik nihai model seçimi, risk seviyesi sınıflandırması ve CLI entegrasyonu `app.services.model_service` altında uygulanmıştır.
 
-- **Gelişmiş Değerlendirme:** ROC-AUC, Precision-Recall Eğrisi ve False Positive Rate (FPR) analizi.
-- **Model Seçimi:** Baseline ve gelişmiş modellerin karşılaştırılıp nihai modelin seçilmesi.
-- **Risk Eşiklerinin Kesinleştirilmesi:** İş gereksinimlerine göre FPR/FNR tolerans sınırlarının ayarlanması.
-- **Model Kartı (Model Card):** Model performans, limitasyon ve eğitim detaylarının dokümantasyonu.
-- **Joblib Model Persistence:** Preprocessor ve eğitilmiş modelin `.joblib` formatında diske kaydedilmesi.
-- **Asenkron Batch Inference:** Yüklenen CSV analiz işlerinin background worker tarafından tahmin edilmesi.
+### 5.1. Olasılık Çıkarımı (`extract_positive_probabilities`)
+- **Dinamik Sınıf Tespiti:** Pozitif saldırı sınıfının (`1`) indeks konumu doğrudan `estimator.classes_` dizisi üzerinden dinamik olarak tespit edilir.
+- **Hedef Sözleşmesi:** Sadece ikili `[0, 1]` sınıflandırma hedeflerini destekler; tek sınıflı veya çok sınıflı durumlarda `VALIDATION_ERROR` (422) fırlatır.
+- **Olasılık Doğrulaması:** Çıkarılan olasılık değerlerinin sonlu (`finite`) ve `[0.0, 1.0]` aralığında olması zorunludur. `predict_proba` desteği olmayan modeller reddedilir.
+- **Güvenlik İzolasyonu:** Eğitilmiş estimator nesneleri veya ham olasılık dizileri (`np.ndarray` / `pd.Series`) hiçbir zaman JSON raporuna sızdırılmaz.
+
+### 5.2. Gelişmiş Değerlendirme Metrikleri (`evaluate_probability_metrics`)
+Olasılık tahminleri ile gerçek hedefleri karşılaştırarak kapsamlı ve kesintisiz performans metrikleri üretir:
+- **ROC-AUC & PR-AUC / Average Precision:** `roc_auc_score` ve `average_precision_score` ile genel ayrım gücü ölçülür.
+- **Eğri (Curve) Analizi:** `roc_curve` ve `precision_recall_curve` hesaplanır. Sonsuz eşik (threshold) değerleri (`+inf`, `-inf`, `nan`) JSON uyumluluğu için güvenli bir şekilde Python `None` değeriyle temsil edilir.
+- **Temel Metrikler & Confusion Matrix:** Karar eşiğinde hesaplanan Accuracy, Precision, Recall, F1-score ve tam `((TN, FP), (FN, TP))` 2x2 karmaşıklık matrisini içerir.
+- **Sıfır Bölme Koruması:** Eğri ve metrik hesaplamalarındaki sıfıra bölme riskleri (`zero_division=0`) ile engellenir.
+
+### 5.3. Validation Tabanlı Karar Eşiği Seçimi (`select_decision_threshold` & OOF Olasılık Üretimi)
+Model karar eşiği, test verisi asla görülmeden yalnızca eğitim kümesi üzerindeki Out-of-Fold (OOF) olasılıkları üzerinden optimize edilir:
+- **OOF Olasılık Üretimi:** Yalnızca `X_train` ve `y_train` kullanılarak varsayılan `StratifiedKFold(n_splits=5, shuffle=True, random_state=42)` uygulanır. Her fold için estimator bağımsız clone edilir (`sklearn.base.clone`). Her eğitim satırı, modelin o satırı görmediği fold'dan tam olarak bir kez validation olasılığı alır.
+- **Test Verisi İzolasyonu:** Test verisi (`X_test`/`y_test`) eşik optimizasyonuna kesinlikle dâhil edilmez; yalnızca validation üzerinde seçilmiş olan eşik değeri ile son değerlendirmede test edilir.
+- **Aday Eşik Tarama:** Varsayılan olarak `0.10` ile `0.90` arasında `0.05` adımlı (17 adet) aday eşik taranır (`score >= threshold` tahmin kuralı ile).
+- **Operasyonel Kısıtlar & Seçim Politikası:** Varsayılan iş gereksinimi olarak `min_recall = 0.95` (En az %95 saldırı yakalama) ve `max_false_positive_rate = 0.05` (En fazla %5 yanlış alarm) kısıtları uygulanır. Bu kısıtları sağlayan adaylar arasından sırasıyla en yüksek Recall, en yüksek F1, en yüksek Precision, en düşük FPR ve en düşük eşik (threshold) tercih edilir.
+- **Sessiz Fallback Yoktur:** Hiçbir eşik operasyonel kısıtları karşılamıyorsa sessizce varsayılan 0.50 eşiğine veya en yüksek accuracy değerine gizli fallback yapılmaz; açıkça `is_selected = False` dönülerek eşik seçilemediği bildirilir.
+
+### 5.4. Değerlendirilen Model Adayları
+Nihai seçim altyapısı, sistemde tanımlı 5 kontrollü model adayını aynı validation kısıtlarıyla değerlendirir:
+- `lr_baseline`: Lojistik Regresyon (`class_weight="balanced"`).
+- `rf_baseline`: Random Forest (`n_estimators=100`, `max_depth=10`, `class_weight="balanced"`).
+- `rf_deeper`: Random Forest (`n_estimators=100`, `max_depth=20`, `class_weight="balanced"`).
+- `rf_unweighted`: Random Forest (`n_estimators=100`, `max_depth=10`, `class_weight=None`).
+- `rf_compact`: Random Forest (`n_estimators=50`, `max_depth=5`, `class_weight="balanced"`).
+
+> [!NOTE]
+> `DummyClassifier` modeli yalnızca en alt referans çizgisi (baseline) olarak raporlarda yer alır; gerçek model adayları arasında sayılmaz ve nihai model seçimine kesinlikle katılamaz.
+
+### 5.5. Deterministik Nihai Model Seçimi (`select_final_model`)
+Aday modeller arasından kazanan modeli belirleyen algoritma tamamen deterministiktir ve çalışma zamanı değişkenliğinden yalıtılmıştır. Operasyonel kısıtları (min_recall, max_fpr) sağlayan adaylar arasında eşitlik (tie) yaşanması durumunda aşağıdaki kesin sıralama kuralı uygulanır:
+
+1. **En yüksek validation Recall** (`validation_recall descending`)
+2. **En düşük validation False Positive Rate** (`validation_false_positive_rate ascending`)
+3. **En yüksek validation F1-score** (`validation_f1_score descending`)
+4. **En yüksek validation Average Precision / PR-AUC** (`validation_average_precision descending`)
+5. **Variant adının alfabetik sırası** (`variant_name ascending` — kesin ve son eşitlik bozucu)
+
+Özellikle:
+- **Çalışma Süresi Bağımsızlığı:** Eğitim süresi (`training_duration_seconds`) donanım, OS zamanlaması ve CPU yüküne göre dalgalanma gösterebildiği için tie-break anahtarından tamamen çıkarılmıştır; yalnızca raporlarda gözlem amacıyla korunur.
+- **Test Metriklerinden İzolasyon:** Test kümesi üzerindeki başarı sonuçları (`test_metrics`) model seçildikten sonra hesaplanır ve hiçbir koşulda seçim kararına etki edemez.
+- **Sessiz Fallback Yoktur:** Hiçbir aday kısıtları sağlamazsa sistem model seçmez (`is_selected = False`); sabit aday sırasına veya en yüksek accuracy adayı gibi alternatiflere fallback yapılmaz.
+
+### 5.6. Operasyonel Risk Seviyeleri (`classify_risk_level`)
+Modelin ürettiği sonlu olasılık değeri (`probability`), karar eşiğinden bağımsız olarak operasyonel önem ve tehdit seviyelerine sınıflandırılır:
+- `LOW` (Düşük): `0.00 <= p < 0.30`
+- `MEDIUM` (Orta): `0.30 <= p < 0.60`
+- `HIGH` (Yüksek): `0.60 <= p < 0.85`
+- `CRITICAL` (Kritik): `0.85 <= p <= 1.00`
+
+> [!IMPORTANT]
+> Risk seviyeleri, binary saldırı karar eşiğinden (`score >= selected_threshold`) bağımsız operasyonel kategorilerdir. Düşük eşikli bir modelde `MEDIUM` aralığındaki bir olasılık "saldırı" olarak sınıflandırılabileceği gibi, operasyonel müdahale önceliği risk seviyesine göre yönetilir.
+
+### 5.7. CLI Entegrasyonu ve Güvenlik Sözleşmesi (`scripts.train_baseline_models`)
+Eğitim CLI betiğine yeni opsiyonlar eklenmiş ve güvenlik kural setleri uygulanmıştır:
+- **Yeni Komut Parametreleri:**
+  - `--select-final-model`: Validation tabanlı deterministik nihai model seçimini çalıştırır.
+  - `--min-recall`: Minimum validation Recall kısıtı (varsayılan: `0.95`).
+  - `--max-fpr`: Maksimum validation FPR kısıtı (varsayılan: `0.05`).
+  - `--cv-splits`: Stratified K-Fold fold sayısı (varsayılan: `5`).
+- **Karşılıklı Dışlama:** `--select-final-model` ile `--compare-random-forest` seçenekleri aynı komutta birlikte kullanılamaz; denendiğinde CLI açık hata mesajı vererek reddeder.
+- **Güvenli JSON Çıktısı:** `json.dumps(..., allow_nan=False)` zorunluluğu uygulanır. Rapor sözlüğüne hiçbir model estimator nesnesi, ham Pandas/NumPy dizisi veya sistem yolu sızamaz.
+- **İzolasyon ve Temizlik:** Başarılı çıktılar yalnızca `stdout`, hatalar `stderr` üzerinden verilir. Hata durumlarında Python traceback dökümü, mutlak dosya yolları (`C:\...` vb.) veya veritabanı bilgileri gizlenir. Diskte `.joblib`, `.pkl` veya geçici rapor artefaktı bırakılmaz.
 
 ---
 
-## 6. Risk Skorlama ve Eşik (Threshold) Yönetimi
+## 6. Gelecek Aşamalar (Henüz Uygulanmayan Özellikler)
 
-Modelin ürettiği saldırı olasılığı (`p`), risk skoru ve risk seviyelerine aşağıdaki kuralla dönüştürülür:
+Aşağıdaki bileşenler Gün 10 itibarıyla **uygulanmamıştır** ve projenin sonraki aşamalarında geliştirilecektir. Bu özellikler sistemde mevcutmuş gibi değerlendirilmemelidir:
+
+- **Joblib/PKL Model Serialization:** Eğitilmiş en iyi modelin, preprocessor pipeline'ının ve karar eşiğinin diske kalıcı olarak kaydedilmesi (`model_persistence`).
+- **Model Registry:** Versiyonlanmış model kayıt arşivi ve aktif model yönetimi.
+- **Inference Servisi:** Kaydedilmiş modelin belleğe yüklenerek yeni ağ akışları üzerinde hızlı tahmin yürütmesi.
+- **Tahmin API Endpoint'i:** REST API üzerinden (`/api/v1/inference` vb.) dış sistemlerden gelen ağ kayıtları için anlık tahmin sunulması.
+- **Background Worker:** Yüklenen CSV analiz işlerinin arka plan işçileri (Celery / ARQ vb.) tarafından asenkron işlenmesi.
+- **Gerçek Zamanlı Trafik Analizi:** Canlı ağ arayüzünden (pcap/socket) veri akışı dinlenmesi ve anlık müdahale.
+- **Production Model Deployment:** Seçilen modelin canlı prodüksiyon ortamına alınması ve uçtan uca çalıştırılması.
+- **Frontend Model Sonuç Ekranları:** React arayüzünde model seçim raporlarının, ROC/PR eğrilerinin ve risk dağılımlarının görselleştirilmesi.
+- **Gerçek CIC-IDS2017 Performans Karşılaştırması:** Tam veri seti üzerinde bütün adayların eğitilerek nihai projenin gerçek kıyaslama tablosunun yayınlanması.
+
+---
+
+## 7. Risk Skorlama ve Eşik (Threshold) Yönetimi
+
+Modelin ürettiği saldırı olasılığı (`p`), operasyonel aksiyonlara yön vermek üzere Gün 10'da uygulanan aralıklarla yönetilir:
 
 $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
-### 6.1. Başlangıç (Provisional) Risk Eşikleri
+### 7.1. Uygulanan Risk Seviyeleri (`classify_risk_level`)
 
-| Risk Seviyesi (`risk_level`) | Risk Skoru Aralığı | Açıklama |
-| :--- | :--- | :--- |
-| **`LOW`** (Düşük) | 0 – 30 | Normal trafik, analistin aksiyon alması gerekmez. |
-| **`MEDIUM`** (Orta) | 31 – 60 | Şüpheli akış, analist detayları inceleyebilir. |
-| **`HIGH`** Yüksek | 61 – 85 | Yüksek saldırı olasılığı, güvenlik olayına dönüştürülebilir. |
-| **`CRITICAL`** (Kritik) | 86 – 100 | Kritik tehdit tespiti, analist tarafından güvenlik olayına dönüştürülmesi önerilir. |
+| Risk Seviyesi (`risk_level`) | Olasılık Aralığı (`p`) | Risk Skoru Aralığı | Operasyonel Açıklama |
+| :--- | :--- | :--- | :--- |
+| **`LOW`** (Düşük) | `0.00 <= p < 0.30` | 0 – 29 | Normal veya çok düşük riskli trafik, analist müdahalesi gerekmez. |
+| **`MEDIUM`** (Orta) | `0.30 <= p < 0.60` | 30 – 59 | Şüpheli ağ davranışı, analist izleme listesine alabilir. |
+| **`HIGH`** (Yüksek) | `0.60 <= p < 0.85` | 60 – 84 | Yüksek saldırı olasılığı, güvenlik olayına (incident) dönüştürülmesi önerilir. |
+| **`CRITICAL`** (Kritik) | `0.85 <= p <= 1.00` | 85 – 100 | Acil tehdit tespiti, otomatik alarm ve analist tarafından anlık müdahale gerektirir. |
 
-> [!WARNING]
-> Bu eşik değerleri geçicidir. **Kesin eşik sınırları, Gün 10'da gerçekleştirilecek olan precision-recall dengesi, False Positive Rate (FPR) toleransı ve iş gereksinimleri değerlendirmesi sonrasında belirlenecektir.**
+> [!NOTE]
+> Yukarıdaki risk seviyeleri, modelin ikili sınıflandırma karar eşiğinden (`selected_threshold`) tamamen bağımsız olarak hesaplanan operasyonel önem dereceleridir. Karar eşiği ise veri setinin doğasına ve kısıtlara göre dinamik olarak optimize edilir.

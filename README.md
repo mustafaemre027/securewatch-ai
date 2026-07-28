@@ -14,8 +14,8 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
 - **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
 - **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
-- **Makine Öğrenmesi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı, ikili etiket kodlaması, sızıntı korumalı (leakage-safe) train/test ayrımı uygulandı. `DummyClassifier` ve `LogisticRegression` baseline modellerine ek olarak Random Forest eğitim ve karşılaştırma altyapısı geliştirildi. Lojistik Regresyon ile dört kontrollü Random Forest deneyi aynı veri seti üzerinde karşılaştırılabilir hâle getirildi (eğitim süresi ve özellik önem derecesi - feature importance raporlaması dâhil). Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 8 Raporu](docs/model-evaluation/day-08-baseline-report.md) ve [Gün 9 Raporu](docs/model-evaluation/day-09-random-forest-report.md).
-- **Risk Skorlaması:** LOW, MEDIUM, HIGH, CRITICAL seviyelerinde risk değerlendirmesi (planlandı).
+- **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression ve dört Random Forest varyantının (`rf_baseline`, `rf_deeper`, `rf_unweighted`, `rf_compact`) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC/AP (Average Precision) gelişmiş olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik ve validation tabanlı model seçim servisi kuruldu. Model seçim raporu güvenli JSON olarak CLI'dan alınabilir. Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
+- **Risk Skorlaması:** Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
 - **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
 - **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
 
@@ -149,7 +149,14 @@ python -m scripts.train_baseline_models --input path/to/training.csv
 
 # Random Forest deneylerini ve Lojistik Regresyon karşılaştırmasını (Feature Importance ile) çalıştırma
 python -m scripts.train_baseline_models --input path/to/training.csv --compare-random-forest
+
+# Validation tabanlı deterministik nihai model seçimini çalıştırma ve güvenli JSON raporu alma
+python -m scripts.train_baseline_models \
+  --input path/to/training.csv \
+  --select-final-model
 ```
+
+Opsiyonel model seçim parametreleri: `--min-recall`, `--max-fpr`, `--cv-splits`. Ayrıntılı teknik belgeler için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
 
 ### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
 
