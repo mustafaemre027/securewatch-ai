@@ -8,6 +8,13 @@ from app.schemas.analysis_job import (
     AnalysisJobListItem,
     AnalysisUploadResponse,
 )
+from app.schemas.detection_result import (
+    AnalysisProcessingResponse,
+    DetectionResultResponse,
+    DetectionResultPage,
+    RiskLevelCounts,
+    AnalysisSummaryResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -20,4 +27,9 @@ __all__ = [
     "AnalysisUploadResponse",
     "AnalysisJobListItem",
     "AnalysisJobDetail",
+    "AnalysisProcessingResponse",
+    "DetectionResultResponse",
+    "DetectionResultPage",
+    "RiskLevelCounts",
+    "AnalysisSummaryResponse",
 ]
