@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     upload_dir: Path = Path("../data/uploads")
     max_upload_size_bytes: int = 52428800
+    model_package_path: Path = Path("../app/ml_models")
 
     @field_validator("upload_dir", mode="before")
     @classmethod
@@ -60,6 +61,29 @@ class Settings(BaseSettings):
 
         Args:
             v (Any): Raw upload directory path (str or Path).
+
+        Returns:
+            Path: Resolved pathlib.Path object.
+        """
+        path = Path(v) if isinstance(v, str) else v
+        if not path.is_absolute():
+            backend_dir = Path(__file__).resolve().parent.parent.parent
+            repo_root = backend_dir.parent
+            if path.parts and path.parts[0] == "..":
+                return (backend_dir / path).resolve()
+            return (repo_root / path).resolve()
+        return path
+
+    @field_validator("model_package_path", mode="before")
+    @classmethod
+    def validate_model_package_path(cls, v: Any) -> Path:
+        """Validate and resolve model package directory path.
+
+        Ensures path is a pathlib.Path and relative paths are resolved relative to
+        the project root to prevent working-directory dependent path issues.
+
+        Args:
+            v (Any): Raw model package directory path (str or Path).
 
         Returns:
             Path: Resolved pathlib.Path object.
