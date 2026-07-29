@@ -187,7 +187,7 @@ def update_incident(
                     if assigned_analyst_id != current_user.id:
                         raise AppException(403, "FORBIDDEN", "Analyst can only assign incidents to themselves")
                     if incident.assigned_analyst_id is not None and incident.assigned_analyst_id != current_user.id:
-                        raise AppException(403, "FORBIDDEN", "Incident is already assigned to another analyst")
+                        raise AppException(409, "INCIDENT_ASSIGNMENT_CONFLICT", "Incident is already assigned to another analyst")
 
                 incident.assigned_analyst_id = assigned_analyst_id
                 db.flush()

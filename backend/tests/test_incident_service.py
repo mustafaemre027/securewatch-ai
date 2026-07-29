@@ -248,7 +248,15 @@ def test_update_assign_analyst_claims_assigned_forbidden(db_session: Session, in
     update_incident(db_session, incident.id, analyst_user, "1.1.1.1", assigned_analyst_id=analyst_user.id)
     with pytest.raises(AppException) as exc:
         update_incident(db_session, incident.id, analyst_user2, "1.1.1.1", assigned_analyst_id=analyst_user2.id)
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 409
+    assert exc.value.code == "INCIDENT_ASSIGNMENT_CONFLICT"
+
+    # Assert assignee has not changed
+    assert incident.assigned_analyst_id == analyst_user.id
+
+    # Assert only 1 assignment audit log exists
+    audit_logs = db_session.query(AuditLog).filter_by(action_type="INCIDENT_ASSIGNED").all()
+    assert len(audit_logs) == 1
 
 
 # --- Status Transitions ---
