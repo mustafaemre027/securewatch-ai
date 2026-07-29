@@ -94,7 +94,7 @@ def dummy_detection_result(db_session: Session, analyst_user):
     from app.models.analysis_job import AnalysisJob
     job = AnalysisJob(
         user_id=analyst_user.id,
-        file_name="dummy.csv", 
+        file_name="dummy.csv",
         file_hash="hash",
         file_size=100,
         status="COMPLETED"
@@ -200,7 +200,7 @@ def test_get_incident_detail(client: TestClient, analyst_token, db_session, dumm
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {analyst_token}"}
     response = client.get(f"/api/v1/incidents/{inc1.id}", headers=headers)
     assert response.status_code == 200
@@ -221,7 +221,7 @@ def test_update_incident_assign_and_status(client: TestClient, analyst_token, an
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {analyst_token}"}
     payload = {
         "assigned_analyst_id": analyst_user.id,
@@ -237,7 +237,7 @@ def test_update_incident_empty_body(client: TestClient, analyst_token, db_sessio
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {analyst_token}"}
     response = client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers, json={})
     assert response.status_code == 422
@@ -246,7 +246,7 @@ def test_update_incident_explicit_null(client: TestClient, analyst_token, db_ses
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {analyst_token}"}
     response = client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers, json={"assigned_analyst_id": None})
     assert response.status_code == 422
@@ -255,11 +255,11 @@ def test_update_incident_conflict_race(client: TestClient, analyst_token, analys
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     # First user claims
     headers1 = {"Authorization": f"Bearer {analyst_token}"}
     client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers1, json={"assigned_analyst_id": analyst_user.id})
-    
+
     # Second user tries to claim
     headers2 = {"Authorization": f"Bearer {analyst2_token}"}
     response = client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers2, json={"assigned_analyst_id": analyst_user2.id})
@@ -270,10 +270,10 @@ def test_update_incident_forbidden_modify_other(client: TestClient, analyst_toke
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers1 = {"Authorization": f"Bearer {analyst_token}"}
     client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers1, json={"status": "IN_PROGRESS"})
-    
+
     headers2 = {"Authorization": f"Bearer {analyst2_token}"}
     response = client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers2, json={"status": "RESOLVED"})
     assert response.status_code == 403
@@ -302,7 +302,7 @@ def test_add_comment(client: TestClient, admin_token, db_session, dummy_detectio
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {admin_token}"}
     response = client.post(f"/api/v1/incidents/{inc1.id}/comments", headers=headers, json={"comment_text": "Looking into this."})
     assert response.status_code == 201
@@ -313,7 +313,7 @@ def test_add_comment_empty(client: TestClient, admin_token, db_session, dummy_de
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     headers = {"Authorization": f"Bearer {admin_token}"}
     response = client.post(f"/api/v1/incidents/{inc1.id}/comments", headers=headers, json={"comment_text": "   "})
     assert response.status_code == 422
@@ -322,11 +322,11 @@ def test_add_comment_forbidden(client: TestClient, analyst_token, analyst2_token
     inc1 = Incident(detection_result_id=dummy_detection_result.id, title="1", description="1", severity=IncidentSeverity.LOW)
     db_session.add(inc1)
     db_session.commit()
-    
+
     # User 1 claims
     headers1 = {"Authorization": f"Bearer {analyst_token}"}
     client.patch(f"/api/v1/incidents/{inc1.id}", headers=headers1, json={"status": "IN_PROGRESS"})
-    
+
     # User 2 tries to comment
     headers2 = {"Authorization": f"Bearer {analyst2_token}"}
     response = client.post(f"/api/v1/incidents/{inc1.id}/comments", headers=headers2, json={"comment_text": "Hey"})

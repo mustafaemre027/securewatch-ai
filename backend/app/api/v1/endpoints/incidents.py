@@ -29,7 +29,7 @@ def create_incident(
 ) -> IncidentResponse:
     """Create a new incident. Only ANALYST can create incidents."""
     ip_address = get_client_ip(request)
-    
+
     incident = incident_service.create_incident(
         db=db,
         detection_result_id=incident_in.detection_result_id,
@@ -86,16 +86,16 @@ def update_incident(
 ) -> IncidentResponse:
     """Update an incident."""
     ip_address = get_client_ip(request)
-    
+
     update_data = incident_in.model_dump(exclude_unset=True)
     if not update_data:
         from app.core.exceptions import AppException
         raise AppException(422, "VALIDATION_ERROR", "Update body cannot be empty")
-        
+
     if "assigned_analyst_id" in incident_in.model_fields_set and incident_in.assigned_analyst_id is None:
         from app.core.exceptions import AppException
         raise AppException(422, "VALIDATION_ERROR", "Unassigning incidents (setting assigned_analyst_id to null) is not supported")
-    
+
     incident = incident_service.update_incident(
         db=db,
         incident_id=incident_id,
@@ -117,7 +117,7 @@ def add_incident_comment(
 ) -> IncidentCommentResponse:
     """Add a comment to an incident."""
     ip_address = get_client_ip(request)
-    
+
     comment = incident_service.add_incident_comment(
         db=db,
         incident_id=incident_id,

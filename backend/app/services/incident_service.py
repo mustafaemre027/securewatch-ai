@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 def get_incident_by_id(db: Session, incident_id: int) -> Optional[Incident]:
     """Get an incident by ID.
-    
+
     Args:
         db (Session): Database session.
         incident_id (int): Incident ID.
-        
+
     Returns:
         Optional[Incident]: The incident if found, None otherwise.
     """
@@ -37,7 +37,7 @@ def list_incidents(
     limit: int = 100,
 ) -> List[Incident]:
     """List incidents with optional filters and pagination.
-    
+
     Args:
         db (Session): Database session.
         status (Optional[IncidentStatus]): Filter by status.
@@ -45,7 +45,7 @@ def list_incidents(
         assigned_analyst_id (Optional[int]): Filter by assigned analyst.
         skip (int): Number of records to skip.
         limit (int): Maximum number of records to return.
-        
+
     Returns:
         List[Incident]: List of incidents.
     """
@@ -73,7 +73,7 @@ def create_incident(
     ip_address: str,
 ) -> Incident:
     """Create a new incident from a detection result.
-    
+
     Args:
         db (Session): Database session.
         detection_result_id (int): Detection result ID.
@@ -82,7 +82,7 @@ def create_incident(
         severity (IncidentSeverity): Incident severity.
         current_user (User): The user creating the incident.
         ip_address (str): User's IP address.
-        
+
     Returns:
         Incident: The created incident.
     """
@@ -93,7 +93,7 @@ def create_incident(
         raise AppException(400, "BAD_REQUEST", "Title cannot be empty")
     if not description or not description.strip():
         raise AppException(400, "BAD_REQUEST", "Description cannot be empty")
-        
+
     if not isinstance(severity, IncidentSeverity):
         raise AppException(400, "BAD_REQUEST", "Invalid severity level")
 
@@ -153,7 +153,7 @@ def update_incident(
     assigned_analyst_id: Optional[int] = None,
 ) -> Incident:
     """Update an incident's assignment and/or status.
-    
+
     Args:
         db (Session): Database session.
         incident_id (int): Incident ID.
@@ -161,7 +161,7 @@ def update_incident(
         ip_address (str): User's IP address.
         status (Optional[IncidentStatus]): New status.
         assigned_analyst_id (Optional[int]): New assigned analyst ID.
-        
+
     Returns:
         Incident: The updated incident.
     """
@@ -249,14 +249,14 @@ def add_incident_comment(
     ip_address: str,
 ) -> IncidentComment:
     """Add a comment to an incident.
-    
+
     Args:
         db (Session): Database session.
         incident_id (int): Incident ID.
         comment_text (str): Comment text.
         current_user (User): The user commenting.
         ip_address (str): User's IP address.
-        
+
     Returns:
         IncidentComment: The created comment.
     """

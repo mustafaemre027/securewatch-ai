@@ -116,7 +116,7 @@ def test_create_incident_success(db_session: Session, detection_result: Detectio
     assert incident.id is not None
     assert incident.status == IncidentStatus.OPEN
     assert incident.assigned_analyst_id is None
-    
+
     # Check audit log
     audit_log = db_session.query(AuditLog).filter_by(action_type="INCIDENT_CREATED", user_id=analyst_user.id).first()
     assert audit_log is not None
@@ -189,7 +189,7 @@ def test_create_incident_audit_rollback(db_session: Session, detection_result: D
         with pytest.raises(AppException) as exc:
             create_incident(db_session, detection_result.id, "T", "D", IncidentSeverity.LOW, analyst_user, "1.1.1.1")
         assert exc.value.status_code == 500
-    
+
     # Incident should be rolled back
     inc = db_session.query(Incident).filter_by(detection_result_id=detection_result.id).first()
     assert inc is None
@@ -209,10 +209,10 @@ def test_list_incidents(db_session: Session, incident: Incident, analyst_user: U
     # Filter by severity
     assert len(list_incidents(db_session, severity=IncidentSeverity.HIGH)) == 1
     assert len(list_incidents(db_session, severity=IncidentSeverity.LOW)) == 0
-    
+
     # Filter by assigned
     assert len(list_incidents(db_session, assigned_analyst_id=analyst_user.id)) == 0
-    
+
     assert get_incident_by_id(db_session, incident.id) is not None
     assert get_incident_by_id(db_session, 9999) is None
 
@@ -222,7 +222,7 @@ def test_list_incidents(db_session: Session, incident: Incident, analyst_user: U
 def test_update_assign_admin_to_analyst(db_session: Session, incident: Incident, admin_user: User, analyst_user: User):
     inc = update_incident(db_session, incident.id, admin_user, "1.1.1.1", assigned_analyst_id=analyst_user.id)
     assert inc.assigned_analyst_id == analyst_user.id
-    
+
     audit_log = db_session.query(AuditLog).filter_by(action_type="INCIDENT_ASSIGNED").first()
     assert audit_log is not None
 
@@ -263,7 +263,7 @@ def test_update_assign_analyst_claims_assigned_forbidden(db_session: Session, in
 
 def test_update_status_open_to_in_progress(db_session: Session, incident: Incident, analyst_user: User):
     # Claim and update status in one transaction
-    inc = update_incident(db_session, incident.id, analyst_user, "1.1.1.1", 
+    inc = update_incident(db_session, incident.id, analyst_user, "1.1.1.1",
                           assigned_analyst_id=analyst_user.id, status=IncidentStatus.IN_PROGRESS)
     assert inc.status == IncidentStatus.IN_PROGRESS
     assert inc.assigned_analyst_id == analyst_user.id
@@ -305,7 +305,7 @@ def test_add_comment_admin_success(db_session: Session, incident: Incident, admi
     comment = add_incident_comment(db_session, incident.id, "Admin comm", admin_user, "1.1.1.1")
     assert comment.id is not None
     assert comment.user_id == admin_user.id
-    
+
     audit_log = db_session.query(AuditLog).filter_by(action_type="INCIDENT_COMMENT_ADDED").first()
     assert audit_log is not None
     assert "Admin comm" not in audit_log.description
@@ -334,6 +334,6 @@ def test_add_comment_audit_rollback(db_session: Session, incident: Incident, adm
         with pytest.raises(AppException) as exc:
             add_incident_comment(db_session, incident.id, "C", admin_user, "1.1.1.1")
         assert exc.value.status_code == 500
-        
+
     comments = db_session.query(IncidentComment).all()
     assert len(comments) == 0
