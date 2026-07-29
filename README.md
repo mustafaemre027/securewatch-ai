@@ -17,7 +17,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression ve dört Random Forest varyantının (`rf_baseline`, `rf_deeper`, `rf_unweighted`, `rf_compact`) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC/AP (Average Precision) gelişmiş olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik ve validation tabanlı model seçim servisi kuruldu. Model seçim raporu güvenli JSON olarak CLI'dan alınabilir. Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
 - **Batch Inference ve API:** Eğitilmiş ve güvenilir model paketleriyle senkron batch inference desteği. Yüklenen CSV kayıtları için saldırı olasılığı, ikili saldırı kararı ve risk seviyesi üretimi. Analiz çalıştırma, sayfalanmış sonuç görüntüleme ve özet raporlama API'leri eklendi. Admin ve Analyst rolleri için sahiplik tabanlı erişim kontrolü uygulanır. Ayrıntılar için bkz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md).
 - **Risk Skorlaması:** Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
-- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
+- **Olay Yönetimi:** Şüpheli ve doğrulanmış saldırı tespitlerinin (`is_attack=True`) güvenlik olaylarına (`Incident`) dönüştürülmesi. Analist atama, kontrollü durum geçişleri (`OPEN` → `IN_PROGRESS` → `RESOLVED` / `FALSE_POSITIVE`), analist inceleme yorumları ve atomik denetim günlükleri (audit logs) ile olay yaşam döngüsü yönetimi. Ayrıntılar için bkz. [Veritabanı Mimari Dokümanı](docs/architecture/03-database-design.md) ve [API Dokümanı](docs/architecture/06-api-endpoints.md).
 - **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
 
 ## Teknoloji Yığını
@@ -51,6 +51,11 @@ Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik kat
 | `/api/v1/analysis/{job_id}/process` | `POST` | `ADMIN`, `ANALYST` | Yüklenmiş bir analiz işini (PENDING) senkron olarak çalıştırır ve sonuçlandırır. |
 | `/api/v1/analysis/{job_id}/results` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin sonuçlarını (DetectionResult) sayfalamalı ve filtrelenebilir olarak listeler. |
 | `/api/v1/analysis/{job_id}/summary` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin risk gruplu (LOW, MEDIUM vb.) özet istatistiklerini getirir. |
+| `/api/v1/incidents` | `POST` | `ANALYST` | Belirli bir `DetectionResult` kaydından yeni bir güvenlik olayı (`Incident`) oluşturur. |
+| `/api/v1/incidents` | `GET` | `ADMIN`, `ANALYST` | Güvenlik olaylarını listeler ve filtreler (status, severity, assigned_analyst_id). |
+| `/api/v1/incidents/{incident_id}` | `GET` | `ADMIN`, `ANALYST` | Belirli bir güvenlik olayının detaylarını ve yorumlarını getirir. |
+| `/api/v1/incidents/{incident_id}` | `PATCH` | `ADMIN`, `ANALYST` | Olay durumunu günceller veya analist ataması yapar. |
+| `/api/v1/incidents/{incident_id}/comments` | `POST` | `ADMIN`, `ANALYST` | Güvenlik olayına analist yorumu ekler. |
 
 ### Audit Log Güvenlik İlkeleri
 

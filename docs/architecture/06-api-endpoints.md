@@ -165,19 +165,17 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
     ```
     > **Not:** `ground_truth_label` değeri yalnızca etiketli değerlendirme dosyaları yüklenmişse dolu olarak döner; normal inference dosyalarında `null` olacaktır.
 
----
-
 ### 3.4. Güvenlik Olayı Yönetimi (Incident Management)
 
 #### **POST `/api/v1/incidents`**
-*   **Açıklama:** Belirli bir `DetectionResult` kaydını referans alarak yeni bir güvenlik olayı (`Incident`) oluşturur.
-*   **Rol:** ANALYST
+*   **Açıklama:** Yalnızca kullanıcının kendi analiz işine (`AnalysisJob`) ait, şüpheli/saldırı olarak tespit edilmiş (`is_attack=True`) bir `DetectionResult` kaydını referans alarak yeni bir güvenlik olayı (`Incident`) oluşturur. Aynı tespit kaydından ikinci bir olay oluşturulamaz.
+*   **Rol:** ANALYST (Admin hesabı olay oluşturamaz, 403 döndürür)
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
       "detection_result_id": 1024501,
       "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
-      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir. Hedef Port: 80, Kayıt Sırası: 12450.",
+      "description": "Model yüksek riskli şüpheli trafik tespit etmiştir.",
       "severity": "CRITICAL"
     }
     ```
@@ -190,15 +188,86 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "status": "OPEN",
       "severity": "CRITICAL",
       "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
-      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir...",
+      "description": "Model yüksek riskli şüpheli trafik tespit etmiştir.",
       "created_at": "2026-07-16T15:35:00Z",
       "updated_at": "2026-07-16T15:35:00Z"
     }
     ```
+*   **Olası Hatalar:**
+    - `403 FORBIDDEN`: İşlemi yapan kullanıcı ANALYST rolünde değilse.
+    - `404 NOT_FOUND`: `detection_result_id` bulunamazsa veya analistin kendi analiz işine ait değilse (güvenli sahiplik gizleme).
+    - `400 BAD_REQUEST`: Tespit sonucu `is_attack=False` ise (sadece saldırı kayıtları olaylaştırılabilir).
+    - `409 CONFLICT`: İlgili `detection_result_id` için zaten bir olay oluşturulmuşsa.
+
+#### **GET `/api/v1/incidents`**
+*   **Açıklama:** Güvenlik olaylarını filtreli ve sayfalamalı olarak listeler.
+*   **Rol:** ADMIN, ANALYST
+*   **Sorgu Parametreleri (Query Params):**
+    - `status` (opsiyonel): `OPEN`, `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE`
+    - `severity` (opsiyonel): `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+    - `assigned_analyst_id` (opsiyonel): Belirli bir analiste atanan olaylar (gt=0)
+    - `skip` (varsayılan: 0, ge=0)
+    - `limit` (varsayılan: 20, ge=1, le=100)
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    [
+      {
+        "id": 12,
+        "detection_result_id": 1024501,
+        "assigned_analyst_id": 2,
+        "status": "IN_PROGRESS",
+        "severity": "CRITICAL",
+        "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+        "description": "Model yüksek riskli şüpheli trafik tespit etmiştir.",
+        "created_at": "2026-07-16T15:35:00Z",
+        "updated_at": "2026-07-16T15:38:00Z"
+      }
+    ]
+    ```
+
+#### **GET `/api/v1/incidents/{incident_id}`**
+*   **Açıklama:** Belirli bir güvenlik olayının (`Incident`) detaylarını ve altında yer alan analist yorumlarını getirir. Ham CSV veya `DetectionResult` öznitelikleri dönülmez.
+*   **Rol:** ADMIN, ANALYST
+*   **Başarılı Yanıt (200 OK):**
+    ```json
+    {
+      "id": 12,
+      "detection_result_id": 1024501,
+      "assigned_analyst_id": 2,
+      "status": "IN_PROGRESS",
+      "severity": "CRITICAL",
+      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+      "description": "Model yüksek riskli şüpheli trafik tespit etmiştir.",
+      "created_at": "2026-07-16T15:35:00Z",
+      "updated_at": "2026-07-16T15:38:00Z",
+      "comments": [
+        {
+          "id": 89,
+          "incident_id": 12,
+          "user_id": 2,
+          "comment_text": "TCP bayrakları ve trafik akışı incelendi.",
+          "created_at": "2026-07-16T15:40:00Z"
+        }
+      ]
+    }
+    ```
+*   **Olası Hatalar:**
+    - `404 NOT_FOUND`: İlgili olay bulunamazsa.
 
 #### **PATCH `/api/v1/incidents/{incident_id}`**
-*   **Açıklama:** Olayın durumunu (`status`) günceller veya olay ataması (`assigned_analyst_id`) yapar.
-*   **Rol:** ALL (Analistler yalnızca kendilerine atanmış veya kendi üstlendikleri olayların durumunu güncelleyebilir. Yöneticiler tüm olaylarda atama ve durum güncellemelerini yapabilir).
+*   **Açıklama:** Olayın durumunu (`status`) günceller ve/veya olay ataması (`assigned_analyst_id`) yapar.
+*   **Rol:** ADMIN, ANALYST
+*   **Erişim & Atama Kuralları:**
+    - Yöneticiler (ADMIN) tüm olaylarda atama (`assigned_analyst_id`) ve durum güncellemelerini yapabilir. Atanan kullanıcı zorunlu olarak ANALYST olmalıdır.
+    - Analistler (ANALYST) atanmamış bir olayı **yalnızca kendisine** alabilir (`assigned_analyst_id == current_user.id`). Başka bir analiste atayamaz.
+    - Analistler yalnızca **kendilerine atanmış** olayların durumunu değiştirebilir. Başkasının olayı güncellenemez (403).
+    - Boş istek gövdesi (`{}`) veya açıkça `assigned_analyst_id: null` gönderimi kabul edilmez (422). Olay unassign edilemez.
+*   **Durum Geçiş Matrisi:**
+    - `OPEN` → `IN_PROGRESS`
+    - `OPEN` → `FALSE_POSITIVE`
+    - `IN_PROGRESS` → `RESOLVED`
+    - `IN_PROGRESS` → `FALSE_POSITIVE`
+    - Terminal durumlar: `RESOLVED` ve `FALSE_POSITIVE` (Bu durumlardan başka bir duruma geçiş yapılamaz).
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
@@ -206,26 +275,28 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "status": "IN_PROGRESS"
     }
     ```
-    *Veya olayın çözülmesi durumunda:*
-    ```json
-    {
-      "status": "RESOLVED"
-    }
-    ```
 *   **Başarılı Yanıt (200 OK):**
     ```json
     {
       "id": 12,
+      "detection_result_id": 1024501,
       "assigned_analyst_id": 2,
       "status": "IN_PROGRESS",
       "severity": "CRITICAL",
+      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
+      "description": "Model yüksek riskli şüpheli trafik tespit etmiştir.",
+      "created_at": "2026-07-16T15:35:00Z",
       "updated_at": "2026-07-16T15:38:00Z"
     }
     ```
+*   **Olası Hatalar:**
+    - `403 FORBIDDEN`: Başka bir analiste atanmış olayın durumunu değiştirmeye veya başka birine atamaya çalışıldığında.
+    - `409 CONFLICT`: Geçersiz durum geçişinde veya eş zamanlı sahiplenme yarışında (`INCIDENT_ASSIGNMENT_CONFLICT`).
+    - `422 UNPROCESSABLE`: Boş istek gövdesi veya `assigned_analyst_id: null` gönderiminde.
 
 #### **POST `/api/v1/incidents/{incident_id}/comments`**
-*   **Açıklama:** Olayın altına analiz yorumu ekler.
-*   **Rol:** ALL (Analistler yalnızca kendilerine atanmış veya kendi üstlendikleri olaylara yorum ekleyebilir)
+*   **Açıklama:** Güvenlik olayına inceleme yorumu ekler.
+*   **Rol:** ADMIN, ANALYST (Analistler yalnızca kendilerine atanmış olaylara yorum ekleyebilir; başkasının olayına ekleyemez, 403).
 *   **İstek Gövdesi (Request Body):**
     ```json
     {
@@ -238,10 +309,15 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
       "id": 89,
       "incident_id": 12,
       "user_id": 2,
-      "comment_text": "Kayıt detayındaki TCP bayrakları incelendi...",
+      "comment_text": "Kayıt detayındaki TCP bayrakları incelendi. Yüksek riskli şüpheli trafik akışı doğrulandı.",
       "created_at": "2026-07-16T15:40:00Z"
     }
     ```
+*   **Olası Hatalar:**
+    - `403 FORBIDDEN`: Analist kendisine atanmamış olaya yorum eklemeye çalışırsa.
+    - `422 UNPROCESSABLE`: Yorum metni boş veya sadece boşluklardan (whitespace-only) oluşuyorsa.
+
+> **Önemli Kısıt:** Güvenlik olayları (`incidents`) ve olay yorumları (`incident_comments`) için **DELETE uç noktası bulunmamaktadır**.
 
 ---
 
@@ -334,55 +410,6 @@ API uç noktalarına erişim, kullanıcı rolüne göre kısıtlanmıştır:
     }
     ```
 
-#### **GET `/api/v1/incidents`**
-*   **Açıklama:** Güvenlik olaylarını listeler ve filtreler.
-*   **Rol:** ALL
-*   **Sorgu Parametreleri (Query Params):**
-    - `status` (opsiyonel): `OPEN`, `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE`
-    - `assigned_analyst_id` (opsiyonel): Belirli bir analiste atanan olaylar
-    - `severity` (opsiyonel): `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
-*   **Başarılı Yanıt (200 OK):**
-    ```json
-    [
-      {
-        "id": 12,
-        "detection_result_id": 1024501,
-        "assigned_analyst_id": 2,
-        "status": "IN_PROGRESS",
-        "severity": "CRITICAL",
-        "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
-        "created_at": "2026-07-16T15:35:00Z",
-        "updated_at": "2026-07-16T15:38:00Z"
-      }
-    ]
-    ```
-
-#### **GET `/api/v1/incidents/{incident_id}`**
-*   **Açıklama:** Belirli bir güvenlik olayının (`Incident`) yorumları ile birlikte detaylarını getirir.
-*   **Rol:** ALL
-*   **Başarılı Yanıt (200 OK):**
-    ```json
-    {
-      "id": 12,
-      "detection_result_id": 1024501,
-      "assigned_analyst_id": 2,
-      "status": "IN_PROGRESS",
-      "severity": "CRITICAL",
-      "title": "Port 80 Üzerinde Şüpheli Trafik Algılandı",
-      "description": "Model %94 olasılıkla yüksek riskli şüpheli trafik tespit etmiştir...",
-      "created_at": "2026-07-16T15:35:00Z",
-      "updated_at": "2026-07-16T15:38:00Z",
-      "comments": [
-        {
-          "id": 89,
-          "user_id": 2,
-          "comment_text": "Kayıt detayındaki TCP bayrakları incelendi...",
-          "created_at": "2026-07-16T15:40:00Z"
-        }
-      ]
-    }
-    ```
-
 ---
 
 ## 4. Hata Kodları ve Hata Yanıt Şeması
@@ -391,12 +418,9 @@ Platform, bir hata durumunda istemciye standart olarak aşağıdaki nested forma
 ```json
 {
   "error": {
-    "code": "RESOURCE_NOT_FOUND",
-    "message": "Aranılan kayıt veritabanında bulunamadı.",
-    "details": {
-      "resource": "Incident",
-      "id": 999
-    }
+    "code": "INCIDENT_ASSIGNMENT_CONFLICT",
+    "message": "This incident has already been assigned to another analyst.",
+    "details": null
   }
 }
 ```
@@ -410,12 +434,15 @@ Platform, bir hata durumunda istemciye standart olarak aşağıdaki nested forma
 | **400 Bad Request** | `DUPLICATE_USERNAME` | Bu kullanıcı adı zaten kullanılmaktadır. |
 | **400 Bad Request** | `DUPLICATE_EMAIL` | Bu e-posta adresi zaten kullanılmaktadır. |
 | **400 Bad Request** | `DUPLICATE_FILE` | Aynı SHA-256 hash değerine sahip bir dosya zaten yüklenmiş. |
+| **400 Bad Request** | `BAD_REQUEST` | İstek parametreleri veya iş kuralları ihlal edildi (Örn. is_attack=False tespitin olaylaştırılmaya çalışılması). |
 | **401 Unauthorized** | `CREDENTIALS_INVALID` | Yanlış kullanıcı adı veya parola girildi; ya da kimlik doğrulama token'ı eksik/geçersiz. |
 | **401 Unauthorized** | `TOKEN_EXPIRED` | JWT oturum token'ının süresi dolmuş. |
 | **401 Unauthorized** | `TOKEN_INVALID` | JWT token doğrulanamadı veya geçersiz. |
-| **403 Forbidden** | `PERMISSION_DENIED` | Kullanıcının bu işlemi gerçekleştirmek için yetkisi (rolü) yetersiz. |
-| **404 Not Found** | `NOT_FOUND` | İstenen kaynak bulunamadı. |
+| **403 Forbidden** | `FORBIDDEN` | Kullanıcının bu işlemi gerçekleştirmek için yetkisi (rolü veya sahipliği) yetersiz. |
+| **404 Not Found** | `NOT_FOUND` | İstenen kaynak veritabanında bulunamadı veya yetkisiz kullanıcıdan gizlendi. |
+| **409 Conflict** | `CONFLICT` | Geçersiz durum geçişi veya mükerrer kaynak çakışması (Örn. Aynı tespitten ikinci olay üretme). |
+| **409 Conflict** | `INCIDENT_ASSIGNMENT_CONFLICT` | Eş zamanlı olay sahiplenme yarışında başka bir analistin işlemi önce tamamlaması. |
 | **413 Payload Too Large** | `FILE_TOO_LARGE` | Yüklenen dosya belirlenen boyutu aşıyor. |
-| **422 Unprocessable** | `VALIDATION_ERROR` | İstek gövdesi veya parametreleri doğrulamayı geçemedi. |
+| **422 Unprocessable** | `VALIDATION_ERROR` | İstek gövdesi veya parametreleri Pydantic doğrulamasını geçemedi. |
 | **422 Unprocessable** | `SCHEMA_MISMATCH` | Yüklenen CSV dosyasının sütunları CIC-IDS2017 şemasıyla eşleşmiyor. |
 | **500 Internal Error** | `INTERNAL_SERVER_ERROR` | Beklenmeyen bir sunucu hatası oluştu. |
