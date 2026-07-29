@@ -137,16 +137,16 @@ def process_job(
     current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
 ) -> AnalysisProcessingResponse:
     """Process a pending analysis job synchronously.
-    
+
     Protected: Admin and Analyst roles permitted.
     """
     is_admin = current_user.role == UserRole.ADMIN
-    
+
     # Ownership and existence check
     job = get_analysis_job_by_id(db, job_id, current_user.id, is_admin)
     if not job:
         raise AppException(404, "NOT_FOUND", "Analysis job not found.")
-        
+
     result = process_analysis_job(db, job.id)
     return AnalysisProcessingResponse(
         job_id=result.job_id,
@@ -166,11 +166,11 @@ def list_results(
     current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
 ) -> DetectionResultPage:
     """List inference results for a completed analysis job.
-    
+
     Protected: Admin and Analyst roles permitted.
     """
     is_admin = current_user.role == UserRole.ADMIN
-    
+
     total, items = get_analysis_results(
         db=db,
         job_id=job_id,
@@ -181,7 +181,7 @@ def list_results(
         is_attack=is_attack,
         risk_level=risk_level
     )
-    
+
     return DetectionResultPage(
         total=total,
         items=items,
@@ -197,11 +197,11 @@ def get_summary(
     current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
 ) -> AnalysisSummaryResponse:
     """Get aggregated summary of inference results for a completed job.
-    
+
     Protected: Admin and Analyst roles permitted.
     """
     is_admin = current_user.role == UserRole.ADMIN
-    
+
     return get_analysis_summary(
         db=db,
         job_id=job_id,

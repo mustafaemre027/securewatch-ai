@@ -31,9 +31,9 @@ class ModelMetadata:
 @dataclass(frozen=True)
 class ModelPackage:
     """Immutable container for the loaded model package.
-    
-    Note: `frozen=True` prevents reassignment of fields, but it does NOT deeply 
-    make the `estimator` and `preprocessor` objects immutable. Callers should 
+
+    Note: `frozen=True` prevents reassignment of fields, but it does NOT deeply
+    make the `estimator` and `preprocessor` objects immutable. Callers should
     treat them as read-only and avoid mutating their internal state.
     """
     estimator: Any
@@ -132,7 +132,7 @@ def load_model_package(filename: str = "model.joblib") -> ModelPackage:
             code="MODEL_CONTRACT_ERROR",
             message="Estimator is not fitted or missing classes_."
         )
-    
+
     classes_ = list(estimator.classes_)
     if len(classes_) != 2 or set(classes_) != {0, 1}:
         raise AppException(
@@ -162,7 +162,7 @@ def load_model_package(filename: str = "model.joblib") -> ModelPackage:
             code="MODEL_CONTRACT_ERROR",
             message="Feature names must be a sequence."
         )
-    
+
     feature_names_tuple = tuple(feature_names)
     if len(feature_names_tuple) != 77:
         raise AppException(
@@ -184,7 +184,7 @@ def load_model_package(filename: str = "model.joblib") -> ModelPackage:
             code="MODEL_CONTRACT_ERROR",
             message="Threshold must be a numeric value."
         )
-    
+
     try:
         t_val = float(threshold)
     except Exception:
@@ -193,7 +193,7 @@ def load_model_package(filename: str = "model.joblib") -> ModelPackage:
             code="MODEL_CONTRACT_ERROR",
             message="Threshold must be a finite number."
         )
-    
+
     import numpy as np
     if np.isnan(t_val) or np.isinf(t_val):
         raise AppException(
@@ -215,7 +215,7 @@ def load_model_package(filename: str = "model.joblib") -> ModelPackage:
             code="MODEL_CONTRACT_ERROR",
             message="Metadata must be a dictionary or ModelMetadata."
         )
-    
+
     m_dict = raw_metadata if isinstance(raw_metadata, dict) else raw_metadata.__dict__
     model_name = m_dict.get("model_name")
     version = m_dict.get("version")

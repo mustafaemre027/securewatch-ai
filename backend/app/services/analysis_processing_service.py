@@ -56,7 +56,7 @@ def process_analysis_job(db: Session, job_id: int) -> AnalysisProcessingResult:
         AnalysisJob.id == job_id,
         AnalysisJob.status == AnalysisJobStatus.PENDING
     ).update({"status": AnalysisJobStatus.PROCESSING})
-    
+
     if updated_rows == 0:
         db.rollback()
         db.refresh(job)
@@ -72,19 +72,19 @@ def process_analysis_job(db: Session, job_id: int) -> AnalysisProcessingResult:
         db.rollback()
         logger.error("Failed to commit PROCESSING state: %s", str(e))
         raise AppException(500, "DB_ERROR", "Could not update job status to PROCESSING.")
-        
+
     # Refresh to ensure job has the latest DB state
     db.refresh(job)
 
     settings = get_settings()
-    
+
     try:
         # Resolve file path
         file_path = resolve_upload_file(job.file_hash, settings.upload_dir)
-        
+
         # Load model package
         model_package = load_model_package()
-        
+
         # Read CSV
         try:
             df = pd.read_csv(file_path)
@@ -93,14 +93,14 @@ def process_analysis_job(db: Session, job_id: int) -> AnalysisProcessingResult:
         except Exception as e:
             logger.error("Failed to read CSV: %s", str(e))
             raise AppException(422, "VALIDATION_ERROR", "Failed to parse the CSV file.")
-            
+
         if df.empty:
             raise AppException(422, "VALIDATION_ERROR", "The CSV file contains no data rows.")
-            
+
         # Inference pipeline
         prepared_df = prepare_inference_data(df)
         batch_result = run_inference(prepared_df, model_package)
-        
+
         # Save results
         detection_results = []
         for pred in batch_result.predictions:
@@ -112,34 +112,34 @@ def process_analysis_job(db: Session, job_id: int) -> AnalysisProcessingResult:
                 risk_level=pred.risk_level
             )
             detection_results.append(det_res)
-            
+
         db.add_all(detection_results)
-        
+
         # Mark as completed
         job.status = AnalysisJobStatus.COMPLETED
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
-        
+
         return AnalysisProcessingResult(
             job_id=job.id,
             records_processed=len(detection_results),
             final_status=AnalysisJobStatus.COMPLETED.value
         )
-        
+
     except Exception as e:
         db.rollback()
-        
+
         job.status = AnalysisJobStatus.FAILED
         job.completed_at = datetime.now(timezone.utc)
         job.error_message = "An error occurred during file processing or analysis."
-        
+
         try:
             db.commit()
         except Exception as inner_e:
             db.rollback()
             logger.error("Failed to save FAILED state: %s", str(inner_e))
             raise AppException(500, "DB_ERROR", "Failed to update job to FAILED state.")
-            
+
         # Rethrow as safe domain error if it was one, else generic
         # Wait, the prompt says: "Başlangıçtaki kontrollü domain hatalarının anlamı korunmalı ancak veritabanına hassas ayrıntı yazılmamalı. FAILED durumunu kaydetmek de başarısız olursa kontrollü veritabanı hatası üret."
         # If we raise AppException here, we return it to the caller.

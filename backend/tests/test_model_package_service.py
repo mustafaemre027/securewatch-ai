@@ -18,7 +18,7 @@ class MockEstimatorWithProba:
             self.classes_ = np.array([0, 1])
         elif classes_ is not False:
             self.classes_ = np.array(classes_)
-            
+
     def predict_proba(self, X):
         return np.array([[0.1, 0.9] for _ in range(len(X))])
 
@@ -35,7 +35,7 @@ class MockPreprocessor:
         if fitted:
             self.transformers_ = []
         self._support_transform = support_transform
-            
+
     def transform(self, X):
         if not self._support_transform:
             raise AttributeError("transform not supported")
@@ -58,12 +58,12 @@ def test_load_model_package_success(tmp_path, monkeypatch, valid_model_package_d
     # Mock settings to point to tmp_path
     class MockSettings:
         model_package_path = tmp_path
-        
+
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     file_path = tmp_path / "valid_model.joblib"
     joblib.dump(valid_model_package_data, file_path)
-    
+
     model_pkg = load_model_package("valid_model.joblib")
     assert isinstance(model_pkg, ModelPackage)
     assert model_pkg.threshold == 0.5
@@ -94,7 +94,7 @@ def test_load_model_package_file_not_found(tmp_path, monkeypatch):
     class MockSettings:
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     with pytest.raises(AppException) as excinfo:
         load_model_package("missing.joblib")
     assert excinfo.value.status_code == 404
@@ -106,10 +106,10 @@ def test_load_model_package_corrupted_file(tmp_path, monkeypatch):
     class MockSettings:
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     file_path = tmp_path / "corrupted.joblib"
     file_path.write_text("This is not a valid joblib file.")
-    
+
     with pytest.raises(AppException) as excinfo:
         load_model_package("corrupted.joblib")
     assert excinfo.value.status_code == 500
@@ -121,10 +121,10 @@ def test_load_model_package_invalid_type(tmp_path, monkeypatch):
     class MockSettings:
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     file_path = tmp_path / "list_model.joblib"
     joblib.dump([1, 2, 3], file_path)
-    
+
     with pytest.raises(AppException) as excinfo:
         load_model_package("list_model.joblib")
     assert excinfo.value.status_code == 500
@@ -137,11 +137,11 @@ def test_load_model_package_missing_keys(tmp_path, monkeypatch, valid_model_pack
     class MockSettings:
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     del valid_model_package_data["threshold"]
     file_path = tmp_path / "missing_keys.joblib"
     joblib.dump(valid_model_package_data, file_path)
-    
+
     with pytest.raises(AppException) as excinfo:
         load_model_package("missing_keys.joblib")
     assert excinfo.value.status_code == 500
@@ -154,23 +154,23 @@ def test_load_model_package_invalid_estimator(tmp_path, monkeypatch, valid_model
     class MockSettings:
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
-    
+
     file_path = tmp_path / "inv_est.joblib"
-    
+
     # Missing predict_proba
     valid_model_package_data["estimator"] = MockEstimatorNoProba()
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:
         load_model_package("inv_est.joblib")
     assert "does not support predict_proba" in excinfo.value.message
-    
+
     # Missing classes_
     valid_model_package_data["estimator"] = MockEstimatorWithProba(classes_=False)
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:
         load_model_package("inv_est.joblib")
     assert "missing classes_" in excinfo.value.message
-    
+
     # Invalid classes
     valid_model_package_data["estimator"] = MockEstimatorWithProba(classes_=[0, 2])
     joblib.dump(valid_model_package_data, file_path)
@@ -185,7 +185,7 @@ def test_load_model_package_invalid_preprocessor(tmp_path, monkeypatch, valid_mo
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
     file_path = tmp_path / "inv_prep.joblib"
-    
+
     # Not fitted
     valid_model_package_data["preprocessor"] = MockPreprocessor(fitted=False)
     joblib.dump(valid_model_package_data, file_path)
@@ -200,14 +200,14 @@ def test_load_model_package_invalid_features(tmp_path, monkeypatch, valid_model_
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
     file_path = tmp_path / "inv_feat.joblib"
-    
+
     # Wrong length
     valid_model_package_data["feature_names"] = tuple(list(INFERENCE_FEATURE_COLUMNS)[:10])
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:
         load_model_package("inv_feat.joblib")
     assert "exactly 77" in excinfo.value.message
-    
+
     # Wrong order
     wrong_order = list(INFERENCE_FEATURE_COLUMNS)
     wrong_order[0], wrong_order[1] = wrong_order[1], wrong_order[0]
@@ -224,7 +224,7 @@ def test_load_model_package_invalid_threshold(tmp_path, monkeypatch, valid_model
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
     file_path = tmp_path / "inv_thresh.joblib"
-    
+
     valid_model_package_data["threshold"] = 1.5
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:
@@ -238,13 +238,13 @@ def test_load_model_package_invalid_metadata(tmp_path, monkeypatch, valid_model_
         model_package_path = tmp_path
     monkeypatch.setattr("app.services.model_package_service.get_settings", lambda: MockSettings())
     file_path = tmp_path / "inv_meta.joblib"
-    
+
     valid_model_package_data["metadata"] = {"model_name": "", "version": "1.0.0"}
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:
         load_model_package("inv_meta.joblib")
     assert "name cannot be empty" in excinfo.value.message
-    
+
     valid_model_package_data["metadata"] = {"model_name": "Test", "version": " "}
     joblib.dump(valid_model_package_data, file_path)
     with pytest.raises(AppException) as excinfo:

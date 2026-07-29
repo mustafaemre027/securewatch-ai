@@ -26,7 +26,7 @@ class MockEstimator:
         else:
             self.probabilities = np.array(probabilities)
         self.classes_ = np.array([0, 1])
-        
+
     def predict_proba(self, X):
         return self.probabilities[:len(X)]
 
@@ -49,9 +49,9 @@ def test_prepare_inference_data_with_label():
     """Test preparing valid inference data that HAS the Label column."""
     columns = list(CICIDS2017_FEATURE_COLUMNS) + [CICIDS2017_OPTIONAL_LABEL]
     df = pd.DataFrame(np.random.rand(5, 79), columns=columns)
-    
+
     prepared = prepare_inference_data(df)
-    
+
     # Label and redundant column should be dropped
     assert len(prepared.columns) == 77
     assert tuple(prepared.columns) == INFERENCE_FEATURE_COLUMNS
@@ -61,7 +61,7 @@ def test_prepare_inference_data_with_label():
 def test_prepare_inference_data_without_label():
     """Test preparing data that does not have the Label column."""
     df = pd.DataFrame(np.random.rand(5, 78), columns=CICIDS2017_FEATURE_COLUMNS)
-    
+
     prepared = prepare_inference_data(df)
     assert len(prepared.columns) == 77
     assert tuple(prepared.columns) == INFERENCE_FEATURE_COLUMNS
@@ -85,15 +85,15 @@ def test_prepare_inference_data_invalid_schema():
 def test_run_inference_success(mock_model_package):
     """Test successful inference execution."""
     df = pd.DataFrame(np.random.rand(2, 77), columns=INFERENCE_FEATURE_COLUMNS)
-    
+
     result = run_inference(df, mock_model_package)
-    
+
     assert isinstance(result, InferenceBatchResult)
     assert len(result.predictions) == 2
     assert result.predictions[0].attack_probability == 0.9
     assert result.predictions[0].is_attack is True
     assert result.predictions[0].risk_level == "CRITICAL"
-    
+
     assert result.predictions[1].attack_probability == 0.2
     assert result.predictions[1].is_attack is False
 

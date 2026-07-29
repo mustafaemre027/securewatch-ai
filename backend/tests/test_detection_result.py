@@ -87,10 +87,10 @@ def test_unique_job_row_index(db_session, test_user):
     res2 = DetectionResult(
         job_id=job.id, row_index=1, attack_probability=0.8, is_attack=True, risk_level="HIGH"
     )
-    
+
     db_session.add(res1)
     db_session.commit()
-    
+
     db_session.add(res2)
     with pytest.raises(IntegrityError):
         db_session.commit()
@@ -108,7 +108,7 @@ def test_different_jobs_same_row_index(db_session, test_user):
     res2 = DetectionResult(job_id=job2.id, row_index=1, attack_probability=0.2, is_attack=False, risk_level="LOW")
     db_session.add_all([res1, res2])
     db_session.commit()
-    
+
     assert res1.id is not None
     assert res2.id is not None
 
@@ -122,10 +122,10 @@ def test_cascade_delete(db_session, test_user):
     res = DetectionResult(job_id=job.id, row_index=0, attack_probability=0.1, is_attack=False, risk_level="LOW")
     db_session.add(res)
     db_session.commit()
-    
+
     db_session.delete(job)
     db_session.commit()
-    
+
     assert db_session.query(DetectionResult).count() == 0
 
 

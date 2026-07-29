@@ -227,21 +227,21 @@ def get_analysis_results(
     job = get_analysis_job_by_id(db, job_id, user_id, is_admin)
     if not job:
         raise AppException(404, "NOT_FOUND", "Analysis job not found.")
-        
+
     if job.status != AnalysisJobStatus.COMPLETED:
         raise AppException(409, "NOT_COMPLETED", "Analysis job is not completed yet.")
-        
+
     query = db.query(DetectionResult).filter(DetectionResult.job_id == job_id)
-    
+
     if is_attack is not None:
         query = query.filter(DetectionResult.is_attack == is_attack)
-        
+
     if risk_level is not None:
         query = query.filter(DetectionResult.risk_level == risk_level)
-        
+
     total = query.count()
     items = query.order_by(DetectionResult.row_index.asc()).offset(skip).limit(limit).all()
-    
+
     return total, items
 
 
@@ -254,28 +254,28 @@ def get_analysis_summary(
     job = get_analysis_job_by_id(db, job_id, user_id, is_admin)
     if not job:
         raise AppException(404, "NOT_FOUND", "Analysis job not found.")
-        
+
     if job.status != AnalysisJobStatus.COMPLETED:
         raise AppException(409, "NOT_COMPLETED", "Analysis job is not completed yet.")
-        
+
     # Aggregate using SQL
     total_records = db.query(func.count(DetectionResult.id)).filter(DetectionResult.job_id == job_id).scalar() or 0
     attack_count = db.query(func.count(DetectionResult.id)).filter(
         DetectionResult.job_id == job_id,
         DetectionResult.is_attack == True
     ).scalar() or 0
-    
+
     normal_count = total_records - attack_count
-    
+
     # Risk levels
     risk_counts = db.query(DetectionResult.risk_level, func.count(DetectionResult.id)).filter(
         DetectionResult.job_id == job_id
     ).group_by(DetectionResult.risk_level).all()
-    
+
     counts_dict = {level: count for level, count in risk_counts}
-    
+
     from app.schemas.detection_result import AnalysisSummaryResponse, RiskLevelCounts
-    
+
     return AnalysisSummaryResponse(
         job_id=job.id,
         status=job.status,

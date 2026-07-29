@@ -52,17 +52,17 @@ def mock_upload_file(tmp_path, monkeypatch):
     class MockSettings:
         upload_dir = tmp_path
         model_package_path = tmp_path
-        
+
     monkeypatch.setattr("app.services.analysis_processing_service.get_settings", lambda: MockSettings())
-    
+
     file_hash = "a" * 64
     csv_path = tmp_path / f"{file_hash}.csv"
-    
+
     # Write a dummy CSV with 77 columns + Label
     columns = [f"col_{i}" for i in range(77)] + ["Label", "Fwd Header Length.1"]
     df = pd.DataFrame(np.random.rand(5, 79), columns=columns)
     df.to_csv(csv_path, index=False)
-    
+
     return file_hash, tmp_path
 
 
@@ -75,10 +75,10 @@ def mock_inference_pipeline(monkeypatch):
                 self.attack_probability = 0.9 if i % 2 == 0 else 0.1
                 self.is_attack = i % 2 == 0
                 self.risk_level = "CRITICAL" if i % 2 == 0 else "LOW"
-                
+
         def __init__(self):
             self.predictions = [self.Row(i) for i in range(5)]
-            
+
     monkeypatch.setattr("app.services.analysis_processing_service.load_model_package", lambda: "mock_model")
     monkeypatch.setattr("app.services.analysis_processing_service.prepare_inference_data", lambda df: df)
     monkeypatch.setattr("app.services.analysis_processing_service.run_inference", lambda df, mdl: MockResult())
@@ -87,7 +87,7 @@ def mock_inference_pipeline(monkeypatch):
 def test_process_analysis_job_success(db_session, test_user, mock_upload_file, mock_inference_pipeline):
     """Test successful job processing."""
     file_hash, _ = mock_upload_file
-    
+
     job = AnalysisJob(
         user_id=test_user.id,
         file_name="test.csv",
@@ -97,18 +97,18 @@ def test_process_analysis_job_success(db_session, test_user, mock_upload_file, m
     )
     db_session.add(job)
     db_session.commit()
-    
+
     res = process_analysis_job(db_session, job.id)
-    
+
     assert res.job_id == job.id
     assert res.records_processed == 5
     assert res.final_status == "COMPLETED"
-    
+
     db_session.refresh(job)
     assert job.status == AnalysisJobStatus.COMPLETED
     assert job.completed_at is not None
     assert job.error_message is None
-    
+
     # Check DB for DetectionResults
     results = db_session.query(DetectionResult).filter_by(job_id=job.id).all()
     assert len(results) == 5
@@ -120,7 +120,7 @@ def test_process_job_invalid_state(db_session, test_user):
     job = AnalysisJob(user_id=test_user.id, file_name="t.csv", file_hash="b"*64, file_size=10, status=AnalysisJobStatus.COMPLETED)
     db_session.add(job)
     db_session.commit()
-    
+
     with pytest.raises(AppException) as excinfo:
         process_analysis_job(db_session, job.id)
     assert excinfo.value.status_code == 409
@@ -129,7 +129,7 @@ def test_process_job_invalid_state(db_session, test_user):
 
 def test_process_job_file_not_found(db_session, test_user, mock_upload_file):
     _, tmp_path = mock_upload_file
-    
+
     job = AnalysisJob(
         user_id=test_user.id,
         file_name="test.csv",
@@ -139,15 +139,15 @@ def test_process_job_file_not_found(db_session, test_user, mock_upload_file):
     )
     db_session.add(job)
     db_session.commit()
-    
+
     with pytest.raises(AppException) as excinfo:
         process_analysis_job(db_session, job.id)
-        
+
     db_session.refresh(job)
     assert job.status == AnalysisJobStatus.FAILED
     assert job.completed_at is not None
     assert "error occurred during file processing" in job.error_message
-    
+
     assert excinfo.value.status_code == 404
     assert excinfo.value.code == "FILE_NOT_FOUND"
 
@@ -156,7 +156,7 @@ def test_process_job_empty_csv(db_session, test_user, mock_upload_file, monkeypa
     _, tmp_path = mock_upload_file
     file_hash = "d"*64
     (tmp_path / f"{file_hash}.csv").write_text("")
-    
+
     job = AnalysisJob(
         user_id=test_user.id,
         file_name="test.csv",
@@ -166,12 +166,12 @@ def test_process_job_empty_csv(db_session, test_user, mock_upload_file, monkeypa
     )
     db_session.add(job)
     db_session.commit()
-    
+
     monkeypatch.setattr("app.services.analysis_processing_service.load_model_package", lambda: "mock_model")
 
     with pytest.raises(AppException) as excinfo:
         process_analysis_job(db_session, job.id)
-        
+
     assert excinfo.value.code == "VALIDATION_ERROR"
     db_session.refresh(job)
     assert job.status == AnalysisJobStatus.FAILED
@@ -182,17 +182,17 @@ def test_process_job_inference_error(db_session, test_user, mock_upload_file, mo
     job = AnalysisJob(user_id=test_user.id, file_name="t.csv", file_hash=file_hash, file_size=1000, status=AnalysisJobStatus.PENDING)
     db_session.add(job)
     db_session.commit()
-    
+
     monkeypatch.setattr("app.services.analysis_processing_service.load_model_package", lambda: "mock_model")
     monkeypatch.setattr("app.services.analysis_processing_service.prepare_inference_data", lambda df: df)
-    
+
     def bad_inference(df, mdl):
         raise AppException(500, "INFERENCE_ERROR", "boom")
     monkeypatch.setattr("app.services.analysis_processing_service.run_inference", bad_inference)
-    
+
     with pytest.raises(AppException) as excinfo:
         process_analysis_job(db_session, job.id)
-    
+
     assert excinfo.value.code == "INFERENCE_ERROR"
     db_session.refresh(job)
     assert job.status == AnalysisJobStatus.FAILED
@@ -228,23 +228,23 @@ def test_process_job_rollback_on_db_error(db_session, test_user, mock_upload_fil
     job = AnalysisJob(user_id=test_user.id, file_name="t.csv", file_hash=file_hash, file_size=1000, status=AnalysisJobStatus.PENDING)
     db_session.add(job)
     db_session.commit()
-    
+
     original_commit = db_session.commit
-    
+
     def failing_commit():
         if job.status == AnalysisJobStatus.COMPLETED:
             raise Exception("Mock DB flush error")
         original_commit()
-        
+
     monkeypatch.setattr(db_session, "commit", failing_commit)
-    
+
     with pytest.raises(AppException) as excinfo:
         process_analysis_job(db_session, job.id)
-        
+
     assert excinfo.value.code == "PROCESSING_ERROR"
     db_session.refresh(job)
     assert job.status == AnalysisJobStatus.FAILED
-    
+
     # Assert absolutely 0 DetectionResult records are in the DB for this job
     results = db_session.query(DetectionResult).filter_by(job_id=job.id).all()
     assert len(results) == 0
@@ -252,7 +252,7 @@ def test_process_job_rollback_on_db_error(db_session, test_user, mock_upload_fil
 
 def test_process_job_concurrent_ownership(db_session, test_user, mock_upload_file, mock_inference_pipeline):
     file_hash, _ = mock_upload_file
-    
+
     job = AnalysisJob(
         user_id=test_user.id,
         file_name="test.csv",
@@ -262,20 +262,20 @@ def test_process_job_concurrent_ownership(db_session, test_user, mock_upload_fil
     )
     db_session.add(job)
     db_session.commit()
-    
+
     SessionLocal = sessionmaker(bind=db_session.get_bind())
     session2 = SessionLocal()
-    
+
     try:
         # Session 2 claims it
         session2.query(AnalysisJob).filter(AnalysisJob.id == job.id).update({"status": AnalysisJobStatus.PROCESSING})
         session2.commit()
-        
-        # Now session 1 tries to process it. It will read PENDING (if it reads at all before the update, or even if it reads after, 
+
+        # Now session 1 tries to process it. It will read PENDING (if it reads at all before the update, or even if it reads after,
         # the atomic update relies on status=PENDING which is no longer true)
         with pytest.raises(AppException) as excinfo:
             process_analysis_job(db_session, job.id)
-            
+
         assert excinfo.value.status_code == 409
     finally:
         session2.close()
