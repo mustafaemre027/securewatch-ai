@@ -51,23 +51,30 @@ def process_analysis_job(db: Session, job_id: int) -> AnalysisProcessingResult:
     if not job:
         raise AppException(404, "JOB_NOT_FOUND", "Analysis job not found.")
 
-    if job.status != AnalysisJobStatus.PENDING:
+    # Atomic update to prevent race conditions
+    updated_rows = db.query(AnalysisJob).filter(
+        AnalysisJob.id == job_id,
+        AnalysisJob.status == AnalysisJobStatus.PENDING
+    ).update({"status": AnalysisJobStatus.PROCESSING})
+    
+    if updated_rows == 0:
+        db.rollback()
+        db.refresh(job)
         raise AppException(
             status_code=409,
             code="INVALID_JOB_STATE",
             message=f"Job cannot be started from state: {job.status.value}"
         )
 
-    # 1. Move to PROCESSING
-    job.status = AnalysisJobStatus.PROCESSING
-    job.error_message = None
-    job.completed_at = None
     try:
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error("Failed to set PROCESSING state: %s", str(e))
+        logger.error("Failed to commit PROCESSING state: %s", str(e))
         raise AppException(500, "DB_ERROR", "Could not update job status to PROCESSING.")
+        
+    # Refresh to ensure job has the latest DB state
+    db.refresh(job)
 
     settings = get_settings()
     

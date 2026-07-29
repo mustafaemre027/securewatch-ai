@@ -277,6 +277,12 @@ def test_api_list_results_filters(client: TestClient, test_user_token: str, db_s
     assert data["total"] == 2
     assert all(x["is_attack"] for x in data["items"])
     
+    # is_attack=false
+    resp = client.get(f"/api/v1/analysis/{job.id}/results?is_attack=false", headers={"Authorization": f"Bearer {test_user_token}"})
+    data = resp.json()
+    assert data["total"] == 2
+    assert all(not x["is_attack"] for x in data["items"])
+    
     # risk_level=LOW
     resp = client.get(f"/api/v1/analysis/{job.id}/results?risk_level=LOW", headers={"Authorization": f"Bearer {test_user_token}"})
     data = resp.json()

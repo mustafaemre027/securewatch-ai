@@ -199,8 +199,21 @@ def test_process_job_inference_error(db_session, test_user, mock_upload_file, mo
 
 
 def test_resolve_upload_file_path_traversal(tmp_path):
-    with pytest.raises(AppException):
-        resolve_upload_file("../abc", tmp_path)
+    with pytest.raises(AppException) as excinfo:
+        resolve_upload_file("../" + ("a" * 61), tmp_path)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        resolve_upload_file(("a" * 30) + "/" + ("a" * 33), tmp_path)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        resolve_upload_file(("a" * 30) + "\\" + ("a" * 33), tmp_path)
+    assert excinfo.value.status_code == 422
+
+    with pytest.raises(AppException) as excinfo:
+        resolve_upload_file(("a" * 30) + "." + ("a" * 33), tmp_path)
+    assert excinfo.value.status_code == 422
 
 
 def test_resolve_upload_file_invalid_hash(tmp_path):
@@ -208,3 +221,61 @@ def test_resolve_upload_file_invalid_hash(tmp_path):
         resolve_upload_file("A" * 64, tmp_path)
     with pytest.raises(AppException):
         resolve_upload_file("a" * 63, tmp_path)
+
+
+def test_process_job_rollback_on_db_error(db_session, test_user, mock_upload_file, monkeypatch, mock_inference_pipeline):
+    file_hash, _ = mock_upload_file
+    job = AnalysisJob(user_id=test_user.id, file_name="t.csv", file_hash=file_hash, file_size=1000, status=AnalysisJobStatus.PENDING)
+    db_session.add(job)
+    db_session.commit()
+    
+    original_commit = db_session.commit
+    
+    def failing_commit():
+        if job.status == AnalysisJobStatus.COMPLETED:
+            raise Exception("Mock DB flush error")
+        original_commit()
+        
+    monkeypatch.setattr(db_session, "commit", failing_commit)
+    
+    with pytest.raises(AppException) as excinfo:
+        process_analysis_job(db_session, job.id)
+        
+    assert excinfo.value.code == "PROCESSING_ERROR"
+    db_session.refresh(job)
+    assert job.status == AnalysisJobStatus.FAILED
+    
+    # Assert absolutely 0 DetectionResult records are in the DB for this job
+    results = db_session.query(DetectionResult).filter_by(job_id=job.id).all()
+    assert len(results) == 0
+
+
+def test_process_job_concurrent_ownership(db_session, test_user, mock_upload_file, mock_inference_pipeline):
+    file_hash, _ = mock_upload_file
+    
+    job = AnalysisJob(
+        user_id=test_user.id,
+        file_name="test.csv",
+        file_hash=file_hash,
+        file_size=1000,
+        status=AnalysisJobStatus.PENDING
+    )
+    db_session.add(job)
+    db_session.commit()
+    
+    SessionLocal = sessionmaker(bind=db_session.get_bind())
+    session2 = SessionLocal()
+    
+    try:
+        # Session 2 claims it
+        session2.query(AnalysisJob).filter(AnalysisJob.id == job.id).update({"status": AnalysisJobStatus.PROCESSING})
+        session2.commit()
+        
+        # Now session 1 tries to process it. It will read PENDING (if it reads at all before the update, or even if it reads after, 
+        # the atomic update relies on status=PENDING which is no longer true)
+        with pytest.raises(AppException) as excinfo:
+            process_analysis_job(db_session, job.id)
+            
+        assert excinfo.value.status_code == 409
+    finally:
+        session2.close()
