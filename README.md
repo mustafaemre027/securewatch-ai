@@ -63,7 +63,7 @@ Ayrıntılı API uç nokta sözleşmeleri ve hata kodları için bkz. [docs/arch
 ### Genel Gereksinimler
 
 - Python 3.10+ (Yerel geliştirme Python 3.14 ile doğrulanmıştır)
-- Node.js 18+
+- Node.js `^20.19.0 || >=22.12.0` (Vite 8 gereksinimi; yerel geliştirme `v24.18.1` ile doğrulanmıştır)
 - PostgreSQL 15+ (Yerel geliştirme PostgreSQL 18 ile doğrulanmıştır)
 - Docker (opsiyonel)
 

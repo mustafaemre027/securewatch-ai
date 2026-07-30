@@ -8,7 +8,7 @@ Frontend katmanı; güvenlik analistleri ve sistem yöneticileri için modern, r
 
 ## Ön Gereksinimler
 
-- **Node.js:** 18.0.0 veya üzeri (Vite 8 ve React 19 uyumlu)
+- **Node.js:** `^20.19.0 || >=22.12.0` (Vite 8 package metadata gereksinimi; yerel ortam `v24.18.1` ile doğrulanmıştır)
 - **npm:** 9.0.0 veya üzeri
 - **İşletim Sistemi:** Windows, macOS veya Linux
 
