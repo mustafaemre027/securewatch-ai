@@ -8,6 +8,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.detection_result import DetectionResult
 
 
 class AnalysisJobStatus(str, enum.Enum):
@@ -66,4 +67,9 @@ class AnalysisJob(Base):
     user: Mapped["User"] = relationship(
         "User",
         back_populates="analysis_jobs",
+    )
+    detection_results: Mapped[list["DetectionResult"]] = relationship(
+        "DetectionResult",
+        back_populates="analysis_job",
+        cascade="all, delete-orphan",
     )

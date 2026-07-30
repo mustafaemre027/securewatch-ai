@@ -15,6 +15,7 @@ from app.services.storage_service import (
     discard_staged,
     finalise_upload,
     stage_upload,
+    resolve_upload_file,
 )
 from app.services.csv_validation_service import (
     CICIDS2017_FEATURE_COLUMNS,
@@ -28,6 +29,8 @@ from app.services.analysis_service import (
     get_analysis_job_by_id,
     handle_csv_upload,
     list_analysis_jobs,
+    get_analysis_results,
+    get_analysis_summary,
 )
 from app.services.preprocessing_service import (
     TrainingDataResult,
@@ -84,6 +87,22 @@ from app.services.model_service import (
     run_final_model_selection_workflow,
     final_model_selection_report_to_dict,
 )
+from app.services.model_package_service import (
+    ModelMetadata,
+    ModelPackage,
+    load_model_package,
+    INFERENCE_FEATURE_COLUMNS,
+)
+from app.services.inference_service import (
+    InferenceRowResult,
+    InferenceBatchResult,
+    prepare_inference_data,
+    run_inference,
+)
+from app.services.analysis_processing_service import (
+    AnalysisProcessingResult,
+    process_analysis_job,
+)
 
 __all__ = [
     "get_user_by_id",
@@ -100,6 +119,7 @@ __all__ = [
     "finalise_upload",
     "discard_staged",
     "delete_finalised",
+    "resolve_upload_file",
     "CICIDS2017_FEATURE_COLUMNS",
     "CICIDS2017_OPTIONAL_LABEL",
     "CsvValidationResult",
@@ -160,4 +180,14 @@ __all__ = [
     "get_risk_level_policy_dict",
     "run_final_model_selection_workflow",
     "final_model_selection_report_to_dict",
+    "ModelMetadata",
+    "ModelPackage",
+    "load_model_package",
+    "INFERENCE_FEATURE_COLUMNS",
+    "InferenceRowResult",
+    "InferenceBatchResult",
+    "prepare_inference_data",
+    "run_inference",
+    "AnalysisProcessingResult",
+    "process_analysis_job",
 ]
