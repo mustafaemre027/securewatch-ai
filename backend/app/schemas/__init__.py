@@ -15,6 +15,15 @@ from app.schemas.detection_result import (
     RiskLevelCounts,
     AnalysisSummaryResponse,
 )
+from app.schemas.incident import (
+    IncidentCreate,
+    IncidentUpdate,
+    IncidentCommentCreate,
+    IncidentCommentResponse,
+    IncidentListItem,
+    IncidentResponse,
+    IncidentDetailResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -32,4 +41,11 @@ __all__ = [
     "DetectionResultPage",
     "RiskLevelCounts",
     "AnalysisSummaryResponse",
+    "IncidentCreate",
+    "IncidentUpdate",
+    "IncidentCommentCreate",
+    "IncidentCommentResponse",
+    "IncidentListItem",
+    "IncidentResponse",
+    "IncidentDetailResponse",
 ]

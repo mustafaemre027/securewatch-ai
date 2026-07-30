@@ -389,7 +389,18 @@ Senkron analiz işlemleri için aşağıdaki uç noktalar tasarlanmıştır:
 - **Model Registry ve Sürüm Geçmişi.**
 - **Asenkron İş Kuyruğu:** Analiz işlemlerinin Celery/Redis gibi worker'lara devredilmesi.
 - **Canlı Ağ Trafiği Inference'ı:** Dosya yerine paket (pcap) düzeyinde anlık dinleme yapılması.
-- **Incident (Olay) Oluşturma ve Yönetimi:** Tespit edilen anormalliklerin analist ekranına güvenlik olayı (incident) olarak düşürülmesi.
-- **Analist Atama:** Olaylara durum (Açık, Kapalı, Yalan Pozitif) ve personel ataması yapılması.
 - **Frontend / Dashboard Entegrasyonu:** React uygulamasının geliştirilmesi.
+- **E-posta / Bildirim Entegrasyonu.**
 - **Gerçek Veri Üzerinde Üretim Performans Ölçümü.**
+
+---
+
+## 9. Güvenlik Olayları Entegrasyonu (Incident Management)
+
+Inference çıktılarının olay yönetimi katmanına devredilme ilkeleri:
+
+- **Tespit Kaynakları:** Tamamlanmış bir `AnalysisJob` sonucunda üretilen ve `is_attack=True` durumunda olan `DetectionResult` kayıtları güvenlik olayına (`Incident`) dönüştürülebilir.
+- **Tekil Dönüştürme:** Bir `DetectionResult` kaydı veritabanı kısıtları (`UNIQUE`) gereği en fazla bir `Incident` nesnesine kaynaklık edebilir (`1 → 0..1`).
+- **İşlem Ayrımı:** Incident oluşturulması veya güncellenmesi model eğitimini ya da inference sürecini tekrar çalıştırmaz; tamamen olay yönetimi katmanına aittir.
+- **Katman Yalıtımı:** Incident severity, status, atama ve yorum işlemleri olay yönetimi servislerince yönetilir. Ham CSV içeriği, model nesnesi veya preprocessor pipeline'ı Incident API yanıtlarına sızdırılmaz.
+- **Mimari Referanslar:** Ayrıntılı veritabanı tasarımı için bkz. [docs/architecture/03-database-design.md](03-database-design.md), API sözleşmeleri için bkz. [docs/architecture/06-api-endpoints.md](06-api-endpoints.md).

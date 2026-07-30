@@ -34,16 +34,11 @@ erDiagram
 
     detection_results {
         bigint id PK
-        int analysis_job_id FK
-        int source_row_number
-        int destination_port
-        string predicted_label
+        int job_id FK
+        int row_index
         float attack_probability
-        int risk_score
+        boolean is_attack
         string risk_level
-        string ground_truth_label
-        jsonb feature_snapshot_json
-        string model_version
         datetime created_at
     }
 
@@ -76,7 +71,7 @@ erDiagram
         datetime created_at
     }
 
-    users ||--o{ analysis_jobs : "creates"
+    users ||--o{ analysis_jobs : "creates (RESTRICT)"
     users |o--o{ audit_logs : "triggers (SET NULL)"
     users |o--o{ incidents : "assigned to (SET NULL)"
     users |o--o{ incident_comments : "writes (SET NULL)"
@@ -112,26 +107,20 @@ Analistler tarafından yüklenen ağ trafiği CSV dosyalarının batch analiz s�
 *   `completed_at` (Timestamp, Nullable): Tahmin işlemlerinin tamamlanma zamanı.
 
 ### 3.3. `detection_results` Tablosu
-Modelleme ve batch tahmin sonrasında üretilen detaylı trafik akışı analiz sonuçlarını saklar.
-> **Not:** CIC-IDS2017 MachineLearningCSV şemasında `destination_port` alanı mevcut olduğu için veritabanında korunmuştur. Ancak veri setinde `source_ip`, `destination_ip`, `source_port` ve `protocol` sütunları bulunmadığı için veritabanı bütünlüğü gereği bu alanlar tabloya eklenmemiştir. Veri setindeki toplam 79 sütun; 78 adet özellik sütunu ve 1 adet hedef değişken (Label) sütunundan oluşmaktadır.
+Modelleme ve batch tahmin sonrasında üretilen satır bazlı tespit sonuçlarını saklar.
 *   `id` (BigSerial, Primary Key): Benzersiz kayıt numarası.
-*   `analysis_job_id` (Integer, Foreign Key): Bağlı olduğu analiz işinin ID'si.
-*   `source_row_number` (Integer, Not Null): Orijinal CSV dosyasındaki satır numarası (izlenebilirliği sağlamak için).
-*   `destination_port` (Integer, Not Null): Hedef port numarası (akıştan çıkarılan tek ağ bilgisi).
-*   `predicted_label` (Varchar(50), Not Null): Modelin tahmini (0: normal/BENIGN, 1: saldırı).
+*   `job_id` (Integer, Foreign Key, Not Null): Bağlı olduğu analiz işinin ID'si (`ON DELETE CASCADE`).
+*   `row_index` (Integer, Not Null): Orijinal CSV dosyasındaki 0 tabanlı satır indeksi.
 *   `attack_probability` (Float, Not Null): Modelin atadığı saldırı olasılığı (0.0 - 1.0).
-*   `risk_score` (Integer, Not Null): Olasılıktan üretilen sayısal risk değeri (0 - 100).
+*   `is_attack` (Boolean, Not Null): Karar eşiğine dayalı ikili saldırı kararı (`True`/`False`).
 *   `risk_level` (Varchar(20), Not Null): Risk seviyesi (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
-*   `ground_truth_label` (Varchar(50), Nullable): Veri setinde varsa orijinal etiket (model doğrulaması için).
-*   `feature_snapshot_json` (JSONB, Not Null): Analiz edilen trafik akışının 78 adet orijinal özelliğinin tamamını içeren JSON nesnesi.
-*   `model_version` (Varchar(50), Not Null): Tahmini yürüten ML modelinin sürümü.
 *   `created_at` (Timestamp, Default: Now()): Kayıt zamanı.
 
 ### 3.4. `incidents` Tablosu
 Tespit edilen tehditlerin analistler tarafından güvenlik olayına dönüştürülmüş kayıtlarıdır.
 *   `id` (Serial, Primary Key): Benzersiz olay numarası.
-*   `detection_result_id` (BigInteger, Foreign Key, Unique, Not Null): Olayın temel aldığı tespit kaydının ID'si.
-*   `assigned_analyst_id` (Integer, Foreign Key, Nullable): Olayı incelemekle görevlendirilen analistin kullanıcı ID'si.
+*   `detection_result_id` (BigInteger, Foreign Key, Unique, Not Null): Olayın temel aldığı tespit kaydının ID'si (`ON DELETE RESTRICT`).
+*   `assigned_analyst_id` (Integer, Foreign Key, Nullable): Olayı incelemekle görevlendirilen analistin kullanıcı ID'si (`ON DELETE SET NULL`).
 *   `status` (Varchar(20), Default: 'OPEN', Not Null): Olay durumu (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `FALSE_POSITIVE`).
 *   `severity` (Varchar(20), Not Null): Olayın aciliyet/önem derecesi (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
 *   `title` (Varchar(150), Not Null): Olay başlığı.
@@ -139,20 +128,22 @@ Tespit edilen tehditlerin analistler tarafından güvenlik olayına dönüştür
 *   `created_at` (Timestamp, Default: Now()): Olayın oluşturulma tarihi.
 *   `updated_at` (Timestamp, Default: Now()): Son güncelleme tarihi.
 
+> **Not:** PostgreSQL native enum tipleri yerine taşınabilirlik ve esneklik sağlamak amacıyla string enum ve uygulama düzeyinde/Check constraint doğrulamaları tercih edilmiştir.
+
 ### 3.5. `incident_comments` Tablosu
 Güvenlik olayları altına analistlerin eklediği inceleme notları ve yorumları içerir.
 *   `id` (Serial, Primary Key): Benzersiz yorum numarası.
-*   `incident_id` (Integer, Foreign Key): Bağlı olduğu güvenlik olayının ID'si.
-*   `user_id` (Integer, Foreign Key, Nullable): Yorumu yazan kullanıcının ID'si (Kullanıcı silindiğinde `SET NULL` kuralı gereği null yapılabilir).
+*   `incident_id` (Integer, Foreign Key, Not Null): Bağlı olduğu güvenlik olayının ID'si (`ON DELETE CASCADE`).
+*   `user_id` (Integer, Foreign Key, Nullable): Yorumu yazan kullanıcının ID'si (`ON DELETE SET NULL`).
 *   `comment_text` (Text, Not Null): Yorum içeriği.
 *   `created_at` (Timestamp, Default: Now()): Yorum zamanı.
 
 ### 3.6. `audit_logs` Tablosu
 Sistem üzerindeki idari ve operasyonel işlemlerin geriye dönük denetim loglarını tutar.
 *   `id` (Serial, Primary Key): Benzersiz günlük numarası.
-*   `user_id` (Integer, Foreign Key, Nullable): Eylemi gerçekleştiren kullanıcının ID'si.
-*   `action_type` (Varchar(50), Not Null): Gerçekleştirilen işlem türü (örn. 'USER_LOGIN', 'FILE_UPLOAD', 'INCIDENT_UPDATE').
-*   `description` (Text, Not Null): Eylemin detaylı açıklaması (Kullanıcı silinse dahi bu açıklama metni korunacaktır).
+*   `user_id` (Integer, Foreign Key, Nullable): Eylemi gerçekleştiren kullanıcının ID'si (`ON DELETE SET NULL`).
+*   `action_type` (Varchar(50), Not Null): Gerçekleştirilen işlem türü (örn. 'USER_LOGIN', 'FILE_UPLOAD', 'INCIDENT_CREATED', 'INCIDENT_ASSIGNED', 'INCIDENT_STATUS_CHANGED', 'INCIDENT_COMMENT_ADDED').
+*   `description` (Text, Not Null): Eylemin detaylı açıklaması.
 *   `ip_address` (Varchar(45), Not Null): İşlemin yapıldığı istemci IP adresi.
 *   `created_at` (Timestamp, Default: Now()): İşlem zamanı.
 
@@ -163,22 +154,22 @@ Sistem üzerindeki idari ve operasyonel işlemlerin geriye dönük denetim logla
 Veritabanındaki yabancı anahtar (Foreign Key) ilişkilerinde bütünlüğü korumak için uygulanan silme kuralları ve gerekçeleri aşağıda açıklanmıştır:
 
 1.  **`users` -> `analysis_jobs` (`ON DELETE RESTRICT`):**
-    - *Gerekçe:* Bir kullanıcı (analist) sistemden silinmek istendiğinde, eğer bu kullanıcının başlattığı geçmiş analiz işleri varsa sistem silme işlemini engellemelidir (`RESTRICT`). Bu durum, geçmiş analizlerin ve veri tabanı geçmişinin kaybolmasını engeller. Kullanıcıyı silmek için önce iş kayıtlarının arşivlenmesi veya başka bir kullanıcıya devredilmesi gerekir.
+    - *Gerekçe:* Bir kullanıcı (analist) sistemden silinmek istendiğinde, eğer bu kullanıcının başlattığı geçmiş analiz işleri varsa sistem silme işlemini engeller (`RESTRICT`).
 
 2.  **`users` -> `audit_logs` (`ON DELETE SET NULL`):**
-    - *Gerekçe:* Bir yönetici veya analist hesabı silinse dahi, o kullanıcının geçmişte tetiklediği sistem denetim günlükleri (`audit_logs`) asla silinmemelidir. Bu nedenle `user_id` alanı `SET NULL` yapılır. Eylemin kimin tarafından yapıldığına dair orijinal bilgi, `audit_logs.description` alanında metinsel olarak zaten saklandığı için denetim izlenebilirliği korunur.
+    - *Gerekçe:* Bir yönetici veya analist hesabı silinse dahi, o kullanıcının geçmişte tetiklediği sistem denetim günlükleri (`audit_logs`) asla silinmez.
 
 3.  **`analysis_jobs` -> `detection_results` (`ON DELETE CASCADE`):**
-    - *Gerekçe:* Bir analiz işi (`analysis_jobs`) sistemden kaldırıldığında, o işe bağlı olarak üretilmiş binlerce/milyonlarca satırlık tahmin sonuçları (`detection_results`) veritabanında gereksiz yer kaplamaması için otomatik olarak silinmelidir (`CASCADE`).
+    - *Gerekçe:* Bir analiz işi (`analysis_jobs`) sistemden kaldırıldığında, o işe bağlı olarak üretilmiş tüm tespit sonuçları (`detection_results`) otomatik olarak silinir (`CASCADE`).
 
 4.  **`detection_results` -> `incidents` (`ON DELETE RESTRICT`):**
-    - *Gerekçe:* Bir analist, tespit edilen bir tehdidi güvenlik olayına (`incidents`) dönüştürdüyse, bu olayla ilişkili olan ham tespit sonucu (`detection_results`) veritabanından silinemez (`RESTRICT`). Güvenlik olayının teknik kanıtı korunmak zorundadır.
+    - *Gerekçe:* Bir analist, tespit edilen bir tehdidi güvenlik olayına (`incidents`) dönüştürdüyse, bu olayla ilişkili olan ham tespit sonucu (`detection_results`) veritabanından silinemez (`RESTRICT`). Güvenlik olayının kanıtı korunmak zorundadır.
 
 5.  **`incidents` -> `incident_comments` (`ON DELETE CASCADE`):**
-    - *Gerekçe:* Bir güvenlik olayı veritabanından silindiğinde (örneğin test ortamında temizlik yapıldığında), o olay altına yazılmış olan tüm yorum ve notlar da işlevini yitireceği için otomatik olarak silinmelidir (`CASCADE`).
+    - *Gerekçe:* Bir güvenlik olayı veritabanından silindiğinde, o olay altına yazılmış olan tüm yorumlar da otomatik olarak silinir (`CASCADE`).
 
 6.  **`users` -> `incidents` (`ON DELETE SET NULL`):**
     - *Gerekçe:* Bir güvenlik olayına atanan analist (`assigned_analyst_id`) sistemden silinirse, olay silinmez. Sadece `assigned_analyst_id` alanı `NULL` yapılarak olay tekrar atanmamış (`unassigned`) statüsüne düşürülür.
 
 7.  **`users` -> `incident_comments` (`ON DELETE SET NULL`):**
-    - *Gerekçe:* Yorum yazan analist hesabı silinse bile, olayın geçmişinde yer alan teknik analiz notları korunmalıdır. Bu nedenle yorumu yazan kullanıcı referansı `SET NULL` yapılarak yorum metni korunmaya devam eder.
+    - *Gerekçe:* Yorum yazan analist hesabı silinse bile, olayın geçmişinde yer alan teknik analiz notları korunur. `user_id` alanı `SET NULL` yapılır.

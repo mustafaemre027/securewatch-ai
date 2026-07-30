@@ -104,6 +104,14 @@ from app.services.analysis_processing_service import (
     process_analysis_job,
 )
 
+from app.services.incident_service import (
+    get_incident_by_id,
+    list_incidents,
+    create_incident,
+    update_incident,
+    add_incident_comment,
+)
+
 __all__ = [
     "get_user_by_id",
     "get_user_by_username",
@@ -190,4 +198,9 @@ __all__ = [
     "run_inference",
     "AnalysisProcessingResult",
     "process_analysis_job",
+    "get_incident_by_id",
+    "list_incidents",
+    "create_incident",
+    "update_incident",
+    "add_incident_comment",
 ]
