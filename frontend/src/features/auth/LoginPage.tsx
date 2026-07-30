@@ -3,6 +3,7 @@ import { useAuth } from './useAuth';
 import { useLocation, useNavigate } from 'react-router';
 import { getSafeRedirect } from '../../routing/utils';
 import { SecureWatchBrand } from '../../components/brand/SecureWatchBrand';
+import { ApiError } from '../../api/types';
 
 export function LoginPage() {
   const { loginUser, isLoading } = useAuth();
@@ -28,8 +29,16 @@ export function LoginPage() {
       const safePath = getSafeRedirect(state?.from);
       navigate(safePath, { replace: true });
     } catch (err: unknown) {
-      if (err instanceof Error && err.message) {
-        setErrorMsg(err.message);
+      if (err instanceof ApiError) {
+        if (err.status >= 500 || err.status === 0) {
+          setErrorMsg('Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.');
+        } else if (err.status === 401) {
+          setErrorMsg('Kullanıcı adı veya parola hatalı.');
+        } else {
+          setErrorMsg('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
+        }
+      } else if (err instanceof Error && err.name === 'AbortError') {
+        // Ignore aborted requests
       } else {
         setErrorMsg('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
       }

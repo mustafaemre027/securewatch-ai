@@ -156,9 +156,9 @@ describe('LoginPage', () => {
     });
   });
 
-  it('16. Failed login shows secure error message with role="alert"', async () => {
+  it('16. Failed login with 401 shows secure generic message without leaking username existence', async () => {
     const user = userEvent.setup();
-    vi.mocked(authApi.login).mockRejectedValueOnce(new ApiError(401, { code: 'ERR', message: 'Geçersiz kimlik bilgileri', details: null }));
+    vi.mocked(authApi.login).mockRejectedValueOnce(new ApiError(401, { code: 'ERR', message: 'User not found in database', details: null }));
 
     renderPage();
 
@@ -167,7 +167,8 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button'));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Geçersiz kimlik bilgileri');
+    expect(alert).toHaveTextContent('Kullanıcı adı veya parola hatalı.');
+    expect(alert).not.toHaveTextContent('User not found in database');
   });
 
   it('17. Clears previous error when new submit starts', async () => {
@@ -252,5 +253,50 @@ describe('LoginPage', () => {
 
     expect(Storage.prototype.setItem).not.toHaveBeenCalled();
     // Network requests are inherently prevented by vi.mock('./authApi')
+  });
+
+  it('25. Failed login with 502 shows generic service error and does not leak HTTP details', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockRejectedValueOnce(new ApiError(502, { code: 'ERR', message: 'HTTP Error 502: Bad Gateway', details: null }));
+
+    renderPage();
+
+    await user.type(screen.getByLabelText('Kullanıcı adı'), 'u');
+    await user.type(screen.getByLabelText('Parola'), 'p');
+    await user.click(screen.getByRole('button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.');
+    expect(alert).not.toHaveTextContent('502');
+    expect(alert).not.toHaveTextContent('Bad Gateway');
+  });
+
+  it('26. Failed login with network error (status 0) shows generic service error', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockRejectedValueOnce(new ApiError(0, { code: 'NETWORK_ERROR', message: 'A network error occurred while communicating with the server.', details: null }));
+
+    renderPage();
+
+    await user.type(screen.getByLabelText('Kullanıcı adı'), 'u');
+    await user.type(screen.getByLabelText('Parola'), 'p');
+    await user.click(screen.getByRole('button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.');
+  });
+
+  it('27. Non-JSON or unexpected transport errors do not leak technical details', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockRejectedValueOnce(new Error('Unexpected token < in JSON at position 0'));
+
+    renderPage();
+
+    await user.type(screen.getByLabelText('Kullanıcı adı'), 'u');
+    await user.type(screen.getByLabelText('Parola'), 'p');
+    await user.click(screen.getByRole('button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
+    expect(alert).not.toHaveTextContent('Unexpected token');
   });
 });
