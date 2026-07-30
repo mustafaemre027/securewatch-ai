@@ -158,13 +158,42 @@ python -m scripts.train_baseline_models \
 
 Opsiyonel model seçim parametreleri: `--min-recall`, `--max-fpr`, `--cv-splits`. Ayrıntılı teknik belgeler için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
 
-### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
+### Frontend Kurulumu ve Çalıştırma (Doğrulandı)
 
-```bash
+Geliştirme ortamında test edilmiş ve doğrulanmış frontend çalıştırma adımları:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+
+> **Not:** Windows PowerShell execution policy kısıtlaması olan sistemlerde `npm.cmd` (ör. `npm.cmd run dev`) kullanılabilir.
+
+#### Frontend Kalite ve Test Komutları
+
+```powershell
+# Type-check
+npm run type-check
+
+# ESLint denetimi
+npm run lint
+
+# Vitest unit ve bileşen testleri
+npm run test
+
+# Production build
+npm run build
+
+# Güvenlik zafiyet taraması
+npm audit --audit-level=high
+```
+
+#### Frontend Mimari ve Güvenlik Notları
+- **Bellek İçi Oturum Yönetimi:** Access token yalnızca React state (`AuthProvider`) içinde tutulur. `localStorage`, `sessionStorage`, IndexedDB veya cookie gibi kalıcı depolama alanlarına yazılmaz.
+- **Yönlendirme ve Sayfa Yenileme:** Sayfa yenilendiğinde token bellekte tutulduğu için oturum sıfırlanır ve korumalı rotalar (`/`) kullanıcıyı `/login` sayfasına yönlendirir.
+- **Yetkilendirme:** Frontend rol bilgisi kullanıcı arayüzü sunumu içindir. Gerçek yetkilendirme backend RBAC sorumluluğundadır.
+- **Development Proxy:** Geliştirme ortamında Vite dev/preview sunucusu bağıl `/api/v1` isteklerini yerel backend sunucusuna (`http://127.0.0.1:8000`) iletir.
 
 ### Docker ile Kurulum (planlandı / henüz doğrulanmadı)
 
