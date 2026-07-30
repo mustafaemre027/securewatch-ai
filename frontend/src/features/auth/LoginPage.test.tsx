@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { LoginPage } from './LoginPage';
 import { AuthProvider } from './AuthProvider';
@@ -27,9 +28,11 @@ describe('LoginPage', () => {
 
   const renderPage = () => {
     return render(
-      <AuthProvider>
-        <LoginPage />
-      </AuthProvider>
+      <MemoryRouter>
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>
+      </MemoryRouter>
     );
   };
 

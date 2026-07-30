@@ -1,19 +1,29 @@
-import { SecureWatchBrand } from './components/brand/SecureWatchBrand'
+import { Routes, Route, Navigate } from 'react-router';
+import { LoginPage } from './features/auth/LoginPage';
+import { ProtectedRoute } from './routing/ProtectedRoute';
+import { PublicOnlyRoute } from './routing/PublicOnlyRoute';
+import { AppLayout } from './layout/AppLayout';
+import { HomePage } from './pages/HomePage';
+import { useAuth } from './features/auth/useAuth';
 
 export function App() {
+  const { isAuthenticated } = useAuth();
+
   return (
-    <main className="min-h-screen bg-[#0A0E1A] text-slate-100 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full bg-[#0B132B] border border-[#1C2541] rounded-xl p-8 text-center shadow-2xl flex flex-col items-center">
-        <SecureWatchBrand variant="logo" className="h-12 w-auto mb-6" />
-        <h1 className="text-3xl font-extrabold text-[#6FFFE9] tracking-tight mb-3">
-          SecureWatch AI
-        </h1>
-        <p className="text-sm text-[#5BC0BE] max-w-sm">
-          Frontend foundation & design system initialized successfully.
-        </p>
-      </div>
-    </main>
-  )
+    <Routes>
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
+    </Routes>
+  );
 }
 
 export default App

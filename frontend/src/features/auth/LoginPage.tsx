@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from './useAuth';
+import { useLocation, useNavigate } from 'react-router';
+import { getSafeRedirect } from '../../routing/utils';
 import { SecureWatchBrand } from '../../components/brand/SecureWatchBrand';
 
 export function LoginPage() {
@@ -7,6 +9,9 @@ export function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +24,9 @@ export function LoginPage() {
 
     try {
       await loginUser({ username: trimmedUsername, password });
-      // Navigation will be handled in the future router block
+      const state = location.state as { from?: string } | null;
+      const safePath = getSafeRedirect(state?.from);
+      navigate(safePath, { replace: true });
     } catch (err: unknown) {
       if (err instanceof Error && err.message) {
         setErrorMsg(err.message);

@@ -1,12 +1,22 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import App from './App'
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router';
+import { App } from './App';
+import { AuthProvider } from './features/auth/AuthProvider';
+
+vi.mock('./features/auth/authApi', () => ({
+  login: vi.fn(),
+}));
 
 describe('App Component', () => {
-  it('renders initial frontend foundation and brand content', () => {
-    render(<App />)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('SecureWatch AI')
-    expect(screen.getByRole('img', { name: 'SecureWatch AI Logo' })).toBeInTheDocument()
-    expect(screen.getByText(/Frontend foundation & design system initialized/i)).toBeInTheDocument()
-  })
-})
+  it('renders routing application and redirects to login by default', () => {
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Platform Girişi')).toBeInTheDocument();
+  });
+});
