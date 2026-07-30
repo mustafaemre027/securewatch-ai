@@ -3,6 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import { AuthProvider } from './AuthProvider';
 import { useAuth } from './useAuth';
 import * as authApi from './authApi';
+import type { TokenResponse, LoginRequest } from './types';
 import { ApiError } from '../../api/types';
 
 vi.mock('./authApi', () => ({
@@ -82,8 +83,8 @@ describe('AuthProvider and useAuth', () => {
   });
 
   it('4. Loading state changes correctly during login', async () => {
-    let resolveLogin: (val: unknown) => void = () => {};
-    const promise = new Promise<unknown>((res) => {
+    let resolveLogin: (val: TokenResponse) => void = () => {};
+    const promise = new Promise<TokenResponse>((res) => {
       resolveLogin = res;
     });
 
@@ -270,7 +271,7 @@ describe('AuthProvider and useAuth', () => {
   });
 
   it('14. Password is not stored in provider state', async () => {
-    let capturedCredentials: Record<string, string> = {};
+    let capturedCredentials: LoginRequest | undefined;
 
     vi.mocked(authApi.login).mockImplementationOnce(async (creds) => {
       capturedCredentials = creds;
@@ -297,7 +298,7 @@ describe('AuthProvider and useAuth', () => {
       screen.getByTestId('login-btn').click();
     });
 
-    expect(capturedCredentials.password).toBe('pw');
+    expect(capturedCredentials?.password).toBe('pw');
 
     const stateDump = screen.getByTestId('state-dump').textContent || '';
     expect(stateDump).not.toContain('pw');
