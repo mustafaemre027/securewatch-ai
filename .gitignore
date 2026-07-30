@@ -25,3 +25,14 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Node.js and Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+.env.local
+.env.*.local
