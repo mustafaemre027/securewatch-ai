@@ -1,4 +1,5 @@
-import { ApiError, ApiErrorDetail } from './types';
+import { ApiError } from './types';
+import type { ApiErrorDetail } from './types';
 
 const API_PREFIX = '/api/v1';
 

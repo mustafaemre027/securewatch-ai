@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import { LoginRequest, UserResponse } from './types';
+import type { LoginRequest, UserResponse } from './types';
 import { ApiError } from '../../api/types';
 
 export interface AuthContextValue {
