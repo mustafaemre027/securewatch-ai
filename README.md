@@ -15,6 +15,7 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
 - **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
 - **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression ve dört Random Forest varyantının (`rf_baseline`, `rf_deeper`, `rf_unweighted`, `rf_compact`) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC/AP (Average Precision) gelişmiş olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik ve validation tabanlı model seçim servisi kuruldu. Model seçim raporu güvenli JSON olarak CLI'dan alınabilir. Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
+- **Batch Inference ve API:** Eğitilmiş ve güvenilir model paketleriyle senkron batch inference desteği. Yüklenen CSV kayıtları için saldırı olasılığı, ikili saldırı kararı ve risk seviyesi üretimi. Analiz çalıştırma, sayfalanmış sonuç görüntüleme ve özet raporlama API'leri eklendi. Admin ve Analyst rolleri için sahiplik tabanlı erişim kontrolü uygulanır. Ayrıntılar için bkz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md).
 - **Risk Skorlaması:** Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
 - **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
 - **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
@@ -47,6 +48,9 @@ Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik kat
 | `/api/v1/analysis/upload` | `POST` | `ANALYST` | CIC-IDS2017 CSV dosyası yükler, doğrular ve `PENDING` analiz işi oluşturur. |
 | `/api/v1/analysis` | `GET` | `ADMIN`, `ANALYST` | Analiz işlerini listeler (Admin tümünü, Analist sadece kendi işlerini görür). |
 | `/api/v1/analysis/{job_id}` | `GET` | `ADMIN`, `ANALYST` | Belirli bir analiz işinin detaylarını getirir. |
+| `/api/v1/analysis/{job_id}/process` | `POST` | `ADMIN`, `ANALYST` | Yüklenmiş bir analiz işini (PENDING) senkron olarak çalıştırır ve sonuçlandırır. |
+| `/api/v1/analysis/{job_id}/results` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin sonuçlarını (DetectionResult) sayfalamalı ve filtrelenebilir olarak listeler. |
+| `/api/v1/analysis/{job_id}/summary` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin risk gruplu (LOW, MEDIUM vb.) özet istatistiklerini getirir. |
 
 ### Audit Log Güvenlik İlkeleri
 

@@ -1,5 +1,5 @@
 """API endpoints for network traffic analysis jobs."""
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from sqlalchemy.orm import Session
@@ -20,6 +20,14 @@ from app.services.analysis_service import (
     get_analysis_job_by_id,
     handle_csv_upload,
     list_analysis_jobs,
+    get_analysis_results,
+    get_analysis_summary,
+)
+from app.services.analysis_processing_service import process_analysis_job
+from app.schemas.detection_result import (
+    DetectionResultPage,
+    AnalysisSummaryResponse,
+    AnalysisProcessingResponse,
 )
 
 router = APIRouter()
@@ -120,3 +128,83 @@ def get_job(
         )
 
     return AnalysisJobDetail.model_validate(job)
+
+
+@router.post("/{job_id}/process", response_model=AnalysisProcessingResponse)
+def process_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
+) -> AnalysisProcessingResponse:
+    """Process a pending analysis job synchronously.
+
+    Protected: Admin and Analyst roles permitted.
+    """
+    is_admin = current_user.role == UserRole.ADMIN
+
+    # Ownership and existence check
+    job = get_analysis_job_by_id(db, job_id, current_user.id, is_admin)
+    if not job:
+        raise AppException(404, "NOT_FOUND", "Analysis job not found.")
+
+    result = process_analysis_job(db, job.id)
+    return AnalysisProcessingResponse(
+        job_id=result.job_id,
+        records_processed=result.records_processed,
+        final_status=result.final_status
+    )
+
+
+@router.get("/{job_id}/results", response_model=DetectionResultPage)
+def list_results(
+    job_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    is_attack: Optional[bool] = Query(None),
+    risk_level: Optional[Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
+) -> DetectionResultPage:
+    """List inference results for a completed analysis job.
+
+    Protected: Admin and Analyst roles permitted.
+    """
+    is_admin = current_user.role == UserRole.ADMIN
+
+    total, items = get_analysis_results(
+        db=db,
+        job_id=job_id,
+        user_id=current_user.id,
+        is_admin=is_admin,
+        skip=skip,
+        limit=limit,
+        is_attack=is_attack,
+        risk_level=risk_level
+    )
+
+    return DetectionResultPage(
+        total=total,
+        items=items,
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.get("/{job_id}/summary", response_model=AnalysisSummaryResponse)
+def get_summary(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.ANALYST])),
+) -> AnalysisSummaryResponse:
+    """Get aggregated summary of inference results for a completed job.
+
+    Protected: Admin and Analyst roles permitted.
+    """
+    is_admin = current_user.role == UserRole.ADMIN
+
+    return get_analysis_summary(
+        db=db,
+        job_id=job_id,
+        user_id=current_user.id,
+        is_admin=is_admin
+    )

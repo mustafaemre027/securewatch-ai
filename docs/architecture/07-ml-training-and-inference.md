@@ -284,3 +284,112 @@ $$\text{Risk Skoru} = \text{round}(p \times 100)$$
 
 > [!NOTE]
 > Yukarıdaki risk seviyeleri, modelin ikili sınıflandırma karar eşiğinden (`selected_threshold`) tamamen bağımsız olarak hesaplanan operasyonel önem dereceleridir. Karar eşiği ise veri setinin doğasına ve kısıtlara göre dinamik olarak optimize edilir.
+
+---
+
+## 8. Güvenli Inference ve Analysis API (Gün 11)
+
+Gün 11 kapsamında, model paketinin güvenli yüklenmesi, uçtan uca çıkarım (inference) veri akışı, analiz işlerinin (AnalysisJob) durum yönetimi ve API üzerinden senkron işlenmesi `app.services` ve `app.api` altında geliştirilmiştir.
+
+### 8.1. Model Paketi Güven Sınırı
+
+Model paketlerinin yüklenmesi ve işlenmesinde katı güvenlik kuralları uygulanır:
+- **API Erişimi Yoktur:** Model paketi kullanıcı tarafından API üzerinden doğrudan yüklenemez.
+- **Güvenli Dizin:** Model paketi yalnızca backend sunucusunun (ve yöneticisinin) kontrol ettiği, çevre değişkeni ile belirtilen güvenli dizinden (`model_package_path` ayarı) okunur.
+- **Git Dışı Yapı:** Gerçek model paketi Git reposuna dâhil edilmez (yalnızca yerel üretim ortamında bulundurulur).
+- **Yönetici Sorumluluğu:** `joblib`/pickle tabanlı nesnelerin yapısı gereği uzaktan kod çalıştırma riski taşıması sebebiyle, model paketleri yalnızca güvenilir yönetici (Admin/DevOps) tarafından sunucuya sağlandığı sürece yüklenebilir.
+- **Dosya Doğrulaması:** Path traversal girişimleri (`../`), farklı dosya uzantıları (örn. `.exe`, `.sh`) ve güvenli dizin dışına çıkma girişimleri yükleme aşamasında kesin olarak reddedilir.
+- **Paket İçeriği:** Güvenli model paketi bir Python sözlüğü (`dict`) olup şunları barındırmak zorundadır: `estimator`, `preprocessor` (fitted preprocessor), `features` (77 özellik adı tam eşleşmeli), `threshold` ve `metadata`.
+- **Estimator Sözleşmesi:** Estimator, `predict_proba()` sözleşmesini karşılamalı ve pozitif/negatif (`0`, `1`) ikili sınıflandırma sınıflarına (`classes_`) sahip olmalıdır.
+
+### 8.2. Inference Veri Akışı
+
+Model tahmini, verinin diskten okunmasından veritabanına yazılmasına kadar şu sıralı adımlarla gerçekleştirilir:
+
+1. **Dosya Çözümleme:** Yüklenen ve saklanan CSV dosyasının `file_hash` yolu güvenli dizinden (`upload_dir`) çözülür (path traversal koruması ile).
+2. **Şema Doğrulaması:** CSV dosyasının CIC-IDS2017 şemasına uygunluğu doğrulanır.
+3. **Hedef Temizliği:** Opsiyonel `Label` sütunu CSV'de mevcutsa model girdisinden çıkarılır.
+4. **Redundant Sütun:** `Fwd Header Length.1` redundant sütunu varsa girdiden silinir.
+5. **Kanonik Sıralama:** Geriye kalan tam 77 kanonik sayısal özellik, modelin eğitildiği özellik sırasına (`model_package["features"]`) göre deterministik biçimde dizilir.
+6. **Preprocess (Yalnızca Transform):** Fitted preprocessor üzerinde **yalnızca** `transform()` fonksiyonu çağrılır.
+7. **İzolasyon:** Inference aşamasında `fit()` veya `fit_transform()` kesinlikle çalıştırılmaz.
+8. **Tahmin (Predict Proba):** Model üzerinden `predict_proba()` çağrılarak sınıf `1`'e (saldırı) ait pozitif olasılık değeri elde edilir.
+9. **Eşik Kararı:** Model paketinden gelen `threshold` değeri kullanılarak ikili saldırı kararı (`is_attack`: `p >= threshold`) verilir.
+10. **Risk Sınıflandırması:** Olasılığa bağlı olarak `LOW`, `MEDIUM`, `HIGH` veya `CRITICAL` risk seviyesi belirlenir.
+11. **Kayıt:** Tüm tahminler veritabanına `DetectionResult` kayıtları olarak topluca aktarılır.
+
+Risk seviyesi sınırları (karar eşiğinden bağımsız operasyonel sınıflandırmadır):
+- `LOW`: `0.00 <= p < 0.30`
+- `MEDIUM`: `0.30 <= p < 0.60`
+- `HIGH`: `0.60 <= p < 0.85`
+- `CRITICAL`: `0.85 <= p <= 1.00`
+
+### 8.3. AnalysisJob İşlem Akışı (Durum Makinesi)
+
+Yüklenen CSV işlerinin analiz durumları aşağıdaki gibi ilerler:
+- `PENDING → PROCESSING → COMPLETED`
+- `PENDING → PROCESSING → FAILED`
+
+- **Sahiplenme ve Atomik Geçiş:** Bir iş yalnızca `PENDING` durumundayken sahiplenilebilir. `PENDING → PROCESSING` geçişi `id` ve `status=PENDING` koşulu içeren atomik bir SQL `UPDATE` komutu ile gerçekleştirilir. Etkilenen satır sayısı `0` ise geçiş başarısız sayılır (409 Conflict). Bu sayede aynı işin iki farklı istek veya süreç tarafından aynı anda çalıştırılması önlenir.
+- **Sahiplenme Zamanlaması:** Atomik sahiplenme işlemi, CSV okuma, model yükleme ve tahmin hesaplamalarından hemen önce yapılır.
+- **Transaction Bütünlüğü:** Başarılı analizlerde `COMPLETED` durumu ve `DetectionResult` kayıtları tek bir veritabanı işleminde (commit) kaydedilir.
+- **Hata ve Rollback:** İşlem sırasında (örn. bozuk veri, model hatası, disk hatası) hata alınırsa, kısmi `DetectionResult` kayıtları anında `rollback` edilir (0 kayıt bırakılır) ve iş `FAILED` durumuna çekilir. İstemciye ve veritabanı hata mesajına mutlak sistem yolları (`C:\...`) veya Python traceback dökümleri sızdırılmaz.
+- **Senkron İşleme:** API'den tetiklenen işlem senkron yürütülmektedir; arka planda Celery, ARQ veya background queue bulunmamaktadır.
+
+### 8.4. DetectionResult Veri Modeli
+
+Tahmin sonuçlarının kaydedildiği veritabanı sözleşmesi:
+- Her tahmin (`DetectionResult`), kendisini üreten bir `AnalysisJob` kaydına dış anahtar (Foreign Key) ile bağlıdır.
+- `row_index`: Orjinal CSV içindeki satırın 0 tabanlı sırasını temsil eder.
+- `attack_probability`: Modelin ürettiği saldırı olasılığıdır (`0.0 - 1.0`).
+- `is_attack`: Model karar eşiğine göre ikili sonuçtur (True/False).
+- `risk_level`: Dört operasyonel sınıftan (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) biridir (native PostgreSQL Enum kullanılmamış, taşınabilirlik için `String` tercih edilmiştir).
+- Benzersizlik (Unique Constraint): `(job_id, row_index)` kombinasyonu tabloda tamamen benzersizdir.
+- Cascade (Silme Kuralı): Analiz işi (`AnalysisJob`) silindiğinde ona bağlı tüm `DetectionResult` kayıtları otomatik olarak silinir.
+- Tabloda tahmin model nesnesi (estimator), ham CSV satırı veya dönüştürülmüş NumPy tensörleri saklanmaz; yalnızca nihai, hafif karar metrikleri barındırılır.
+
+### 8.5. API Sözleşmesi ve RBAC Kuralları
+
+Senkron analiz işlemleri için aşağıdaki uç noktalar tasarlanmıştır:
+
+#### POST /api/v1/analysis/{job_id}/process
+- `PENDING` durumundaki işi senkron çalıştırır. Sonuç olarak işlenen kayıt sayısını döner.
+- Durum `PENDING` değilse `409 Conflict` döner.
+- Analyst kendi yüklediği işi çalıştırabilir, Admin herkesin işini çalıştırabilir.
+
+#### GET /api/v1/analysis/{job_id}/results
+- `COMPLETED` işler için tahmin sonuçlarını listeler. İş tamamlanmamışsa `409 Conflict` döner.
+- Çıktı `row_index ASC` yönünde sıralıdır.
+- `skip` ve `limit` (max 100) kullanılarak sayfalama (pagination) yapılır.
+- `is_attack` (`true/false`) ve tip güvenli `risk_level` (`LOW`, vb.) filtrelerini destekler (ikisi de optional). `is_attack is not None` bazlı filtrelenir. Geçersiz `risk_level` sorguları `422 Unprocessable Entity` ile reddedilir.
+
+#### GET /api/v1/analysis/{job_id}/summary
+- Toplam (`total_records`), normal (`normal_count`) ve saldırı (`attack_count`) kayıt sayımlarını döner.
+- Ayrıca risk seviyesi kırılımlarını (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL` sayımları) barındırır.
+- Boş çıkan risk seviyeleri sonuçta `0` olarak yer alır. İşin `completed_at` zaman damgası rapora eklenir.
+
+**RBAC Kuralları:**
+- Analyst rolündeki kullanıcılar yalnızca kendi ID'leri (`user_id`) ile oluşturdukları analiz kayıtlarına erişebilirler.
+- Admin rolü tüm kayıtlar üzerinde işlem yetkisine sahiptir.
+- Erişim hakkı olmayan veya mevcut olmayan `job_id` sorgularında bilgi sızdırmamak adına `404 Not Found` döndürülür.
+- Tüm uç noktalarda kimlik doğrulama, kullanıcı gridisinden değil güvenli `access_token` üzerinden çıkarılır.
+
+### 8.6. Güvenlik ve Gizlilik Sınırları
+
+- API üzerinden model, preprocessor veya herhangi bir yapılandırma dosyası alınmaz/verilmez.
+- Model veya preprocessor nesneleri HTTP Response içine asla konulmaz.
+- Ham DataFrame, NumPy bellek dizileri ve CSV dosya içeriği yanıt gövdesine (response body) sızdırılmaz.
+- Mutlak sistem yolları ve traceback sızıntıları kullanıcı yanıtlarından ayıklanmıştır.
+- API model yükleme ve okuma işlemleri, kullanıcı tarafından sağlanan parametrelerle path oluşturulmasına izin vermez (kullanıcı kontrollü path yok).
+- Proje içindeki test takımından dönen `354 passed` bildirimi, sistemin yazılım mühendisliği kurallarını ve sözleşmelerini başarıyla sağladığını gösterir; gerçek bir IDS saldırı tespit model doğruluğunu veya üretim performansını kanıtlamaz.
+
+### 8.7. Henüz Uygulanmayan Özellikler (Gelecek Aşamalar)
+
+- **Gerçek Üretim Modelinin Paketlenmesi:** Güvenli pakete konmuş eğitimli gerçek model henüz yerleştirilmemiştir.
+- **Model Registry ve Sürüm Geçmişi.**
+- **Asenkron İş Kuyruğu:** Analiz işlemlerinin Celery/Redis gibi worker'lara devredilmesi.
+- **Canlı Ağ Trafiği Inference'ı:** Dosya yerine paket (pcap) düzeyinde anlık dinleme yapılması.
+- **Incident (Olay) Oluşturma ve Yönetimi:** Tespit edilen anormalliklerin analist ekranına güvenlik olayı (incident) olarak düşürülmesi.
+- **Analist Atama:** Olaylara durum (Açık, Kapalı, Yalan Pozitif) ve personel ataması yapılması.
+- **Frontend / Dashboard Entegrasyonu:** React uygulamasının geliştirilmesi.
+- **Gerçek Veri Üzerinde Üretim Performans Ölçümü.**
