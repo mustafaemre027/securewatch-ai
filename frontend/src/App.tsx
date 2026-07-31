@@ -4,6 +4,7 @@ import { ProtectedRoute } from './routing/ProtectedRoute';
 import { PublicOnlyRoute } from './routing/PublicOnlyRoute';
 import { AppLayout } from './layout/AppLayout';
 import { HomePage } from './pages/HomePage';
+import { AnalysisPage } from './features/analysis/AnalysisPage';
 import { useAuth } from './features/auth/useAuth';
 
 export function App() {
@@ -18,6 +19,7 @@ export function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/analysis" element={<AnalysisPage />} />
         </Route>
       </Route>
 

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useNavigate, NavLink } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
 import { SecureWatchBrand } from '../components/brand/SecureWatchBrand';
 
@@ -29,9 +29,25 @@ export function AppLayout() {
 
       <header className="bg-rich-navy border-b border-space-blue sticky top-0 z-40">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <SecureWatchBrand className="h-8 w-auto flex-shrink-0" />
-            <span className="font-semibold text-lg hidden sm:block truncate">SecureWatch AI</span>
+          <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+            <div className="flex items-center gap-3">
+              <SecureWatchBrand className="h-8 w-auto flex-shrink-0" />
+              <span className="font-semibold text-lg hidden sm:block truncate">SecureWatch AI</span>
+            </div>
+            <div className="flex items-center sm:border-l border-space-blue sm:pl-6">
+              <NavLink
+                to="/analysis"
+                className={({ isActive }) =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-space-blue text-white'
+                      : 'text-muted-blue hover:text-white hover:bg-space-blue/50'
+                  }`
+                }
+              >
+                Analiz
+              </NavLink>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 min-w-0">
