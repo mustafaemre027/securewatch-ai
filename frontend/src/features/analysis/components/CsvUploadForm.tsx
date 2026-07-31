@@ -22,18 +22,23 @@ function formatBytes(bytes: number): string {
 
 export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
   const { user, accessToken, isAuthenticated } = useAuth();
-  
+
   const [file, setFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
+  const isSubmittingRef = useRef(false);
+  const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -59,27 +64,28 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
   const validateFile = (selectedFile: File): boolean => {
     setValidationError(null);
     setApiError(null);
-    
+    setSuccessMessage(null);
+
     if (!selectedFile) {
       setValidationError('Lütfen bir CSV dosyası seçin.');
       return false;
     }
-    
+
     if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
       setValidationError('Yalnızca CSV dosyaları yüklenebilir.');
       return false;
     }
-    
+
     if (selectedFile.size === 0) {
       setValidationError('Boş CSV dosyaları yüklenemez.');
       return false;
     }
-    
+
     if (selectedFile.size > MAX_SIZE_BYTES) {
       setValidationError('CSV dosyası en fazla 50 MB olabilir.');
       return false;
     }
-    
+
     return true;
   };
 
@@ -108,8 +114,8 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
-    if (isSubmitting) return;
-    
+    if (isSubmitting || isSubmittingRef.current) return;
+
     const droppedFile = e.dataTransfer.files[0];
     handleFileSelect(droppedFile);
   };
@@ -121,28 +127,34 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || isSubmittingRef.current) return;
     if (!file) {
       setValidationError('Lütfen bir CSV dosyası seçin.');
       return;
     }
 
     setApiError(null);
+    setSuccessMessage(null);
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
 
     abortControllerRef.current = new AbortController();
+    const currentController = abortControllerRef.current;
 
     try {
-      const response = await uploadAnalysisCsv(file, accessToken, abortControllerRef.current.signal);
+      const response = await uploadAnalysisCsv(file, accessToken, currentController.signal);
+      if (!isMountedRef.current) return;
       onUploaded(response);
+      setSuccessMessage('CSV dosyası başarıyla yüklendi.');
       setFile(null);
     } catch (err: unknown) {
+      if (!isMountedRef.current) return;
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
-      
+
       let errorMessage = 'CSV yükleme işlemi başarısız oldu. Lütfen tekrar deneyin.';
-      
+
       if (err instanceof ApiError) {
         switch (err.status) {
           case 400:
@@ -172,8 +184,13 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
       }
       setApiError(errorMessage);
     } finally {
-      setIsSubmitting(false);
-      abortControllerRef.current = null;
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
+      isSubmittingRef.current = false;
+      if (abortControllerRef.current === currentController) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -187,7 +204,7 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div 
+        <div
           className={`flex flex-col items-center justify-center p-10 bg-rich-navy border-2 border-dashed rounded-xl transition-colors ${isDragOver ? 'border-cyber-cyan bg-space-blue' : 'border-muted-blue'}`}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
@@ -205,7 +222,7 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
           <p className="text-sm text-muted-blue mb-6 text-center">
             veya göz atmak için bilgisayarınızdan seçin
           </p>
-          
+
           <label htmlFor="csv-file-input" className="sr-only">CSV dosyası seçin</label>
           <input
             id="csv-file-input"
@@ -218,8 +235,8 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
             aria-label="CSV dosyası seçin"
             data-testid="file-input"
           />
-          
-          <button 
+
+          <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={isSubmitting}
@@ -237,7 +254,7 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
 
         <div className="p-6 bg-rich-navy border-2 border-space-blue rounded-xl flex flex-col">
           <h2 className="text-lg font-bold text-white mb-4">Yüklenen Dosya Bilgileri</h2>
-          
+
           <div className="flex-1">
             {file ? (
               <div className="p-4 bg-deep-dark border border-space-blue rounded-lg mb-6 flex items-center">
@@ -280,6 +297,12 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
             {(validationError || apiError) && (
               <div className="mb-4 p-3 bg-deep-dark border border-red-500/50 rounded-lg" role="alert">
                 <p className="text-sm text-red-400 font-semibold">{validationError || apiError}</p>
+              </div>
+            )}
+
+            {successMessage && !validationError && !apiError && (
+              <div className="mb-4 p-3 bg-deep-dark border border-green-500/50 rounded-lg" role="status" aria-live="polite">
+                <p className="text-sm text-green-400 font-semibold">{successMessage}</p>
               </div>
             )}
           </div>

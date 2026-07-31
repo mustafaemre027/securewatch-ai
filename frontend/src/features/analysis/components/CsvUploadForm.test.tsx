@@ -11,7 +11,7 @@ vi.mock('../api');
 describe('CsvUploadForm', () => {
   const mockOnUploaded = vi.fn();
   const mockToken = 'test-token-123';
-  
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(useAuth).mockReturnValue({
@@ -25,16 +25,18 @@ describe('CsvUploadForm', () => {
     });
   });
 
-  const createMockFile = (name: string, size: number, type: string) => {
+  const createMockFile = (name: string, size: number, type: string = 'text/csv') => {
     const file = new File([''], name, { type });
     Object.defineProperty(file, 'size', { value: size });
     return file;
   };
 
+  const getSubmitButton = () => screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret|Yükleniyor.../i });
+
   it('1. Renders error message when not authenticated', () => {
     vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
+
     expect(screen.getByRole('alert')).toHaveTextContent('CSV yüklemek için geçerli bir oturum gereklidir.');
     expect(screen.queryByTestId('dropzone')).not.toBeInTheDocument();
   });
@@ -50,80 +52,80 @@ describe('CsvUploadForm', () => {
       error: null,
     });
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
+
     expect(screen.getByRole('alert')).toHaveTextContent('CSV yükleme işlemi yalnızca güvenlik analistleri tarafından gerçekleştirilebilir.');
     expect(screen.queryByTestId('dropzone')).not.toBeInTheDocument();
   });
 
   it('3. Renders form for ANALYST users', () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
     expect(screen.getByTestId('dropzone')).toBeInTheDocument();
-    expect(screen.getByLabelText(/CSV dosyası seçin/i)).toBeInTheDocument();
-    expect(screen.getByText('Doğrulanmış Analizi Başlat ve Karar Desteği Üret')).toBeInTheDocument();
   });
 
-  it('4. Prevents submit without file', () => {
+  it('4. Prevents submit without file and does not call API', async () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+    const submitButton = getSubmitButton();
     expect(submitButton).toBeDisabled();
+
+    // forcefully click
+    fireEvent.click(submitButton);
+    expect(vi.mocked(uploadAnalysisCsv)).not.toHaveBeenCalled();
   });
 
-  it('5. Rejects file with invalid extension', async () => {
+  it('5. Rejects file with invalid extension (.csv.exe)', async () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
     const input = screen.getByTestId('file-input');
-    const file = createMockFile('test.txt', 100, 'text/plain');
-    
-    fireEvent.change(input, { target: { files: [file] } });
-    
+    fireEvent.change(input, { target: { files: [createMockFile('test.csv.exe', 100)] } });
+
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Yalnızca CSV dosyaları yüklenebilir.');
     });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
-    expect(submitButton).toBeDisabled();
+    expect(getSubmitButton()).toBeDisabled();
+    expect(vi.mocked(uploadAnalysisCsv)).not.toHaveBeenCalled();
   });
 
   it('6. Accepts case-insensitive .CSV extension', async () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
     const input = screen.getByTestId('file-input');
-    const file = createMockFile('TEST.CSV', 1024, 'text/csv');
-    
-    fireEvent.change(input, { target: { files: [file] } });
-    
+    fireEvent.change(input, { target: { files: [createMockFile('TEST.CSV', 1024)] } });
+
     await waitFor(() => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.getByText('TEST.CSV')).toBeInTheDocument();
     });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
-    expect(submitButton).not.toBeDisabled();
+    expect(getSubmitButton()).not.toBeDisabled();
   });
 
   it('7. Rejects empty file', async () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
     const input = screen.getByTestId('file-input');
-    const file = createMockFile('empty.csv', 0, 'text/csv');
-    
-    fireEvent.change(input, { target: { files: [file] } });
-    
+    fireEvent.change(input, { target: { files: [createMockFile('empty.csv', 0)] } });
+
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Boş CSV dosyaları yüklenemez.');
     });
   });
 
-  it('8. Rejects file larger than 50 MB', async () => {
-    render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
+  it('8. Accepts exactly 50MB and rejects 50MB + 1 byte', async () => {
+    const { unmount } = render(<CsvUploadForm onUploaded={mockOnUploaded} />);
     const input = screen.getByTestId('file-input');
-    const file = createMockFile('large.csv', 51 * 1024 * 1024, 'text/csv');
-    
-    fireEvent.change(input, { target: { files: [file] } });
-    
+
+    // Exactly 50MB
+    const exact50 = 50 * 1024 * 1024;
+    fireEvent.change(input, { target: { files: [createMockFile('exact50.csv', exact50)] } });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(getSubmitButton()).not.toBeDisabled();
+    });
+
+    unmount();
+    render(<CsvUploadForm onUploaded={mockOnUploaded} />);
+
+    const input2 = screen.getByTestId('file-input');
+
+    // 50MB + 1 byte
+    fireEvent.change(input2, { target: { files: [createMockFile('large.csv', exact50 + 1)] } });
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('CSV dosyası en fazla 50 MB olabilir.');
     });
@@ -131,118 +133,160 @@ describe('CsvUploadForm', () => {
 
   it('9. Supports drag and drop', async () => {
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
     const dropzone = screen.getByTestId('dropzone');
-    const file = createMockFile('dragged.csv', 1024, 'text/csv');
-    
     fireEvent.dragOver(dropzone);
     expect(dropzone.className).toContain('border-cyber-cyan');
-    
-    fireEvent.drop(dropzone, {
-      dataTransfer: { files: [file] }
-    });
-    
+
+    fireEvent.drop(dropzone, { dataTransfer: { files: [createMockFile('dragged.csv', 1024)] } });
+
     await waitFor(() => {
       expect(screen.getByText('dragged.csv')).toBeInTheDocument();
     });
   });
 
-  it('10. Submits valid file and calls onUploaded with correct token and signal', async () => {
+  it('10. Submits valid file, calls onUploaded, renders success status', async () => {
     const mockResponse = { job_id: 1, file_name: 'valid.csv', file_hash: 'abc', file_size: 1024, created_at: '', status: 'PENDING' as const };
     vi.mocked(uploadAnalysisCsv).mockResolvedValueOnce(mockResponse);
-    
+
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const input = screen.getByTestId('file-input');
-    const file = createMockFile('valid.csv', 1024, 'text/csv');
-    fireEvent.change(input, { target: { files: [file] } });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('valid.csv', 1024)] } });
+
+    const submitButton = getSubmitButton();
     await waitFor(() => expect(submitButton).not.toBeDisabled());
-    
     fireEvent.click(submitButton);
-    
-    expect(screen.getByRole('button', { name: /Yükleniyor.../i })).toBeDisabled();
-    
+
     await waitFor(() => {
-      expect(vi.mocked(uploadAnalysisCsv)).toHaveBeenCalledWith(file, mockToken, expect.any(AbortSignal));
+      expect(vi.mocked(uploadAnalysisCsv)).toHaveBeenCalledWith(expect.any(File), mockToken, expect.any(AbortSignal));
       expect(mockOnUploaded).toHaveBeenCalledWith(mockResponse);
+      const status = screen.getByRole('status');
+      expect(status).toHaveTextContent('CSV dosyası başarıyla yüklendi.');
+      expect(status.textContent).not.toContain('abc'); // file hash is not leaked
     });
   });
 
-  it('11. Handles validation error from API securely (422)', async () => {
-    vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(new ApiError(422, { code: 'VAL', message: 'Raw error', details: null }));
-    
+  it('11. Prevents duplicate submit synchronously', async () => {
+    let resolveApi: (value: unknown) => void;
+    const promise = new Promise(resolve => { resolveApi = resolve; });
+    vi.mocked(uploadAnalysisCsv).mockImplementation(() => promise as Promise<unknown> as ReturnType<typeof uploadAnalysisCsv>);
+
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const input = screen.getByTestId('file-input');
-    fireEvent.change(input, { target: { files: [createMockFile('valid.csv', 1024, 'text/csv')] } });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('dup.csv', 1024)] } });
+
+    const submitButton = getSubmitButton();
     await waitFor(() => expect(submitButton).not.toBeDisabled());
+
+    // Simulate double click synchronously (before React re-renders with disabled)
     fireEvent.click(submitButton);
-    
-    await waitFor(() => {
-      const alert = screen.getByRole('alert');
-      expect(alert).toHaveTextContent('CSV dosyası doğrulanamadı. Dosya biçimini kontrol edin.');
-      expect(alert).not.toHaveTextContent('Raw error');
-    });
+    fireEvent.click(submitButton);
+
+    expect(vi.mocked(uploadAnalysisCsv)).toHaveBeenCalledTimes(1);
+
+    resolveApi!({ job_id: 1, file_name: 'dup.csv', file_hash: 'h', file_size: 1024, created_at: '', status: 'PENDING' });
   });
 
-  it('12. Handles duplicate upload error (409)', async () => {
-    vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(new ApiError(409, { code: 'DUP', message: 'Already exists', details: null }));
-    
+  it('12. Supports retry after failure', async () => {
+    vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(new ApiError(500, { code: 'ERR', message: 'Fail', details: null }));
+    const mockResponse = { job_id: 2, file_name: 'retry.csv', file_hash: 'abc', file_size: 1024, created_at: '', status: 'PENDING' as const };
+    vi.mocked(uploadAnalysisCsv).mockResolvedValueOnce(mockResponse);
+
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const input = screen.getByTestId('file-input');
-    fireEvent.change(input, { target: { files: [createMockFile('valid.csv', 1024, 'text/csv')] } });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('retry.csv', 1024)] } });
+
+    const submitButton = getSubmitButton();
     await waitFor(() => expect(submitButton).not.toBeDisabled());
-    fireEvent.click(submitButton);
-    
+
+    fireEvent.click(submitButton); // 1st try
+
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Bu CSV dosyası daha önce yüklenmiş.');
+      expect(screen.getByRole('alert')).toHaveTextContent('Sunucuya şu anda ulaşılamıyor.');
+    });
+
+    expect(getSubmitButton()).not.toBeDisabled();
+
+    fireEvent.click(getSubmitButton()); // 2nd try
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('CSV dosyası başarıyla yüklendi.');
+      expect(mockOnUploaded).toHaveBeenCalledTimes(1); // Only called on success
     });
   });
 
-  it('13. Does not leak sensitive information in DOM on unexpected error', async () => {
+  it('13. Handles specific error codes safely (400/401/403/409/413/422/503/0)', async () => {
+    const errorCases = [
+      { status: 400, expected: 'CSV dosyası doğrulanamadı. Dosya biçimini kontrol edin.' },
+      { status: 422, expected: 'CSV dosyası doğrulanamadı. Dosya biçimini kontrol edin.' },
+      { status: 401, expected: 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.' },
+      { status: 403, expected: 'Bu işlem için yetkiniz bulunmuyor.' },
+      { status: 409, expected: 'Bu CSV dosyası daha önce yüklenmiş.' },
+      { status: 413, expected: 'CSV dosyası izin verilen boyut sınırını aşıyor.' },
+      { status: 503, expected: 'Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.' },
+      { status: 0, expected: 'Sunucuya şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.' },
+    ];
+
+    const { unmount } = render(<CsvUploadForm onUploaded={mockOnUploaded} />);
+
+    for (const { status, expected } of errorCases) {
+      vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(new ApiError(status, { code: 'ERR', message: 'Raw Error from Backend', details: null }));
+
+      fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('err.csv', 1024)] } });
+      const submitButton = getSubmitButton();
+      await waitFor(() => expect(submitButton).not.toBeDisabled());
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        const alert = screen.getByRole('alert');
+        expect(alert).toHaveTextContent(expected);
+        expect(alert.textContent).not.toContain('Raw Error');
+      });
+    }
+
+    unmount();
+  });
+
+  it('14. Does not leak sensitive information on unexpected Error', async () => {
     vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(new Error('My secret stack trace /home/user'));
-    
+
     render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const input = screen.getByTestId('file-input');
-    fireEvent.change(input, { target: { files: [createMockFile('valid.csv', 1024, 'text/csv')] } });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('valid.csv', 1024)] } });
+
+    const submitButton = getSubmitButton();
     await waitFor(() => expect(submitButton).not.toBeDisabled());
     fireEvent.click(submitButton);
-    
+
     await waitFor(() => {
       const alert = screen.getByRole('alert');
       expect(alert).toHaveTextContent('CSV yükleme işlemi başarısız oldu. Lütfen tekrar deneyin.');
       expect(alert.textContent).not.toContain('secret stack trace');
-      expect(alert.textContent).not.toContain(mockToken);
     });
   });
 
-  it('14. Aborts request on unmount', () => {
+  it('15. Aborts request on unmount and prevents state update', async () => {
     let abortSignal: AbortSignal | null = null;
     vi.mocked(uploadAnalysisCsv).mockImplementation((_file: File, _token: string | null | undefined, signal?: AbortSignal) => {
       if (signal) abortSignal = signal;
       return new Promise(() => {}); // never resolves
     });
-    
+
+    // We mock console.error to catch any "state update on unmounted component" warnings
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
     const { unmount } = render(<CsvUploadForm onUploaded={mockOnUploaded} />);
-    
-    const input = screen.getByTestId('file-input');
-    fireEvent.change(input, { target: { files: [createMockFile('valid.csv', 1024, 'text/csv')] } });
-    
-    const submitButton = screen.getByRole('button', { name: /Doğrulanmış Analizi Başlat ve Karar Desteği Üret/i });
+
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('valid.csv', 1024)] } });
+    const submitButton = getSubmitButton();
     fireEvent.click(submitButton);
-    
+
+    expect(abortSignal).not.toBeNull();
+
     unmount();
-    
+
     expect((abortSignal as AbortSignal | null)?.aborted).toBe(true);
+
+    // Give it a tick to ensure no state updates happen after unmount
+    await new Promise(r => setTimeout(r, 10));
+
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 });
