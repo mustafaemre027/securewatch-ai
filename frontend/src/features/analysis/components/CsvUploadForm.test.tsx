@@ -289,4 +289,31 @@ describe('CsvUploadForm', () => {
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
+  it('16. Maps 400 DUPLICATE_FILE correctly without leak', async () => {
+    vi.mocked(uploadAnalysisCsv).mockRejectedValueOnce(
+      new ApiError(400, { code: 'DUPLICATE_FILE', message: 'Trace /var/www file_hash=abc1234', details: { token: 'xyz987' } })
+    );
+
+    render(<CsvUploadForm onUploaded={mockOnUploaded} />);
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [createMockFile('dup.csv', 1024)] } });
+
+    const submitButton = getSubmitButton();
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Bu CSV dosyası daha önce yüklenmiş.');
+      expect(alert.textContent).not.toContain('CSV dosyası doğrulanamadı');
+      expect(alert.textContent).not.toContain('DUPLICATE_FILE');
+      expect(alert.textContent).not.toContain('file_hash');
+      expect(alert.textContent).not.toContain('abc1234');
+      expect(alert.textContent).not.toContain('Trace');
+      expect(alert.textContent).not.toContain('/var/www');
+      expect(alert.textContent).not.toContain('xyz987');
+      expect(alert.textContent).not.toContain('token');
+
+      expect(mockOnUploaded).not.toHaveBeenCalled();
+    });
+  });
 });

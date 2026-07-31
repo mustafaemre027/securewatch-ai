@@ -158,6 +158,12 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
       if (err instanceof ApiError) {
         switch (err.status) {
           case 400:
+            if (err.code === 'DUPLICATE_FILE') {
+              errorMessage = 'Bu CSV dosyası daha önce yüklenmiş.';
+            } else {
+              errorMessage = 'CSV dosyası doğrulanamadı. Dosya biçimini kontrol edin.';
+            }
+            break;
           case 422:
             errorMessage = 'CSV dosyası doğrulanamadı. Dosya biçimini kontrol edin.';
             break;
