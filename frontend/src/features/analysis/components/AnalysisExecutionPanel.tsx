@@ -18,36 +18,17 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-const statusTextMap: Record<AnalysisJobStatus, string> = {
-  PENDING: 'Bekliyor',
-  PROCESSING: 'İşleniyor',
-  COMPLETED: 'Tamamlandı',
-  FAILED: 'Başarısız'
-};
-
-export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExecutionPanelProps) {
+function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExecutionPanelProps) {
   const { accessToken, isAuthenticated } = useAuth();
-  
+
   const [currentStatus, setCurrentStatus] = useState<AnalysisJobStatus>(job.status);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordsProcessed, setRecordsProcessed] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  
+
   const isProcessingRef = useRef(false);
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
-  useEffect(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setCurrentStatus(job.status);
-    setApiError(null);
-    setRecordsProcessed(null);
-    setIsProcessing(false);
-    isProcessingRef.current = false;
-  }, [job.job_id, job.status]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -64,34 +45,47 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
       setApiError('Oturumunuz geçersiz. Lütfen yeniden giriş yapın.');
       return;
     }
-    
-    if (isProcessingRef.current || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING') return;
-    
+
+    if (isProcessingRef.current || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING' || currentStatus === 'FAILED') {
+      return;
+    }
+
     setApiError(null);
     setIsProcessing(true);
     isProcessingRef.current = true;
     setCurrentStatus('PROCESSING');
-    
+
     abortControllerRef.current = new AbortController();
     const currentController = abortControllerRef.current;
-    
+
     try {
       const response = await processAnalysisJob(job.job_id, accessToken, currentController.signal);
-      
+
       if (!isMountedRef.current || abortControllerRef.current !== currentController) return;
-      
+
+      if (response.job_id !== job.job_id) {
+         setCurrentStatus('FAILED');
+         setApiError('Analiz sonucu doğrulanamadı.');
+         return;
+      }
+
       const finalStatus = response.final_status;
       if (finalStatus === 'PENDING' || finalStatus === 'PROCESSING') {
         setCurrentStatus('FAILED');
         setApiError('Analiz sonucu doğrulanamadı.');
       } else {
         setCurrentStatus(finalStatus);
-        if (finalStatus === 'COMPLETED' && Number.isFinite(response.records_processed) && response.records_processed >= 0) {
+
+        if (
+          finalStatus === 'COMPLETED' &&
+          typeof response.records_processed === 'number' &&
+          Number.isFinite(response.records_processed) &&
+          Number.isInteger(response.records_processed) &&
+          response.records_processed >= 0
+        ) {
           setRecordsProcessed(response.records_processed);
-        } else if (finalStatus === 'FAILED') {
-          setApiError('Analiz işlemi güvenli biçimde tamamlanamadı.');
         }
-        
+
         if (finalStatus === 'COMPLETED' && onSuccess) {
           onSuccess(response);
         }
@@ -101,10 +95,11 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
-      
-      setCurrentStatus('FAILED');
+
+      setCurrentStatus('PENDING');
+
       let errorMessage = 'Analiz işlemi güvenli biçimde tamamlanamadı.';
-      
+
       if (err instanceof ApiError) {
         switch (err.status) {
           case 400:
@@ -148,26 +143,37 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
     <div className="w-full" aria-busy={isProcessing}>
       <div className="p-6 bg-rich-navy border-2 border-space-blue rounded-xl flex flex-col">
         <h2 className="text-xl font-bold text-white mb-6">Analiz Yürütme Paneli</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
             <p className="text-xs font-bold text-muted-blue uppercase mb-1">İşlem Numarası (Job ID)</p>
             <p className="text-sm font-semibold text-white">#{job.job_id}</p>
           </div>
-          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
+
+          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg" role="status" aria-live="polite" aria-atomic="true">
             <p className="text-xs font-bold text-muted-blue uppercase mb-1">Durum</p>
             <div className="flex items-center">
               {currentStatus === 'COMPLETED' && <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>}
               {currentStatus === 'PROCESSING' && <span className="w-2 h-2 rounded-full bg-cyber-cyan animate-pulse mr-2"></span>}
               {currentStatus === 'FAILED' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>}
               {currentStatus === 'PENDING' && <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></span>}
-              <p className="text-sm font-bold text-white">{statusTextMap[currentStatus]}</p>
+              <p className="text-sm font-bold text-white">
+                {currentStatus === 'PENDING' && 'Bekliyor'}
+                {currentStatus === 'PROCESSING' && 'İşleniyor'}
+                {currentStatus === 'COMPLETED' && <span className="text-green-400">Tamamlandı</span>}
+                {currentStatus === 'FAILED' && <span className="text-red-400">Başarısız</span>}
+              </p>
             </div>
+            {currentStatus === 'COMPLETED' && recordsProcessed !== null && (
+              <p className="text-xs text-green-300 mt-2">İşlenen Kayıt Sayısı: {recordsProcessed}</p>
+            )}
           </div>
+
           <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
             <p className="text-xs font-bold text-muted-blue uppercase mb-1">Dosya Adı</p>
             <p className="text-sm font-semibold text-white truncate" title={job.file_name}>{job.file_name}</p>
           </div>
+
           <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
             <p className="text-xs font-bold text-muted-blue uppercase mb-1">Dosya Boyutu</p>
             <p className="text-sm font-semibold text-white">{formatBytes(job.file_size)}</p>
@@ -180,20 +186,11 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
           </div>
         )}
 
-        {currentStatus === 'COMPLETED' && (
-          <div className="mb-6 p-4 bg-deep-dark border border-green-500/50 rounded-lg" role="status" aria-live="polite">
-            <p className="text-sm text-green-400 font-bold mb-1">Analiz başarıyla tamamlandı.</p>
-            {recordsProcessed !== null && (
-              <p className="text-xs text-green-300">İşlenen Kayıt Sayısı: {recordsProcessed}</p>
-            )}
-          </div>
-        )}
-
         <div className="mt-auto flex flex-col sm:flex-row gap-4">
           <button
             type="button"
             onClick={handleProcess}
-            disabled={isProcessing || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING'}
+            disabled={isProcessing || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING' || currentStatus === 'FAILED'}
             className="flex-1 py-3 px-4 bg-ai-teal text-deep-dark font-bold rounded-lg hover:bg-cyber-cyan transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isProcessing ? (
@@ -208,7 +205,7 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
               'Doğrulanmış Analizi Başlat'
             )}
           </button>
-          
+
           {onReset && (
             <button
               type="button"
@@ -223,4 +220,8 @@ export function AnalysisExecutionPanel({ job, onSuccess, onReset }: AnalysisExec
       </div>
     </div>
   );
+}
+
+export function AnalysisExecutionPanel(props: AnalysisExecutionPanelProps) {
+  return <AnalysisExecutionPanelInternal key={`${props.job.job_id}-${props.job.status}`} {...props} />;
 }
