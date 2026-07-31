@@ -113,7 +113,10 @@ export function AnalysisHistoryList() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    fetchJobs(skip, statusFilter);
+    const load = async () => {
+      await fetchJobs(skip, statusFilter);
+    };
+    void load();
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
@@ -260,7 +263,7 @@ export function AnalysisHistoryList() {
                     <span>Boyut: {formatBytes(job.file_size)}</span>
                   </div>
                 </div>
-                <div className="flex-shrink-0 bg-deep-dark p-3 rounded-lg border border-space-blue" role="status" aria-live="polite" aria-atomic="true">
+                <div className="flex-shrink-0 bg-deep-dark p-3 rounded-lg border border-space-blue">
                   {renderStatus(job.status)}
                 </div>
               </li>
