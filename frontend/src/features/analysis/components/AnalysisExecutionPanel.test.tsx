@@ -399,4 +399,29 @@ describe('AnalysisExecutionPanel', () => {
       expect(mockOnSuccess).not.toHaveBeenCalled();
     });
   });
+  it('31. MODEL_NOT_FOUND maps to safe message and prevents leak', async () => {
+    vi.mocked(processAnalysisJob).mockRejectedValueOnce(
+      new ApiError(404, { code: 'MODEL_NOT_FOUND', message: 'Trace: C:\\Projects\\securewatch-ai\\app\\ml_models\\model.joblib', details: { secret: 'token123' } })
+    );
+
+    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+
+    const button = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.');
+      expect(alert.textContent).not.toContain('Kayıt bulunamadı veya bu kayda erişemiyorsunuz.');
+      expect(alert.textContent).not.toContain('MODEL_NOT_FOUND');
+      expect(alert.textContent).not.toContain('model.joblib');
+      expect(alert.textContent).not.toContain('C:\\Projects\\securewatch-ai\\app\\ml_models');
+      expect(alert.textContent).not.toContain('Trace');
+      expect(alert.textContent).not.toContain('token123');
+
+      expect(button).not.toBeDisabled();
+      expect(screen.getByRole('status')).toHaveTextContent('Bekliyor');
+      expect(mockOnSuccess).not.toHaveBeenCalled();
+    });
+  });
 });

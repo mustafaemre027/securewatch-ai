@@ -113,7 +113,11 @@ function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExe
             errorMessage = 'Bu işlem için yetkiniz bulunmuyor.';
             break;
           case 404:
-            errorMessage = 'Kayıt bulunamadı veya bu kayda erişemiyorsunuz.';
+            if (err.code === 'MODEL_NOT_FOUND') {
+              errorMessage = 'Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+            } else {
+              errorMessage = 'Kayıt bulunamadı veya bu kayda erişemiyorsunuz.';
+            }
             break;
           case 409:
             errorMessage = 'Analiz mevcut durumunda başlatılamıyor.';
