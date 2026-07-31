@@ -16,8 +16,10 @@ export async function apiClient<T>(
 
   const headers = new Headers(options.headers);
 
-  if (options.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
+  if (options.body !== undefined) {
+    if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
   }
 
   if (token) {
@@ -27,7 +29,9 @@ export async function apiClient<T>(
   const fetchOptions: RequestInit = {
     ...options,
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.body !== undefined
+      ? (options.body instanceof FormData ? options.body : JSON.stringify(options.body))
+      : undefined,
   };
 
   let response: Response;
