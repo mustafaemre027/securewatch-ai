@@ -197,7 +197,7 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
   return (
     <div className="w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-white mb-2">Ağ Trafiği Veri Yükleme</h1>
+        <h2 className="text-3xl font-extrabold text-white mb-2">Ağ Trafiği Veri Yükleme</h2>
         <p className="text-muted-blue">
           Karar destek modelinin analiz etmesi için CIC-IDS2017 veri seti formatında bir CSV dosyası yükleyin.
         </p>

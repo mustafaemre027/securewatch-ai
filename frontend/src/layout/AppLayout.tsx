@@ -1,10 +1,12 @@
-import { Outlet, useNavigate, NavLink } from 'react-router';
+import { Outlet, useNavigate, NavLink, useLocation } from 'react-router';
 import { useAuth } from '../features/auth/useAuth';
 import { SecureWatchBrand } from '../components/brand/SecureWatchBrand';
 
 export function AppLayout() {
   const { user, logoutUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAnalysisActive = location.pathname.startsWith('/analysis');
 
   const handleLogout = () => {
     logoutUser();
@@ -37,6 +39,7 @@ export function AppLayout() {
             <div className="flex items-center sm:border-l border-space-blue sm:pl-6">
               <NavLink
                 to="/analysis"
+                aria-current={isAnalysisActive ? 'page' : undefined}
                 className={({ isActive }) =>
                   `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive

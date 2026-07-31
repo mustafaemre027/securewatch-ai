@@ -24,30 +24,25 @@ export function AnalysisPage() {
 
   return (
     <div className="flex flex-col gap-8 w-full">
+      <div className="mb-2">
+        <h1 className="text-3xl font-extrabold text-white mb-2">Analiz İşlemleri</h1>
+        <p className="text-muted-blue">
+          {!activeJob && user?.role === 'ADMIN' && 'Güvenlik analiz kayıtlarını inceleyin.'}
+          {!activeJob && user?.role !== 'ADMIN' && 'Yeni ağ trafiği verilerini yükleyin veya geçmiş kayıtları inceleyin.'}
+          {activeJob && 'Yüklenen dosyanız üzerinde analiz işlemini yürütün.'}
+        </p>
+      </div>
+
       <section aria-labelledby="upload-process-section">
         <h2 id="upload-process-section" className="sr-only">Veri Yükleme ve İşleme</h2>
         {!activeJob ? (
-          <>
-            {user?.role === 'ADMIN' && (
-              <div className="mb-8">
-                <h1 className="text-3xl font-extrabold text-white mb-2">Ağ Trafiği Analizi</h1>
-                <p className="text-muted-blue">Güvenlik analiz kayıtlarını inceleyin.</p>
-              </div>
-            )}
-            <CsvUploadForm onUploaded={handleUploadSuccess} />
-          </>
+          <CsvUploadForm onUploaded={handleUploadSuccess} />
         ) : (
-          <>
-            <div className="mb-8">
-              <h1 className="text-3xl font-extrabold text-white mb-2">Ağ Trafiği Analiz İşlemi</h1>
-              <p className="text-muted-blue">Yüklenen dosyanız üzerinde analiz işlemini yürütün.</p>
-            </div>
-            <AnalysisExecutionPanel 
-              job={activeJob} 
-              onSuccess={handleProcessSuccess}
-              onReset={handleReset} 
-            />
-          </>
+          <AnalysisExecutionPanel
+            job={activeJob}
+            onSuccess={handleProcessSuccess}
+            onReset={handleReset}
+          />
         )}
       </section>
 
