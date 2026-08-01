@@ -193,10 +193,16 @@ npm run build
 npm audit --audit-level=high
 ```
 
-#### Frontend Mimari ve Güvenlik Notları
+*(Windows PowerShell execution policy kısıtlamaları olan ortamlarda `npm.cmd` örneğin `npm.cmd run dev`, `npm.cmd run test` kullanılabilir).*
+
+#### Frontend Mimari, Analiz İş Akışı ve Güvenlik Notları
 - **Bellek İçi Oturum Yönetimi:** Access token yalnızca React state (`AuthProvider`) içinde tutulur. `localStorage`, `sessionStorage`, IndexedDB veya cookie gibi kalıcı depolama alanlarına yazılmaz.
-- **Yönlendirme ve Sayfa Yenileme:** Sayfa yenilendiğinde token bellekte tutulduğu için oturum sıfırlanır ve korumalı rotalar (`/`) kullanıcıyı `/login` sayfasına yönlendirir.
-- **Yetkilendirme:** Frontend rol bilgisi kullanıcı arayüzü sunumu içindir. Gerçek yetkilendirme backend RBAC sorumluluğundadır.
+- **Yönlendirme ve Sayfa Yenileme:** Sayfa yenilendiğinde token bellekte tutulduğu için oturum sıfırlanır ve korumalı rotalar (`/`, `/analysis`) kullanıcıyı `/login` sayfasına yönlendirir.
+- **Analiz Ekranı İş Akışı (`/analysis`):** ANALYST rolündeki kullanıcılar CIC-IDS2017 formatında CSV dosyası yükleyebilir (en fazla 50 MB, `.csv` uzantılı, sürükle-bırak ve klavye destekli), yüklenen dosya için `job_id` alarak analizi manuel başlatabilir. Analiz tamamlandığında özet sonuçlar ve güncellenen analiz geçmişi listelenir.
+- **API Sözleşmeleri ve Listeleme:** Analiz işleri `GET /api/v1/analysis?skip=0&limit=20` üzerinden listelenir. Yanıt sahte bir `total` alanı içermez, doğrudan dizi olarak döner.
+- **Hata Maskeleme & Güvenlik:** Backend'den dönen teknik hatalar, stack trace, dosya yolları veya `DUPLICATE_FILE` / `MODEL_NOT_FOUND` gibi hata kodları kullanıcı arayüzüne sızdırılmaz. Güvenli Türkçe mesajlara (`Bu CSV dosyası daha önce yüklenmiş.`, `Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.`) dönüştürülür. İptal edilen istekler `AbortController` ile yönetilir; duplicate-submit ve stale-response korumaları uygulanır.
+- **Erişilebilirlik ve Responsive:** Semantik HTML5 başlıkları, ARIA canlı bölgeleri (`role="status"`, `role="alert"`), klavye odağı (`focus-visible`) ve 320px mobil genişliğe kadar responsive tasarım desteklenmektedir. Durumlar yalnızca renk ile ifade edilmez.
+- **Yetkilendirme:** Frontend rol bilgisi kullanıcı arayüzü sunumu içindir (ör. ADMIN kullanıcıya yükleme formu gösterilmez). Gerçek yetkilendirme ve sahiplik denetimi backend RBAC sorumluluğundadır.
 - **Development Proxy:** Geliştirme ortamında Vite dev/preview sunucusu bağıl `/api/v1` isteklerini yerel backend sunucusuna (`http://127.0.0.1:8000`) iletir.
 
 ### Docker ile Kurulum (planlandı / henüz doğrulanmadı)
