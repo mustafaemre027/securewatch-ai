@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalysisExecutionPanel } from './AnalysisExecutionPanel';
 import { useAuth } from '../../auth/useAuth';
@@ -130,7 +130,9 @@ describe('AnalysisExecutionPanel', () => {
       expect(statusArea).toHaveTextContent('İşleniyor');
     });
 
-    deferred.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+    await act(async () => {
+      deferred.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+    });
   });
 
   it('11. Fast double click causes only 1 API call', async () => {
@@ -144,7 +146,9 @@ describe('AnalysisExecutionPanel', () => {
     fireEvent.click(startButton);
 
     expect(vi.mocked(processAnalysisJob)).toHaveBeenCalledTimes(1);
-    deferred.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+    await act(async () => {
+      deferred.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+    });
   });
 
   it('12-14. COMPLETED shows success, records count in same status region, calls callback once', async () => {
@@ -301,7 +305,7 @@ describe('AnalysisExecutionPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
-    await new Promise(r => setTimeout(r, 10));
+    await act(async () => {});
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
