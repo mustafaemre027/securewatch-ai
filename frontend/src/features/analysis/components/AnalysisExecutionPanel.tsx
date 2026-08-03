@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import { processAnalysisJob } from '../api';
 import type { AnalysisUploadResponse, AnalysisProcessingResponse, AnalysisJobStatus } from '../types';
@@ -170,6 +171,17 @@ function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExe
             </div>
             {currentStatus === 'COMPLETED' && recordsProcessed !== null && (
               <p className="text-xs text-green-300 mt-2">İşlenen Kayıt Sayısı: {recordsProcessed}</p>
+            )}
+            {currentStatus === 'COMPLETED' && typeof job.job_id === 'number' && Number.isSafeInteger(job.job_id) && job.job_id > 0 && (
+              <div className="mt-3">
+                <Link
+                  to={`/analysis/${job.job_id}/results`}
+                  aria-label={`Analiz #${job.job_id} sonuçlarını görüntüle`}
+                  className="inline-block px-4 py-2 bg-ai-teal text-deep-dark text-sm font-bold rounded-lg hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rich-navy focus:ring-ai-teal truncate max-w-[200px] text-center"
+                >
+                  Sonuçları görüntüle
+                </Link>
+              </div>
             )}
           </div>
 

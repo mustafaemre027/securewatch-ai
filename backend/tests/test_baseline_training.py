@@ -3,6 +3,7 @@
 Uses small, deterministic, fully synthetic data — no real CIC-IDS2017 rows.
 CICIDS2017_FEATURE_COLUMNS is used to construct the canonical 78-column schema.
 """
+import hashlib
 import json
 import subprocess
 import sys
@@ -69,6 +70,20 @@ def _make_synthetic_df(
 @pytest.fixture
 def synthetic_df():
     return _make_synthetic_df()
+
+
+def _get_model_snapshot(directory: Path) -> dict:
+    """Helper to get a snapshot of model artifacts (files and their hashes)."""
+    snapshot = {}
+    for ext in [".pkl", ".joblib", ".pickle"]:
+        for m in directory.rglob(f"*{ext}"):
+            if ".venv" not in m.parts:
+                try:
+                    digest = hashlib.sha256(m.read_bytes()).hexdigest()
+                    snapshot[m.resolve()] = digest
+                except Exception:
+                    pass  # Ignore unreadable files if any
+    return snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -343,11 +358,14 @@ def test_cli_error_no_absolute_path_or_traceback(tmp_path):
 
 
 def test_cli_no_model_files_created(tmp_path):
-    """Test 26: Scriptin model/Joblib dosyası oluşturmaması."""
+    """Test 26: Scriptin model/Joblib dosyası oluşturmaması veya mevcut olanı değiştirmemesi."""
     import os
     df = _make_synthetic_df()
     csv_file = tmp_path / "train.csv"
     df.to_csv(csv_file, index=False)
+
+    backend_dir = Path(__file__).parent.parent
+    snapshot_before = _get_model_snapshot(backend_dir)
 
     result = subprocess.run(
         [sys.executable, "-m", "scripts.train_baseline_models", "--input", str(csv_file)],
@@ -361,13 +379,8 @@ def test_cli_no_model_files_created(tmp_path):
     artifacts = [f for f in tmp_path.iterdir() if f.suffix in {".pkl", ".joblib"}]
     assert len(artifacts) == 0
 
-    # No new .pkl/.joblib files in the backend directory
-    backend_dir = Path(__file__).parent.parent
-    for ext in [".pkl", ".joblib"]:
-        matches = list(backend_dir.rglob(f"*{ext}"))
-        # Filter out venv
-        matches = [m for m in matches if ".venv" not in m.parts]
-        assert len(matches) == 0, f"Unexpected model artifact found: {matches}"
+    snapshot_after = _get_model_snapshot(backend_dir)
+    assert snapshot_before == snapshot_after, "Baseline training caused side-effects on model artifacts"
 
 
 def test_cli_compare_random_forest_success(tmp_path):
@@ -469,3 +482,30 @@ def test_cli_select_final_model_invalid_args(tmp_path):
         )
         assert result.returncode == 1
         assert expected_msg in result.stderr
+
+
+def test_model_snapshot_detects_changes(tmp_path):
+    """Test 31: Snapshot helper'in değişiklikleri, eklemeleri ve silinmeleri algılaması."""
+    dummy_model = tmp_path / "test_model.joblib"
+    dummy_model.write_bytes(b"initial_state")
+
+    snapshot_initial = _get_model_snapshot(tmp_path)
+
+    # Verify no change matches
+    assert snapshot_initial == _get_model_snapshot(tmp_path)
+
+    # Verify content change is detected
+    dummy_model.write_bytes(b"changed_state")
+    snapshot_changed = _get_model_snapshot(tmp_path)
+    assert snapshot_initial != snapshot_changed
+
+    # Verify file deletion is detected
+    dummy_model.unlink()
+    snapshot_deleted = _get_model_snapshot(tmp_path)
+    assert snapshot_changed != snapshot_deleted
+
+    # Verify new file creation is detected
+    new_model = tmp_path / "new_model.pkl"
+    new_model.write_bytes(b"new_state")
+    snapshot_new = _get_model_snapshot(tmp_path)
+    assert snapshot_deleted != snapshot_new
