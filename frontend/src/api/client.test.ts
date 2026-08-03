@@ -203,4 +203,22 @@ describe('apiClient', () => {
     const fetchOptions = (vi.mocked(globalThis.fetch)).mock.calls[0][1] as RequestInit;
     expect(fetchOptions.signal).toBe(controller.signal);
   });
+  it('12. Passes FormData without stringifying and without setting Content-Type', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+    } as Response);
+
+    const formData = new FormData();
+    formData.append('test', 'value');
+    await apiClient('/test', { method: 'POST', body: formData });
+
+    const callArgs = vi.mocked(globalThis.fetch).mock.calls[0];
+    const fetchOptions = callArgs[1] as RequestInit;
+
+    expect(fetchOptions.body).toBe(formData);
+    const headers = fetchOptions.headers as Headers;
+    expect(headers.has('Content-Type')).toBe(false);
+  });
 });
