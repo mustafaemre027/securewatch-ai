@@ -78,7 +78,7 @@ describe('DetectionResultsList', () => {
   it('1. İlk istek doğru jobId, skip:0, limit:20, token ve signal ile gönderilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     expect(listDetectionResults).toHaveBeenCalledWith(
       123,
       { skip: 0, limit: 20 },
@@ -90,7 +90,7 @@ describe('DetectionResultsList', () => {
   it('2. Loading ve aria-busy doğru çalışır', () => {
     vi.mocked(listDetectionResults).mockReturnValue(new Promise(() => {}));
     render(<DetectionResultsList jobId={123} />);
-    
+
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Sonuçlar yükleniyor...')).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe('DetectionResultsList', () => {
   it('3. Geçerli sonuçlar güvenli şekilde render edilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Satır 1')).toBeInTheDocument();
       expect(screen.getByText('Satır 2')).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('DetectionResultsList', () => {
   it('4. Saldırı ve Normal metinleri bulunur', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getAllByText('Saldırı').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Normal').length).toBeGreaterThan(0);
@@ -120,7 +120,7 @@ describe('DetectionResultsList', () => {
   it('5. Risk seviyelerinin dört metinsel karşılığı bulunur', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Kritik')).toBeInTheDocument();
       expect(screen.getByText('Düşük')).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('DetectionResultsList', () => {
   it('6. Saldırı olasılığı yüzde olarak doğru gösterilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('%95')).toBeInTheDocument();
       expect(screen.getByText('%12')).toBeInTheDocument();
@@ -144,10 +144,10 @@ describe('DetectionResultsList', () => {
   it('7. isAttack:true doğru gönderilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     const select = screen.getByLabelText(/Tahmin Filtresi/i);
     fireEvent.change(select, { target: { value: 'ATTACK' } });
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenCalledWith(
         123,
@@ -161,10 +161,10 @@ describe('DetectionResultsList', () => {
   it('8. isAttack:false kaybolmadan gönderilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     const select = screen.getByLabelText(/Tahmin Filtresi/i);
     fireEvent.change(select, { target: { value: 'NORMAL' } });
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenCalledWith(
         123,
@@ -178,10 +178,10 @@ describe('DetectionResultsList', () => {
   it('9. Risk filtresi doğru gönderilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     const select = screen.getByLabelText(/Risk Seviyesi/i);
     fireEvent.change(select, { target: { value: 'HIGH' } });
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenCalledWith(
         123,
@@ -195,10 +195,10 @@ describe('DetectionResultsList', () => {
   it('10. Birlikte kullanılan iki filtre doğru gönderilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     fireEvent.change(screen.getByLabelText(/Tahmin Filtresi/i), { target: { value: 'ATTACK' } });
     fireEvent.change(screen.getByLabelText(/Risk Seviyesi/i), { target: { value: 'CRITICAL' } });
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenLastCalledWith(
         123,
@@ -214,16 +214,16 @@ describe('DetectionResultsList', () => {
       .mockResolvedValueOnce({ ...validPage, total: 40, skip: 0 })
       .mockResolvedValueOnce({ ...validPage, total: 40, skip: 20 })
       .mockResolvedValueOnce({ ...validPage, total: 40, skip: 0 });
-      
+
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByText('Sonraki')).not.toBeDisabled());
     fireEvent.click(screen.getByText('Sonraki'));
-    
+
     await waitFor(() => expect(listDetectionResults).toHaveBeenCalledWith(123, { skip: 20, limit: 20 }, mockToken, expect.any(AbortSignal)));
-    
+
     fireEvent.change(screen.getByLabelText(/Risk Seviyesi/i), { target: { value: 'LOW' } });
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenLastCalledWith(123, { skip: 0, limit: 20, riskLevel: 'LOW' }, mockToken, expect.any(AbortSignal));
     });
@@ -232,13 +232,13 @@ describe('DetectionResultsList', () => {
   it('12. Filtre değişimi eski isteği abort eder', async () => {
     vi.mocked(listDetectionResults).mockReturnValue(new Promise(() => {}));
     render(<DetectionResultsList jobId={123} />);
-    
+
     const initialCallsCount = vi.mocked(listDetectionResults).mock.calls.length;
     const initialSignal = vi.mocked(listDetectionResults).mock.calls[initialCallsCount - 1][3];
     expect(initialSignal?.aborted).toBe(false);
-    
+
     fireEvent.change(screen.getByLabelText(/Risk Seviyesi/i), { target: { value: 'HIGH' } });
-    
+
     expect(initialSignal?.aborted).toBe(true);
     const newCallsCount = vi.mocked(listDetectionResults).mock.calls.length;
     const newSignal = vi.mocked(listDetectionResults).mock.calls[newCallsCount - 1][3];
@@ -249,12 +249,12 @@ describe('DetectionResultsList', () => {
     vi.mocked(listDetectionResults)
       .mockResolvedValueOnce({ ...validPage, total: 40, skip: 0, limit: 20, items: validItems })
       .mockResolvedValueOnce({ ...validPage, total: 40, skip: 20, limit: 20, items: validItems });
-      
+
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByText('Sonraki')).not.toBeDisabled());
     fireEvent.click(screen.getByText('Sonraki'));
-    
+
     await waitFor(() => {
       expect(listDetectionResults).toHaveBeenCalledWith(123, { skip: 20, limit: 20 }, mockToken, expect.any(AbortSignal));
     });
@@ -263,10 +263,10 @@ describe('DetectionResultsList', () => {
   it('14. total kullanılarak son sayfa doğru belirlenir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue({ ...validPage, total: 24, skip: 0, items: validItems });
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByText('Sonraki')).not.toBeDisabled());
     fireEvent.click(screen.getByText('Sonraki'));
-    
+
     // items is 4, skip is 20 -> 24 total -> next disabled
     vi.mocked(listDetectionResults).mockResolvedValue({ ...validPage, total: 24, skip: 20, items: validItems });
     await waitFor(() => expect(screen.getByText('Sonraki')).toBeDisabled());
@@ -275,12 +275,12 @@ describe('DetectionResultsList', () => {
   it('15. Son sayfada eksik kayıt olsa bile aralık doğru gösterilir', async () => {
     vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, total: 22, skip: 0, items: validItems });
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByText('Sonraki')).not.toBeDisabled());
-    
+
     vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, total: 22, skip: 20, items: [validItems[0], validItems[1]] });
     fireEvent.click(screen.getByText('Sonraki'));
-    
+
     await waitFor(() => {
       expect(screen.getByText('21–22')).toBeInTheDocument();
       expect(screen.getByText('/ 22 sonuç')).toBeInTheDocument();
@@ -290,7 +290,7 @@ describe('DetectionResultsList', () => {
   it('16. Toplam sıfırken yanlış aralık gösterilmez', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue({ items: [], total: 0, skip: 0, limit: 20 });
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('0–0')).toBeInTheDocument();
       expect(screen.getByText('/ 0 sonuç')).toBeInTheDocument();
@@ -300,13 +300,13 @@ describe('DetectionResultsList', () => {
   it('17. Filtreli ve filtresiz empty state ayrılır', async () => {
     vi.mocked(listDetectionResults).mockResolvedValue({ items: [], total: 0, skip: 0, limit: 20 });
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.getByText('Bu analiz için tespit sonucu bulunmuyor.')).toBeInTheDocument();
     });
-    
+
     fireEvent.change(screen.getByLabelText(/Risk Seviyesi/i), { target: { value: 'HIGH' } });
-    
+
     await waitFor(() => {
       expect(screen.getByText('Seçilen filtrelerle eşleşen tespit sonucu bulunamadı.')).toBeInTheDocument();
     });
@@ -327,10 +327,10 @@ describe('DetectionResultsList', () => {
   it('20. Unmount isteği abort eder', () => {
     vi.mocked(listDetectionResults).mockReturnValue(new Promise(() => {}));
     const { unmount } = render(<DetectionResultsList jobId={123} />);
-    
+
     const signal = vi.mocked(listDetectionResults).mock.calls[0][3];
     expect(signal?.aborted).toBe(false);
-    
+
     unmount();
     expect(signal?.aborted).toBe(true);
   });
@@ -338,17 +338,17 @@ describe('DetectionResultsList', () => {
   it('21. jobId değişimi isteği abort eder ve sayfayı sıfırlar', async () => {
     vi.mocked(listDetectionResults).mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(listDetectionResults).toHaveBeenCalled());
-    
+
     const initialCallsCount = vi.mocked(listDetectionResults).mock.calls.length;
     const signal1 = vi.mocked(listDetectionResults).mock.calls[initialCallsCount - 1][3];
     expect(signal1?.aborted).toBe(false);
-    
+
     rerender(<DetectionResultsList jobId={124} />);
-    
+
     expect(signal1?.aborted).toBe(true);
-    
+
     await waitFor(() => expect(listDetectionResults).toHaveBeenCalledTimes(initialCallsCount + 1));
     const newCallsCount = vi.mocked(listDetectionResults).mock.calls.length;
     const signal2 = vi.mocked(listDetectionResults).mock.calls[newCallsCount - 1][3];
@@ -359,22 +359,22 @@ describe('DetectionResultsList', () => {
     let resolveFirst: (v: DetectionResultPage) => void = () => {};
     vi.mocked(listDetectionResults).mockImplementation((jobId) => {
       if (jobId === 123) return new Promise((resolve) => { resolveFirst = resolve; });
-      return Promise.resolve({ 
-        ...validPage, 
-        total: 100, 
+      return Promise.resolve({
+        ...validPage,
+        total: 100,
         skip: 0,
         items: validPage.items.map(i => ({ ...i, job_id: 124 }))
       });
     });
-    
+
     const { rerender } = render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(listDetectionResults).toHaveBeenCalled());
-    
+
     rerender(<DetectionResultsList jobId={124} />);
-    
+
     resolveFirst({ ...validPage, total: 50, skip: 0 });
-    
+
     await waitFor(() => {
       expect(screen.getByText('/ 100 sonuç')).toBeInTheDocument();
       expect(screen.queryByText('/ 50 sonuç')).not.toBeInTheDocument();
@@ -384,7 +384,7 @@ describe('DetectionResultsList', () => {
   it('23. AbortError alert göstermez', async () => {
     vi.mocked(listDetectionResults).mockRejectedValueOnce(new DOMException('Aborted', 'AbortError'));
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
@@ -393,28 +393,28 @@ describe('DetectionResultsList', () => {
   it('24. Hızlı çift retry tek istek oluşturur', async () => {
     vi.mocked(listDetectionResults).mockRejectedValue(new ApiError(0, { code: 'NETWORK_ERROR', message: 'Err', details: null }));
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    
+
     const initialCalls = vi.mocked(listDetectionResults).mock.calls.length;
     vi.mocked(listDetectionResults).mockReturnValue(new Promise(() => {}));
-    
+
     const retryBtn = screen.getByText('Tekrar Dene');
     fireEvent.click(retryBtn);
     fireEvent.click(retryBtn);
-    
+
     expect(listDetectionResults).toHaveBeenCalledTimes(initialCalls + 1);
   });
 
   it('25. Retry hata sonrasında başarıyla çalışır', async () => {
     vi.mocked(listDetectionResults).mockRejectedValue(new ApiError(0, { code: 'NETWORK_ERROR', message: 'Err', details: null }));
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    
+
     vi.mocked(listDetectionResults).mockResolvedValue(validPage);
     fireEvent.click(screen.getByText('Tekrar Dene'));
-    
+
     await waitFor(() => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.getByText('Satır 1')).toBeInTheDocument();
@@ -448,7 +448,7 @@ describe('DetectionResultsList', () => {
   it('28. Raw message, details, code, path ve stack trace sızmaz', async () => {
     vi.mocked(listDetectionResults).mockRejectedValueOnce(new ApiError(500, { code: 'DB_ERROR', message: 'Secret details', details: 'StackTrace...' }));
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.queryByText(/Secret/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Stack/)).not.toBeInTheDocument();
@@ -478,7 +478,7 @@ describe('DetectionResultsList', () => {
     vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, items: [{ ...validItems[0], id: -5 }] });
     const { rerender } = render(<DetectionResultsList jobId={123} />);
     await waitFor(() => expect(screen.getByText('Tespit sonuçları doğrulanamadı.')).toBeInTheDocument());
-    
+
     vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, items: [{ ...validItems[0], row_index: 1.5 }] });
     rerender(<DetectionResultsList jobId={124} />);
     await waitFor(() => expect(screen.getByText('Tespit sonuçları doğrulanamadı.')).toBeInTheDocument());
@@ -523,7 +523,7 @@ describe('DetectionResultsList', () => {
   it('39. DOM’da token veya hassas mock değerleri bulunmaz', async () => {
     vi.mocked(listDetectionResults).mockResolvedValueOnce(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       expect(screen.queryByText(mockToken)).not.toBeInTheDocument();
     });
@@ -532,7 +532,7 @@ describe('DetectionResultsList', () => {
   it('40. Çoklu sonuçlarda gereksiz çok sayıda live region oluşmaz', async () => {
     vi.mocked(listDetectionResults).mockResolvedValueOnce(validPage);
     render(<DetectionResultsList jobId={123} />);
-    
+
     await waitFor(() => {
       const liveRegions = screen.getAllByRole('status', { hidden: true });
       // Initially, loading might add one, then it's gone.

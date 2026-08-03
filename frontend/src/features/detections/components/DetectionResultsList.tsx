@@ -12,12 +12,12 @@ const PAGE_SIZE = 20;
 
 export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobId }) => {
   const { isAuthenticated, accessToken } = useAuth();
-  
+
   const [results, setResults] = useState<DetectionResult[] | null>(null);
   const [total, setTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  
+
   const [skip, setSkip] = useState<number>(0);
   const [isAttackFilter, setIsAttackFilter] = useState<boolean | undefined>(undefined);
   const [riskFilter, setRiskFilter] = useState<DetectionRiskLevel | undefined>(undefined);
@@ -46,7 +46,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
       if (currentRisk !== undefined) params.riskLevel = currentRisk;
 
       const response = await listDetectionResults(currentJobId, params, accessToken, currentController.signal);
-      
+
       if (abortControllerRef.current !== currentController) return;
 
       // Validate response
@@ -54,7 +54,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
         setApiError('Tespit sonuçları doğrulanamadı.');
         return;
       }
-      
+
       if (!Number.isFinite(response.total) || !Number.isInteger(response.total) || response.total < 0) {
         setApiError('Tespit sonuçları doğrulanamadı.');
         return;
@@ -67,7 +67,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
         setApiError('Tespit sonuçları doğrulanamadı.');
         return;
       }
-      
+
       if (response.items.length > response.limit || response.items.length > response.total || response.skip + response.items.length > response.total) {
         setApiError('Tespit sonuçları doğrulanamadı.');
         return;
@@ -82,7 +82,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
         }
-        
+
         if (!Number.isFinite(item.id) || !Number.isInteger(item.id) || item.id <= 0 || seenIds.has(item.id)) {
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
@@ -93,7 +93,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
         }
-        
+
         if (!Number.isFinite(item.row_index) || !Number.isInteger(item.row_index) || item.row_index < 0 || seenRowIndices.has(item.row_index)) {
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
@@ -109,17 +109,17 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
         }
-        
+
         if (typeof item.is_attack !== 'boolean') {
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
         }
-        
+
         if (!['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(item.risk_level)) {
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
         }
-        
+
         if (typeof item.created_at !== 'string') {
           setApiError('Tespit sonuçları doğrulanamadı.');
           return;
@@ -185,7 +185,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
     setResults(null);
     setTotal(0);
     setApiError(null);
-    
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -245,7 +245,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
       default: return 'Bilinmiyor';
     }
   };
-  
+
   const getRiskColor = (risk: DetectionRiskLevel) => {
     switch (risk) {
       case 'LOW': return 'text-blue-400';
@@ -278,7 +278,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
     <div className="w-full mt-6 bg-rich-navy border border-space-blue rounded-xl overflow-hidden flex flex-col">
       <div className="p-4 bg-deep-dark border-b border-space-blue flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h3 className="text-lg font-bold text-white">Tespit Sonuçları</h3>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="flex flex-col">
             <label htmlFor={`attack-filter-${jobId}`} className="text-xs text-muted-blue mb-1 font-semibold uppercase">Tahmin Filtresi</label>
@@ -344,8 +344,8 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
         {!apiError && results && results.length === 0 && (
           <div className="flex flex-1 items-center justify-center p-8 text-center" aria-live="polite">
             <p className="text-muted-blue">
-              {isAttackFilter !== undefined || riskFilter !== undefined 
-                ? 'Seçilen filtrelerle eşleşen tespit sonucu bulunamadı.' 
+              {isAttackFilter !== undefined || riskFilter !== undefined
+                ? 'Seçilen filtrelerle eşleşen tespit sonucu bulunamadı.'
                 : 'Bu analiz için tespit sonucu bulunmuyor.'}
             </p>
           </div>
@@ -360,7 +360,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
                     <span className="text-xs font-bold text-muted-blue uppercase">CSV Satırı</span>
                     <span className="text-lg font-bold text-white">Satır {result.row_index + 1}</span>
                   </div>
-                  
+
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-bold text-muted-blue uppercase">Tahmin</span>
                     <span className={`text-base font-bold ${result.is_attack ? 'text-red-400' : 'text-green-400'}`}>
@@ -393,7 +393,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
             </ul>
           </div>
         )}
-        
+
         <div className="mt-auto pt-4 border-t border-space-blue flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm font-medium text-muted-blue">
             <span className="text-white">{start}–{end}</span> / {total} sonuç
