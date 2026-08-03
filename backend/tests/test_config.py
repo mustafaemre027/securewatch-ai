@@ -118,3 +118,35 @@ def test_upload_dir_is_path_and_resolves_correctly() -> None:
     from pathlib import Path
     settings = _make_settings()
     assert isinstance(settings.upload_dir, Path)
+
+def test_model_package_path_default_resolves_to_backend_dir() -> None:
+    from pathlib import Path
+    settings = _make_settings()
+    backend_dir = Path(__file__).resolve().parent.parent
+    expected_path = backend_dir / "app" / "ml_models"
+    assert settings.model_package_path == expected_path
+    assert "backend" in settings.model_package_path.parts
+
+
+def test_model_package_path_relative_override_resolves_to_backend_dir() -> None:
+    from pathlib import Path
+    settings = _make_settings(MODEL_PACKAGE_PATH="custom/models")
+    backend_dir = Path(__file__).resolve().parent.parent
+    expected_path = backend_dir / "custom" / "models"
+    assert settings.model_package_path == expected_path
+
+
+def test_model_package_path_absolute_override_is_preserved() -> None:
+    from pathlib import Path
+    import os
+    absolute_path = "C:\\Temp\\models" if os.name == 'nt' else "/tmp/models"
+    settings = _make_settings(MODEL_PACKAGE_PATH=absolute_path)
+    assert settings.model_package_path == Path(absolute_path)
+
+
+def test_model_package_path_rejects_relative_escape_from_backend_dir() -> None:
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError) as exc_info:
+        _make_settings(MODEL_PACKAGE_PATH="../escape/path")
+    errors = exc_info.value.errors()
+    assert any("escape" in str(e).lower() for e in errors)
