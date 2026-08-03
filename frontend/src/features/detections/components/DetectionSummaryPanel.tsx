@@ -35,7 +35,7 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
 
     try {
       const response = await getAnalysisSummary(currentJobId, accessToken, currentController.signal);
-      
+
       if (abortControllerRef.current !== currentController) return;
 
       if (!response) {
@@ -43,8 +43,8 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
       }
 
       if (
-        !Number.isInteger(response.job_id) || 
-        response.job_id <= 0 || 
+        !Number.isInteger(response.job_id) ||
+        response.job_id <= 0 ||
         response.job_id !== currentJobId
       ) {
         setApiError('Analiz özeti doğrulanamadı.');
@@ -78,7 +78,7 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
         return;
       }
 
-      const riskSum = 
+      const riskSum =
         response.risk_level_counts.LOW +
         response.risk_level_counts.MEDIUM +
         response.risk_level_counts.HIGH +
@@ -97,7 +97,7 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
       setSummary(response);
     } catch (err: unknown) {
       if (abortControllerRef.current !== currentController) return;
-      
+
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
@@ -119,7 +119,7 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
           errorMessage = 'Analiz özeti geçici olarak kullanılamıyor.';
         }
       }
-      
+
       setApiError(errorMessage);
     } finally {
       if (abortControllerRef.current === currentController) {
