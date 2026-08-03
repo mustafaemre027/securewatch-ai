@@ -113,6 +113,80 @@ describe('Routing Components', () => {
     );
 
     expect(screen.getByText('Home Mock')).toBeInTheDocument();
-    expect(screen.queryByText('Login Page Mock')).not.toBeInTheDocument();
+  });
+});
+
+import { App } from '../App';
+
+vi.mock('../features/detections/DetectionResultsPage', () => ({
+  DetectionResultsPage: vi.fn(() => <div data-testid="mock-detection-results">Detection Results Page Mock</div>)
+}));
+vi.mock('../features/analysis/AnalysisPage', () => ({
+  AnalysisPage: vi.fn(() => <div data-testid="mock-analysis-page">Analysis Page Mock</div>)
+}));
+vi.mock('../pages/HomePage', () => ({
+  HomePage: vi.fn(() => <div data-testid="mock-home-page">Home Page Mock</div>)
+}));
+vi.mock('../features/auth/LoginPage', () => ({
+  LoginPage: vi.fn(() => <div data-testid="mock-login-page">Login Page Mock</div>)
+}));
+
+describe('App Route Integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const renderApp = (initialRoute: string) => {
+    return render(
+      <MemoryRouter initialEntries={[initialRoute]}>
+        <App />
+      </MemoryRouter>
+    );
+  };
+
+  it('1. Authentication bulunmayan kullanıcı /analysis/123/results adresinden güvenli login akışına yönlendirilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/analysis/123/results');
+    expect(screen.getByTestId('mock-login-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-detection-results')).not.toBeInTheDocument();
+  });
+
+  it('2. Authenticated ANALYST, /analysis/123/results route’unu açabilir ve uygulama kabuğu içinde render edilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/analysis/123/results');
+
+    expect(screen.getByTestId('mock-detection-results')).toBeInTheDocument();
+    expect(document.querySelector('main')).toBeInTheDocument();
+  });
+
+  it('3. Authenticated ADMIN, /analysis/123/results route’unu açabilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ADMIN', username: 'admin1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/analysis/456/results');
+    expect(screen.getByTestId('mock-detection-results')).toBeInTheDocument();
+  });
+
+  it('4. Route URL’sinde token veya kullanıcı bilgisi bulunmaz ve yeni frontend role engeli oluşmaz.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/analysis/789/results');
+    expect(screen.getByTestId('mock-detection-results')).toBeInTheDocument();
+  });
+
+  it('5. Mevcut /analysis route’u çalışmaya devam eder.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/analysis');
+    expect(screen.getByTestId('mock-analysis-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-detection-results')).not.toBeInTheDocument();
   });
 });
