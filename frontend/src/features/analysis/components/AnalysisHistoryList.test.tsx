@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalysisHistoryList } from './AnalysisHistoryList';
 import { useAuth } from '../../auth/useAuth';
@@ -52,7 +53,7 @@ describe('AnalysisHistoryList', () => {
   });
 
   it('1, 5, 34, 35. Authenticated ANALYST triggers initial API call with correct pagination params and no status', async () => {
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
     await waitFor(() => {
       expect(vi.mocked(listAnalysisJobs)).toHaveBeenCalledWith(
         { skip: 0, limit: 20 },
@@ -72,7 +73,7 @@ describe('AnalysisHistoryList', () => {
       logoutUser: vi.fn(),
       error: null,
     });
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
     await waitFor(() => {
       expect(vi.mocked(listAnalysisJobs)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(listAnalysisJobs)).toHaveBeenCalledWith(
@@ -88,7 +89,7 @@ describe('AnalysisHistoryList', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null, accessToken: null, isAuthenticated: false, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null
     });
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
     await new Promise(r => setTimeout(r, 20));
     expect(vi.mocked(listAnalysisJobs)).not.toHaveBeenCalled();
     expect(screen.queryByText('Analiz geçmişi yükleniyor...')).not.toBeInTheDocument();
@@ -99,7 +100,7 @@ describe('AnalysisHistoryList', () => {
       user: { id: 1, role: 'ANALYST', username: 'analyst', email: 'a@a.com', created_at: '' },
       accessToken: null, isAuthenticated: true, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null
     });
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
     await new Promise(r => setTimeout(r, 20));
     expect(vi.mocked(listAnalysisJobs)).not.toHaveBeenCalled();
     expect(screen.queryByText('Analiz geçmişi yükleniyor...')).not.toBeInTheDocument();
@@ -117,7 +118,7 @@ describe('AnalysisHistoryList', () => {
       unknownJob,
     ];
     vi.mocked(listAnalysisJobs).mockResolvedValue(jobs);
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       const list = screen.getByRole('list');
@@ -138,7 +139,7 @@ describe('AnalysisHistoryList', () => {
     Object.assign(jobWithSecrets, { file_hash: 'secret-hash', user_id: 42 });
 
     vi.mocked(listAnalysisJobs).mockResolvedValue([jobWithSecrets]);
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('#99')).toBeInTheDocument();
@@ -156,7 +157,7 @@ describe('AnalysisHistoryList', () => {
       { ...mockJob, id: 2, created_at: 'invalid-date', completed_at: 'invalid' },
     ];
     vi.mocked(listAnalysisJobs).mockResolvedValue(jobs);
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       const html = document.body.innerHTML;
@@ -173,7 +174,7 @@ describe('AnalysisHistoryList', () => {
       { ...mockJob, id: 4, file_size: Infinity },
     ];
     vi.mocked(listAnalysisJobs).mockResolvedValue(jobs);
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText(/1 MB/)).toBeInTheDocument();
@@ -188,7 +189,7 @@ describe('AnalysisHistoryList', () => {
   it('21, 53, 55. Loading aria-busy, Empty State, and role="status"', async () => {
     const deferred = createDeferred<AnalysisJobListItem[]>();
     vi.mocked(listAnalysisJobs).mockReturnValueOnce(deferred.promise);
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText('Analiz geçmişi yükleniyor...')).toBeInTheDocument();
@@ -211,7 +212,7 @@ describe('AnalysisHistoryList', () => {
     let signal1: AbortSignal;
     vi.mocked(listAnalysisJobs).mockImplementationOnce((_p, _t, s) => { signal1 = s!; return deferred1.promise; });
 
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => expect(vi.mocked(listAnalysisJobs)).toHaveBeenCalledTimes(1));
 
@@ -243,7 +244,7 @@ describe('AnalysisHistoryList', () => {
     const twentyJobs = Array.from({ length: 20 }, (_, i) => ({ ...mockJob, id: i + 1 }));
     vi.mocked(listAnalysisJobs).mockResolvedValue(twentyJobs);
 
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Sayfa 1')).toBeInTheDocument();
@@ -285,7 +286,7 @@ describe('AnalysisHistoryList', () => {
     const deferred = createDeferred<AnalysisJobListItem[]>();
     vi.mocked(listAnalysisJobs).mockReturnValueOnce(deferred.promise);
 
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     const refreshBtn = screen.getByRole('button', { name: 'Listeyi Yenile' });
     expect(refreshBtn).toBeDisabled();
@@ -321,7 +322,7 @@ describe('AnalysisHistoryList', () => {
       { status: 503, expected: 'Analiz geçmişi servisi geçici olarak kullanılamıyor.' },
     ];
 
-    const { unmount } = render(<AnalysisHistoryList />);
+    const { unmount } = render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Listeyi Yenile' })).not.toBeDisabled());
 
@@ -351,7 +352,7 @@ describe('AnalysisHistoryList', () => {
 
   it('46. AbortError is swallowed safely without showing an alert', async () => {
     vi.mocked(listAnalysisJobs).mockRejectedValueOnce(Object.assign(new Error('Abort'), { name: 'AbortError' }));
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await act(async () => {});
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -364,7 +365,7 @@ describe('AnalysisHistoryList', () => {
       return new Promise(() => {});
     });
 
-    const { unmount } = render(<AnalysisHistoryList />);
+    const { unmount } = render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => expect(activeSignal).not.toBeNull());
     unmount();
@@ -379,7 +380,7 @@ describe('AnalysisHistoryList', () => {
       .mockReturnValueOnce(deferred1.promise)
       .mockReturnValueOnce(deferred2.promise);
 
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText('Durum Filtresi'), { target: { value: 'COMPLETED' } });
 
@@ -401,7 +402,7 @@ describe('AnalysisHistoryList', () => {
     const twentyJobs = Array.from({ length: 20 }, (_, i) => ({ ...mockJob, id: i + 1 }));
     vi.mocked(listAnalysisJobs).mockResolvedValue(twentyJobs);
 
-    render(<AnalysisHistoryList />);
+    render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
 
     await waitFor(() => {
       const list = screen.getByRole('list');
@@ -410,5 +411,109 @@ describe('AnalysisHistoryList', () => {
 
     const liveRegions = screen.queryAllByRole('status');
     expect(liveRegions.length).toBeLessThanOrEqual(1);
+  });
+
+  describe('Results Navigation Link', () => {
+    it('1, 2, 3, 4. COMPLETED ve geçerli ID’ye sahip işler için doğru link görünür ve erişilebilir adıyla ayırt edilir', async () => {
+      const job1 = { ...mockJob, id: 101, status: 'COMPLETED' as const };
+      const job2 = { ...mockJob, id: 102, status: 'COMPLETED' as const };
+      vi.mocked(listAnalysisJobs).mockResolvedValue([job1, job2]);
+
+      render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'Analiz #101 sonuçlarını görüntüle' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Analiz #102 sonuçlarını görüntüle' })).toBeInTheDocument();
+      });
+
+      const link1 = screen.getByRole('link', { name: 'Analiz #101 sonuçlarını görüntüle' });
+      expect(link1).toHaveAttribute('href', '/analysis/101/results');
+      expect(link1).toHaveTextContent('Sonuçları görüntüle');
+
+      const link2 = screen.getByRole('link', { name: 'Analiz #102 sonuçlarını görüntüle' });
+      expect(link2).toHaveAttribute('href', '/analysis/102/results');
+    });
+
+    it('5, 6, 7. PENDING, PROCESSING, FAILED işler için link görünmez', async () => {
+      const jobP = { ...mockJob, id: 101, status: 'PENDING' as const };
+      const jobPr = { ...mockJob, id: 102, status: 'PROCESSING' as const };
+      const jobF = { ...mockJob, id: 103, status: 'FAILED' as const };
+      vi.mocked(listAnalysisJobs).mockResolvedValue([jobP, jobPr, jobF]);
+
+      render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Bekliyor/)).toBeInTheDocument();
+        expect(screen.getByText(/İşleniyor/)).toBeInTheDocument();
+        expect(screen.getByText(/Başarısız/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
+
+    it('8. Geçersiz veya safe-integer olmayan ID için link görünmez', async () => {
+      const job1 = { ...mockJob, id: -5, status: 'COMPLETED' as const };
+      const job2 = { ...mockJob, id: 0, status: 'COMPLETED' as const };
+      const job3 = { ...mockJob, id: 1.5, status: 'COMPLETED' as const };
+      const job4 = { ...mockJob, id: NaN, status: 'COMPLETED' as const };
+      const job5 = { ...mockJob, id: Number.MAX_SAFE_INTEGER + 1, status: 'COMPLETED' as const };
+
+      vi.mocked(listAnalysisJobs).mockResolvedValue([job1, job2, job3, job4, job5]);
+
+      render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('status', { name: /yükleniyor/i })).not.toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
+
+    it('9, 10, 11. Loading, Error veya Empty durumlarda link görünmez', async () => {
+      vi.mocked(listAnalysisJobs).mockResolvedValue([]);
+
+      const { unmount } = render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      // Loading
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+
+      // Empty
+      await waitFor(() => {
+        expect(screen.getByText('Henüz analiz kaydı bulunmuyor.')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+
+      unmount();
+
+      // Error
+      vi.mocked(listAnalysisJobs).mockRejectedValue(new Error('Network error'));
+      render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('14. ANALYST/ADMIN ayrımı yapmadan linki render eder', async () => {
+      vi.mocked(useAuth).mockReturnValue({
+        user: { id: 2, role: 'ADMIN', username: 'admin', email: 'admin@a.com', created_at: '' },
+        accessToken: 'mock-token',
+        isAuthenticated: true,
+        isLoading: false,
+        loginUser: vi.fn(),
+        logoutUser: vi.fn(),
+        error: null,
+      });
+
+      const job1 = { ...mockJob, id: 999, status: 'COMPLETED' as const };
+      vi.mocked(listAnalysisJobs).mockResolvedValue([job1]);
+
+      render(<MemoryRouter><AnalysisHistoryList /></MemoryRouter>);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'Analiz #999 sonuçlarını görüntüle' })).toBeInTheDocument();
+      });
+    });
   });
 });
