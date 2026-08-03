@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalysisExecutionPanel } from './AnalysisExecutionPanel';
 import { useAuth } from '../../auth/useAuth';
@@ -53,7 +54,7 @@ describe('AnalysisExecutionPanel', () => {
   });
 
   it('1-3. PENDING render, safe data display, and correct role="status" area', () => {
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     // File info safely rendered
     expect(screen.getByText('test_traffic.csv')).toBeInTheDocument();
@@ -72,13 +73,13 @@ describe('AnalysisExecutionPanel', () => {
   });
 
   it('4. API not called before button press', () => {
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     expect(vi.mocked(processAnalysisJob)).not.toHaveBeenCalled();
   });
 
   it('5. Valid ANALYST can start process', async () => {
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
     await waitFor(() => expect(vi.mocked(processAnalysisJob)).toHaveBeenCalled());
@@ -95,7 +96,7 @@ describe('AnalysisExecutionPanel', () => {
       error: null,
     });
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
     await waitFor(() => expect(vi.mocked(processAnalysisJob)).toHaveBeenCalled());
@@ -103,7 +104,7 @@ describe('AnalysisExecutionPanel', () => {
 
   it('7-8. Unauthenticated or missing token prevents API call', async () => {
     vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
     expect(vi.mocked(processAnalysisJob)).not.toHaveBeenCalled();
@@ -117,7 +118,7 @@ describe('AnalysisExecutionPanel', () => {
     const deferred = createDeferred<AnalysisProcessingResponse>();
     vi.mocked(processAnalysisJob).mockReturnValue(deferred.promise);
 
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     const startButton = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
     fireEvent.click(startButton);
 
@@ -139,7 +140,7 @@ describe('AnalysisExecutionPanel', () => {
     const deferred = createDeferred<AnalysisProcessingResponse>();
     vi.mocked(processAnalysisJob).mockReturnValue(deferred.promise);
 
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     const startButton = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
 
     fireEvent.click(startButton);
@@ -155,7 +156,7 @@ describe('AnalysisExecutionPanel', () => {
     const responseObj: AnalysisProcessingResponse = { job_id: 123, final_status: 'COMPLETED', records_processed: 42 };
     vi.mocked(processAnalysisJob).mockResolvedValueOnce(responseObj);
 
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     await waitFor(() => {
@@ -170,7 +171,7 @@ describe('AnalysisExecutionPanel', () => {
   it('15-16. Unexpected PENDING/PROCESSING final status shows FAILED', async () => {
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 123, final_status: 'PENDING', records_processed: 0 });
 
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     await waitFor(() => {
@@ -193,7 +194,7 @@ describe('AnalysisExecutionPanel', () => {
       { status: 0, expected: 'Sunucuya ulaşılamıyor.' }
     ];
 
-    const { unmount } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { unmount } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     for (const { status, expected } of errorCases) {
       vi.mocked(processAnalysisJob).mockRejectedValueOnce(new ApiError(status, { code: 'ERR', message: 'Raw DB Error StackTrace: XYZ', details: null }));
@@ -213,7 +214,7 @@ describe('AnalysisExecutionPanel', () => {
   it('19. Non-ApiError (ordinary error) rejected safely without sensitive leak', async () => {
     vi.mocked(processAnalysisJob).mockRejectedValueOnce(new Error('Internal raw trace: /usr/bin/python line 5'));
 
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     await waitFor(() => {
@@ -229,7 +230,7 @@ describe('AnalysisExecutionPanel', () => {
     const successResponse: AnalysisProcessingResponse = { job_id: 123, final_status: 'COMPLETED', records_processed: 5 };
     vi.mocked(processAnalysisJob).mockResolvedValueOnce(successResponse);
 
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
     await waitFor(() => {
@@ -251,7 +252,7 @@ describe('AnalysisExecutionPanel', () => {
       return new Promise<AnalysisProcessingResponse>(() => {});
     });
 
-    const { unmount } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { unmount } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     expect(activeSignal).not.toBeNull();
@@ -267,13 +268,13 @@ describe('AnalysisExecutionPanel', () => {
       return new Promise<AnalysisProcessingResponse>(() => {});
     });
 
-    const { rerender } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     expect(activeSignal).not.toBeNull();
 
     const newJob: AnalysisUploadResponse = { ...mockJob, job_id: 999 };
-    rerender(<AnalysisExecutionPanel job={newJob} />);
+    rerender(<MemoryRouter><AnalysisExecutionPanel job={newJob} /></MemoryRouter>);
 
     expect((activeSignal as AbortSignal | null)?.aborted).toBe(true);
     const statusArea = screen.getByRole('status');
@@ -284,11 +285,11 @@ describe('AnalysisExecutionPanel', () => {
     const deferred = createDeferred<AnalysisProcessingResponse>();
     vi.mocked(processAnalysisJob).mockReturnValueOnce(deferred.promise);
 
-    const { rerender } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     const newJob: AnalysisUploadResponse = { ...mockJob, job_id: 999, status: 'PENDING' };
-    rerender(<AnalysisExecutionPanel job={newJob} />);
+    rerender(<MemoryRouter><AnalysisExecutionPanel job={newJob} /></MemoryRouter>);
 
     deferred.resolve({ job_id: 123, final_status: 'FAILED', records_processed: 0 });
 
@@ -301,12 +302,87 @@ describe('AnalysisExecutionPanel', () => {
 
   it('24. Aborted request does not show error to user', async () => {
     vi.mocked(processAnalysisJob).mockRejectedValueOnce(Object.assign(new Error('Abort'), { name: 'AbortError' }));
-    render(<AnalysisExecutionPanel job={mockJob} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     await act(async () => {});
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  describe('Results Navigation Link', () => {
+    it('1, 2, 3. Başlangıç, PENDING, PROCESSING durumlarında link yoktur', () => {
+      const { rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+
+      rerender(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'PROCESSING' }} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
+
+    it('4, 5, 6. Başarılı process response’u COMPLETED olduğunda geçerli link görünür', async () => {
+      const deferred = createDeferred<AnalysisProcessingResponse>();
+      vi.mocked(processAnalysisJob).mockReturnValue(deferred.promise);
+
+      render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
+
+      await act(async () => {
+        deferred.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+      });
+
+      const link = screen.getByRole('link', { name: 'Analiz #123 sonuçlarını görüntüle' });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute('href', '/analysis/123/results');
+    });
+
+    it('7. Geçersiz job ID için completed state olsa bile link yoktur', () => {
+      render(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED', job_id: -5 }} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+
+      const { rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED', job_id: 0 }} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+
+      rerender(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED', job_id: 1.5 }} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
+
+    it('8. FAILED durumda link yoktur', () => {
+      render(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'FAILED' }} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
+
+    it('9, 10, 11, 12. API Error, Aborted, Stale response durumlarında link render edilmez, job change linki temizler', async () => {
+      // 9. API Error
+      const deferred = createDeferred<AnalysisProcessingResponse>();
+      vi.mocked(processAnalysisJob).mockReturnValue(deferred.promise);
+
+      const { unmount, rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
+
+      await act(async () => {
+        deferred.reject(new Error('Test Error'));
+      });
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+
+      // 10. Aborted
+      const deferred2 = createDeferred<AnalysisProcessingResponse>();
+      vi.mocked(processAnalysisJob).mockReturnValue(deferred2.promise);
+
+      rerender(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
+      unmount();
+      await act(async () => {
+        deferred2.resolve({ job_id: 123, final_status: 'COMPLETED', records_processed: 10 });
+      });
+
+      // 12. Job change cleans up link
+      const { rerender: rerenderNew } = render(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED' }} /></MemoryRouter>);
+      expect(screen.getByRole('link', { name: 'Analiz #123 sonuçlarını görüntüle' })).toBeInTheDocument();
+
+      const newJob = { ...mockJob, job_id: 456, status: 'PENDING' as const };
+      rerenderNew(<MemoryRouter><AnalysisExecutionPanel job={newJob} /></MemoryRouter>);
+      expect(screen.queryByRole('link', { name: /Sonuçları görüntüle/i })).not.toBeInTheDocument();
+    });
   });
 
   it('25. No React state update warning on unmount (no leak)', async () => {
@@ -315,7 +391,7 @@ describe('AnalysisExecutionPanel', () => {
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { unmount } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { unmount } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
     unmount();
@@ -328,7 +404,7 @@ describe('AnalysisExecutionPanel', () => {
 
   it('26. Backend terminal FAILED disables process button, shows message, no onSuccess', async () => {
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 123, final_status: 'FAILED', records_processed: 0 });
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
 
     const button = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
     fireEvent.click(button);
@@ -341,7 +417,7 @@ describe('AnalysisExecutionPanel', () => {
   });
 
   it('27. Second process is prevented if status is COMPLETED', async () => {
-    render(<AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED' }} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, status: 'COMPLETED' }} /></MemoryRouter>);
     const button = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
     expect(button).toBeDisabled();
 
@@ -351,7 +427,7 @@ describe('AnalysisExecutionPanel', () => {
 
   it('28. onReset callback works even if job failed', async () => {
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 123, final_status: 'FAILED', records_processed: 0 });
-    render(<AnalysisExecutionPanel job={mockJob} onReset={mockOnReset} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onReset={mockOnReset} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
@@ -368,14 +444,14 @@ describe('AnalysisExecutionPanel', () => {
   it('29. records_processed validates invalid/negative numbers', async () => {
     const invalidCases = [-5, NaN, Infinity, -Infinity, 10.5];
 
-    const { unmount, rerender } = render(<AnalysisExecutionPanel job={mockJob} />);
+    const { unmount, rerender } = render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} /></MemoryRouter>);
 
     for (let i = 0; i < invalidCases.length; i++) {
       const val = invalidCases[i];
       const currentJobId = mockJob.job_id + i;
 
       if (i > 0) {
-        rerender(<AnalysisExecutionPanel job={{ ...mockJob, job_id: currentJobId }} />);
+        rerender(<MemoryRouter><AnalysisExecutionPanel job={{ ...mockJob, job_id: currentJobId }} /></MemoryRouter>);
       }
 
       vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: currentJobId, final_status: 'COMPLETED', records_processed: val });
@@ -392,7 +468,7 @@ describe('AnalysisExecutionPanel', () => {
 
   it('30. Response job_id cross-check prevents state corruption', async () => {
     vi.mocked(processAnalysisJob).mockResolvedValueOnce({ job_id: 999, final_status: 'COMPLETED', records_processed: 50 });
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
 
     fireEvent.click(screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' }));
 
@@ -408,7 +484,7 @@ describe('AnalysisExecutionPanel', () => {
       new ApiError(404, { code: 'MODEL_NOT_FOUND', message: 'Trace: C:\\Projects\\securewatch-ai\\app\\ml_models\\model.joblib', details: { secret: 'token123' } })
     );
 
-    render(<AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} />);
+    render(<MemoryRouter><AnalysisExecutionPanel job={mockJob} onSuccess={mockOnSuccess} /></MemoryRouter>);
 
     const button = screen.getByRole('button', { name: 'Doğrulanmış Analizi Başlat' });
     fireEvent.click(button);
