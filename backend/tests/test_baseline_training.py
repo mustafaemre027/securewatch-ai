@@ -488,22 +488,22 @@ def test_model_snapshot_detects_changes(tmp_path):
     """Test 31: Snapshot helper'in değişiklikleri, eklemeleri ve silinmeleri algılaması."""
     dummy_model = tmp_path / "test_model.joblib"
     dummy_model.write_bytes(b"initial_state")
-    
+
     snapshot_initial = _get_model_snapshot(tmp_path)
-    
+
     # Verify no change matches
     assert snapshot_initial == _get_model_snapshot(tmp_path)
-    
+
     # Verify content change is detected
     dummy_model.write_bytes(b"changed_state")
     snapshot_changed = _get_model_snapshot(tmp_path)
     assert snapshot_initial != snapshot_changed
-    
+
     # Verify file deletion is detected
     dummy_model.unlink()
     snapshot_deleted = _get_model_snapshot(tmp_path)
     assert snapshot_changed != snapshot_deleted
-    
+
     # Verify new file creation is detected
     new_model = tmp_path / "new_model.pkl"
     new_model.write_bytes(b"new_state")
