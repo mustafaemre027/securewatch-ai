@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalysisHistoryList } from './AnalysisHistoryList';
 import { useAuth } from '../../auth/useAuth';
@@ -353,7 +353,7 @@ describe('AnalysisHistoryList', () => {
     vi.mocked(listAnalysisJobs).mockRejectedValueOnce(Object.assign(new Error('Abort'), { name: 'AbortError' }));
     render(<AnalysisHistoryList />);
 
-    await new Promise(r => setTimeout(r, 20));
+    await act(async () => {});
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
