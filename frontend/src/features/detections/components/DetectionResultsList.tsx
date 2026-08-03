@@ -281,7 +281,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="flex flex-col">
-            <label htmlFor={`attack-filter-${jobId}`} className="text-xs text-muted-blue mb-1 font-semibold uppercase">Tahmin Filtresi</label>
+            <label htmlFor={`attack-filter-${jobId}`} className="text-xs text-slate-300 mb-1 font-semibold uppercase">Tahmin Filtresi</label>
             <select
               id={`attack-filter-${jobId}`}
               className="bg-rich-navy border border-space-blue text-white text-sm rounded-lg p-2 focus:ring-2 focus:ring-ai-teal focus:border-transparent outline-none"
@@ -296,7 +296,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
           </div>
 
           <div className="flex flex-col">
-            <label htmlFor={`risk-filter-${jobId}`} className="text-xs text-muted-blue mb-1 font-semibold uppercase">Risk Seviyesi</label>
+            <label htmlFor={`risk-filter-${jobId}`} className="text-xs text-slate-300 mb-1 font-semibold uppercase">Risk Seviyesi</label>
             <select
               id={`risk-filter-${jobId}`}
               className="bg-rich-navy border border-space-blue text-white text-sm rounded-lg p-2 focus:ring-2 focus:ring-ai-teal focus:border-transparent outline-none"
@@ -357,33 +357,33 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
               {results.map((result) => (
                 <li key={result.id} className={`bg-deep-dark border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${getRiskBorder(result.risk_level)}`}>
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">CSV Satırı</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase">CSV Satırı</span>
                     <span className="text-lg font-bold text-white">Satır {result.row_index + 1}</span>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">Tahmin</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase">Tahmin</span>
                     <span className={`text-base font-bold ${result.is_attack ? 'text-red-400' : 'text-green-400'}`}>
                       {result.is_attack ? 'Saldırı' : 'Normal'}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">Saldırı Olasılığı</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase">Saldırı Olasılığı</span>
                     <span className="text-base font-bold text-white">
                       %{(result.attack_probability * 100).toFixed(2).replace(/\.00$/, '')}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">Risk Seviyesi</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase">Risk Seviyesi</span>
                     <span className={`text-base font-bold ${getRiskColor(result.risk_level)}`}>
                       {getRiskLabel(result.risk_level)}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">Oluşturulma Zamanı</span>
+                    <span className="text-xs font-bold text-slate-300 uppercase">Oluşturulma Zamanı</span>
                     <span className="text-sm font-medium text-gray-300">
                       {formatDate(result.created_at)}
                     </span>
@@ -395,7 +395,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
         )}
 
         <div className="mt-auto pt-4 border-t border-space-blue flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm font-medium text-muted-blue">
+          <p className="text-sm font-medium text-slate-300">
             <span className="text-white">{start}–{end}</span> / {total} sonuç
           </p>
           <div className="flex items-center gap-2">

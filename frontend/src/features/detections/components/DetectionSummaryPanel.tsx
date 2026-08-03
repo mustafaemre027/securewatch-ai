@@ -184,11 +184,11 @@ export function DetectionSummaryPanel({ jobId }: DetectionSummaryPanelProps) {
         {summary && !isLoading && !apiError && (
           <div aria-live="polite" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-              <p className="text-xs font-bold text-muted-blue uppercase mb-1">İşlem Numarası</p>
+              <p className="text-xs font-bold text-slate-300 uppercase mb-1">İşlem Numarası</p>
               <p className="text-lg font-bold text-white">#{summary.job_id}</p>
             </div>
             <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-              <p className="text-xs font-bold text-muted-blue uppercase mb-1">Toplam Kayıt</p>
+              <p className="text-xs font-bold text-slate-300 uppercase mb-1">Toplam Kayıt</p>
               <p className="text-lg font-bold text-white">{summary.total_records}</p>
             </div>
             <div className="p-4 bg-deep-dark border border-green-500/30 rounded-lg">

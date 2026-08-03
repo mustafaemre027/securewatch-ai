@@ -17,8 +17,8 @@ export const DetectionResultsPage: React.FC = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-slate-900 mb-2">Analiz Sonuçları</h1>
-      <p className="text-slate-600 mb-8">
+      <h1 className="text-2xl font-bold text-white mb-2">Analiz Sonuçları</h1>
+      <p className="text-slate-300 mb-8">
         Ağ trafiği üzerinden tespit edilen potansiyel güvenlik tehditleri ve anomalilerin detaylı sonuçları.
       </p>
 
