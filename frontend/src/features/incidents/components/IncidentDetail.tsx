@@ -93,7 +93,6 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
   }, [isAuthenticated, accessToken, user, incidentId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDetail();
     return () => {
       if (abortControllerRef.current) {

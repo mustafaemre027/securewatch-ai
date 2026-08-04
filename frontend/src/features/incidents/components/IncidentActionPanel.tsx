@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../auth/useAuth';
 import { updateIncident } from '../api';
-import type { IncidentDetail as IncidentDetailType, IncidentListItem } from '../types';
+import type { IncidentDetail as IncidentDetailType, IncidentListItem, IncidentUpdatePayload } from '../types';
 import { ApiError } from '../../../api/types';
 
 export interface IncidentActionPanelProps {
@@ -95,7 +95,7 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
     return 'Olay işlemi güvenli biçimde tamamlanamadı.';
   };
 
-  const executeAction = async (actionType: 'CLAIM' | 'START' | 'RESOLVE' | 'FALSE_POSITIVE', payload: any) => {
+  const executeAction = async (actionType: 'CLAIM' | 'START' | 'RESOLVE' | 'FALSE_POSITIVE', payload: IncidentUpdatePayload) => {
     if (submittingRef.current || !accessToken) return;
     
     if (abortControllerRef.current) {
