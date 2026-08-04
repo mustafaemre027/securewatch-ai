@@ -5,7 +5,7 @@ import { IncidentCommentForm } from './IncidentCommentForm';
 import { useAuth } from '../../auth/useAuth';
 import { addIncidentComment } from '../api';
 import { ApiError } from '../../../api/types';
-
+import type { IncidentComment } from '../types';
 vi.mock('../../auth/useAuth', () => ({
   useAuth: vi.fn(),
 }));
@@ -23,7 +23,7 @@ describe('IncidentCommentForm', () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       accessToken: 'test-token',
-      user: { id: 1, username: 'analyst1', role: 'ANALYST' },
+      user: { id: 1, username: 'analyst1', role: 'ANALYST', email: 'analyst@example.test', created_at: '2026-01-01T00:00:00Z' },
       isLoading: false,
       loginUser: vi.fn(),
       logoutUser: vi.fn(),
@@ -41,7 +41,7 @@ describe('IncidentCommentForm', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         accessToken: 'test-token',
-        user: { id: 2, username: 'admin', role: 'ADMIN' },
+        user: { id: 2, username: 'admin', role: 'ADMIN', email: 'admin@example.test', created_at: '2026-01-01T00:00:00Z' },
         isLoading: false,
         loginUser: vi.fn(),
         logoutUser: vi.fn(),
@@ -69,7 +69,7 @@ describe('IncidentCommentForm', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         accessToken: null,
-        user: { id: 1, username: 'a', role: 'ANALYST' },
+        user: { id: 1, username: 'a', role: 'ANALYST', email: 'analyst@example.test', created_at: '2026-01-01T00:00:00Z' },
         isLoading: false,
         loginUser: vi.fn(),
         logoutUser: vi.fn(),
@@ -97,7 +97,7 @@ describe('IncidentCommentForm', () => {
       vi.mocked(useAuth).mockReturnValue({
         isAuthenticated: true,
         accessToken: 'token',
-        user: { id: 1, username: 'u', role: 'VIEWER' as never },
+        user: { id: 1, username: 'u', role: 'VIEWER' as never, email: 'analyst@example.test', created_at: '2026-01-01T00:00:00Z' },
         isLoading: false,
         loginUser: vi.fn(),
         logoutUser: vi.fn(),
@@ -164,8 +164,8 @@ describe('IncidentCommentForm', () => {
     });
 
     it('20. Duplicate submit engellenir, 21. Submit sırasında textarea disabled olur, 22. Submit sırasında düğme disabled olur, 23. Submit düğmesi loading metni gösterir, 48. Form aria-busy', async () => {
-      let resolvePromise: (val: any) => void = () => {};
-      const promise = new Promise<any>((resolve) => { resolvePromise = resolve; });
+      let resolvePromise: (val: IncidentComment) => void = () => {};
+      const promise = new Promise<IncidentComment>((resolve) => { resolvePromise = resolve; });
       vi.mocked(addIncidentComment).mockReturnValue(promise);
       
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
@@ -230,8 +230,8 @@ describe('IncidentCommentForm', () => {
     });
 
     it('33. Stale response callback çağırmaz', async () => {
-      let resolvePromise: (val: any) => void = () => {};
-      const promise = new Promise<any>((resolve) => { resolvePromise = resolve; });
+      let resolvePromise: (val: IncidentComment) => void = () => {};
+      const promise = new Promise<IncidentComment>((resolve) => { resolvePromise = resolve; });
       vi.mocked(addIncidentComment).mockReturnValue(promise);
       
       const { unmount } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
@@ -273,7 +273,7 @@ describe('IncidentCommentForm', () => {
 
     errorCases.forEach(({ code, text, msg }) => {
       it(msg, async () => {
-        const error = new ApiError(code, 'HAM_API_MESAJI');
+        const error = new ApiError(code, { code: String(code), message: 'HAM_API_MESAJI', details: null });
         vi.mocked(addIncidentComment).mockRejectedValue(error);
         
         render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
