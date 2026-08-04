@@ -416,7 +416,7 @@ describe('IncidentDetail', () => {
     });
 
     it('55. Loading role=status kullanır', () => {
-      let resolveApi: (value: any) => void = () => {};
+      let resolveApi: (value: IncidentDetailType) => void = () => {};
       vi.mocked(getIncident).mockImplementation(() => new Promise((res) => { resolveApi = res; }));
       render(<IncidentDetail incidentId={1} />);
       
