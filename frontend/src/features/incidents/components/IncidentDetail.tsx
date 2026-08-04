@@ -4,6 +4,8 @@ import { getIncident } from '../api';
 import type { IncidentDetail as IncidentDetailType, IncidentStatus, IncidentSeverity, IncidentListItem } from '../types';
 import { ApiError } from '../../../api/types';
 import { IncidentActionPanel } from './IncidentActionPanel';
+import { IncidentCommentForm } from './IncidentCommentForm';
+import type { IncidentComment } from '../types';
 
 export interface IncidentDetailProps {
   incidentId: number;
@@ -116,6 +118,23 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
         ...current,
         ...updatedIncident,
         comments: current.comments,
+      };
+    });
+  }, []);
+
+  const handleCommentAdded = useCallback((addedComment: IncidentComment) => {
+    setIncident((current) => {
+      if (!current) {
+        return current;
+      }
+
+      if (current.comments.some((item) => item.id === addedComment.id)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        comments: [...current.comments, addedComment],
       };
     });
   }, []);
@@ -303,6 +322,7 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
                 ))}
               </ol>
             )}
+            <IncidentCommentForm incidentId={incident.id} onCommentAdded={handleCommentAdded} />
           </div>
         </div>
       ) : null}

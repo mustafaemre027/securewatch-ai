@@ -10,6 +10,7 @@ import type { IncidentDetail as IncidentDetailType } from '../types';
 vi.mock('../api', () => ({
   getIncident: vi.fn(),
   updateIncident: vi.fn(),
+  addIncidentComment: vi.fn(),
 }));
 
 vi.mock('../../auth/useAuth', () => ({
@@ -535,6 +536,74 @@ describe('IncidentDetail', () => {
       
       // 6. Update sonrasında getIncident tekrar çağrılmaz
       expect(getIncident).toHaveBeenCalledTimes(1); // Only initial fetch
+    });
+  });
+
+  describe('IncidentCommentForm Entegrasyonu', () => {
+    it('1. IncidentCommentForm yorum geçmişinden sonra render edilir, 2. Form doğru incident ID’yi alır', async () => {
+      vi.mocked(getIncident).mockResolvedValue(createMockDetail(1));
+      render(<IncidentDetail incidentId={1} />);
+      
+      const formHeading = await screen.findByRole('heading', { name: 'Olaya Yorum Ekle' });
+      expect(formHeading).toBeInTheDocument();
+      
+      const btn = screen.getByRole('button', { name: 'Yorum Ekle' });
+      expect(btn).toBeInTheDocument();
+    });
+
+    it('3, 4, 5, 6, 7, 9, 10, 11, 12, 13. Yeni yorumun eklenmesi', async () => {
+      const initialDetail = createMockDetail(1, { 
+        comments: [{ id: 1, incident_id: 1, user_id: 99, comment_text: 'Eski Yorum', created_at: '2023-01-01T10:00:00Z' }] 
+      });
+      vi.mocked(getIncident).mockResolvedValue(initialDetail);
+      
+      const { addIncidentComment } = await import('../api');
+      vi.mocked(addIncidentComment).mockResolvedValue({
+        id: 2, incident_id: 1, user_id: 101, comment_text: 'Yeni Yorum', created_at: '2023-01-01T11:00:00Z'
+      });
+      
+      render(<IncidentDetail incidentId={1} />);
+      
+      await screen.findByText('Eski Yorum');
+      expect(screen.queryByText('Yeni Yorum')).not.toBeInTheDocument();
+      
+      const textarea = screen.getByLabelText('Yorum');
+      const submitBtn = screen.getByRole('button', { name: 'Yorum Ekle' });
+      
+      await userEvent.type(textarea, 'Yeni Yorum');
+      await userEvent.click(submitBtn);
+      
+      expect(await screen.findByText('Yeni Yorum')).toBeInTheDocument();
+      expect(screen.getByText('Eski Yorum')).toBeInTheDocument();
+      expect(screen.getByText('Siz')).toBeInTheDocument();
+      expect(getIncident).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('heading', { name: 'Olay İşlemleri' })).toBeInTheDocument();
+    });
+
+    it('8. Aynı comment ID ikinci kez eklenmez', async () => {
+      const initialDetail = createMockDetail(1, { 
+        comments: [{ id: 1, incident_id: 1, user_id: 99, comment_text: 'Tek Yorum', created_at: '2023-01-01T10:00:00Z' }] 
+      });
+      vi.mocked(getIncident).mockResolvedValue(initialDetail);
+      
+      const { addIncidentComment } = await import('../api');
+      vi.mocked(addIncidentComment).mockResolvedValue({
+        id: 1, incident_id: 1, user_id: 101, comment_text: 'Tek Yorum', created_at: '2023-01-01T10:00:00Z'
+      });
+      
+      render(<IncidentDetail incidentId={1} />);
+      await screen.findByText('Tek Yorum');
+      
+      const textarea = screen.getByLabelText('Yorum');
+      await userEvent.type(textarea, 'Tek Yorum');
+      await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
+      
+      await waitFor(() => {
+        expect(textarea).toHaveValue('');
+      });
+      
+      const comments = screen.getAllByText('Tek Yorum');
+      expect(comments).toHaveLength(1);
     });
   });
 });
