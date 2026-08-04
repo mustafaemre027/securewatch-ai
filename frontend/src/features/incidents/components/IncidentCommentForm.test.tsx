@@ -229,6 +229,21 @@ describe('IncidentCommentForm', () => {
       expect(textarea).toHaveValue('');
     });
 
+    it('Yazılan metin rerender sırasında gereksiz yere silinmez (Regression Test)', async () => {
+      const { rerender } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
+      const textarea = screen.getByLabelText('Yorum');
+
+      // Kullanıcı metin yazar
+      await userEvent.type(textarea, 'abc');
+      expect(textarea).toHaveValue('abc');
+
+      // Aynı incidentId ile bileşen yeniden render edilir (örneğin parent güncellendiğinde)
+      rerender(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
+
+      // Değer korunmalıdır!
+      expect(textarea).toHaveValue('abc');
+    });
+
     it('33. Stale response callback çağırmaz', async () => {
       let resolvePromise: (val: IncidentComment) => void = () => {};
       const promise = new Promise<IncidentComment>((resolve) => { resolvePromise = resolve; });
