@@ -15,16 +15,14 @@ export interface IncidentDetailProps {
 export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBack }) => {
   const { isAuthenticated, accessToken, user } = useAuth();
 
-  const [incident, setIncident] = useState<IncidentDetailType | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [incidentData, setIncidentData] = useState<{ id: number; data: IncidentDetailType } | null>(null);
+  const [isRetrying, setIsRetrying] = useState<boolean>(false);
+  const [apiErrorData, setApiErrorData] = useState<{ id: number; error: string } | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const currentIncidentIdRef = useRef<number | null>(null);
 
-  const fetchDetail = useCallback(async () => {
+  const fetchDetail = useCallback(() => {
     if (!isAuthenticated || !accessToken || !user || !incidentId || incidentId <= 0 || !Number.isInteger(incidentId)) {
-      setIsLoading(false);
       return;
     }
 
@@ -33,65 +31,59 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    currentIncidentIdRef.current = incidentId;
+    const fetchId = incidentId;
 
-    setIsLoading(true);
-    setApiError(null);
-    setIncident(null); // Clean previous incident info
-
-    try {
-      const response = await getIncident(incidentId, accessToken, controller.signal);
-
-      if (abortControllerRef.current === controller) {
-        setIncident(response);
-        setApiError(null);
-      }
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'name' in err && (err as Error).name === 'AbortError') {
-        return;
-      }
-      
-      if (abortControllerRef.current === controller) {
-        let errorMessage = 'Olay detayı güvenli biçimde yüklenemedi.';
-
-        const isApiError = err instanceof ApiError || (err && typeof err === 'object' && 'status' in err && 'code' in err);
-
-        if (isApiError) {
-          const apiErr = err as ApiError;
-          const statusCode = `${apiErr.status}_${apiErr.code}`;
-          
-          switch (statusCode) {
-            case '401_CREDENTIALS_INVALID':
-            case '401_TOKEN_INVALID':
-            case '401_TOKEN_EXPIRED':
-              errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
-              break;
-            case '0_NETWORK_ERROR':
-              errorMessage = 'Sunucuya ulaşılamıyor. Lütfen bağlantınızı kontrol edin.';
-              break;
-            default:
-              if (apiErr.status === 403) {
-                errorMessage = 'Bu olayın detaylarını görüntüleme yetkiniz bulunmuyor.';
-              } else if (apiErr.status === 404) {
-                errorMessage = 'Olay kaydı bulunamadı veya bu kayda erişemiyorsunuz.';
-              } else if (apiErr.status === 422) {
-                errorMessage = 'Olay kimliği doğrulanamadı.';
-              } else if (apiErr.status === 401) {
-                errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
-              } else if (apiErr.status >= 500) {
-                errorMessage = 'Olay detayı geçici olarak kullanılamıyor.';
-              }
-              break;
-          }
+    getIncident(fetchId, accessToken, controller.signal)
+      .then((response) => {
+        if (abortControllerRef.current === controller) {
+          setIncidentData({ id: fetchId, data: response });
+          setApiErrorData(null);
+          setIsRetrying(false);
         }
+      })
+      .catch((err: unknown) => {
+        if (err && typeof err === 'object' && 'name' in err && (err as Error).name === 'AbortError') {
+          return;
+        }
+        
+        if (abortControllerRef.current === controller) {
+          let errorMessage = 'Olay detayı güvenli biçimde yüklenemedi.';
 
-        setApiError(errorMessage);
-      }
-    } finally {
-      if (abortControllerRef.current === controller) {
-        setIsLoading(false);
-      }
-    }
+          const isApiError = err instanceof ApiError || (err && typeof err === 'object' && 'status' in err && 'code' in err);
+
+          if (isApiError) {
+            const apiErr = err as ApiError;
+            const statusCode = `${apiErr.status}_${apiErr.code}`;
+            
+            switch (statusCode) {
+              case '401_CREDENTIALS_INVALID':
+              case '401_TOKEN_INVALID':
+              case '401_TOKEN_EXPIRED':
+                errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
+                break;
+              case '0_NETWORK_ERROR':
+                errorMessage = 'Sunucuya ulaşılamıyor. Lütfen bağlantınızı kontrol edin.';
+                break;
+              default:
+                if (apiErr.status === 403) {
+                  errorMessage = 'Bu olayın detaylarını görüntüleme yetkiniz bulunmuyor.';
+                } else if (apiErr.status === 404) {
+                  errorMessage = 'Olay kaydı bulunamadı veya bu kayda erişemiyorsunuz.';
+                } else if (apiErr.status === 422) {
+                  errorMessage = 'Olay kimliği doğrulanamadı.';
+                } else if (apiErr.status === 401) {
+                  errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
+                } else if (apiErr.status >= 500) {
+                  errorMessage = 'Olay detayı geçici olarak kullanılamıyor.';
+                }
+                break;
+            }
+          }
+
+          setApiErrorData({ id: fetchId, error: errorMessage });
+          setIsRetrying(false);
+        }
+      });
   }, [isAuthenticated, accessToken, user, incidentId]);
 
   useEffect(() => {
@@ -103,38 +95,54 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
     };
   }, [fetchDetail]);
 
+  const isInvalidId = !incidentId || incidentId <= 0 || !Number.isInteger(incidentId);
+  const hasData = incidentData && incidentData.id === incidentId;
+  const hasError = apiErrorData && apiErrorData.id === incidentId;
+  
+  const isLoading = isRetrying || (!hasData && !hasError && !isInvalidId);
+  const apiError = hasError ? apiErrorData.error : null;
+  const incident = hasData ? incidentData.data : null;
+
   const handleRetry = () => {
     if (!isLoading) {
+      setIsRetrying(true);
+      setApiErrorData(null);
       fetchDetail();
     }
   };
 
   const handleIncidentUpdate = useCallback((updatedIncident: IncidentListItem) => {
-    setIncident((current) => {
-      if (!current) {
+    setIncidentData((current) => {
+      if (!current || !current.data) {
         return current;
       }
       return {
-        ...current,
-        ...updatedIncident,
-        comments: current.comments,
+        id: current.id,
+        data: {
+          ...current.data,
+          ...updatedIncident,
+          comments: current.data.comments,
+        }
       };
     });
   }, []);
 
   const handleCommentAdded = useCallback((addedComment: IncidentComment) => {
-    setIncident((current) => {
-      if (!current) {
+    setIncidentData((current) => {
+      if (!current || !current.data) {
         return current;
       }
 
-      if (current.comments.some((item) => item.id === addedComment.id)) {
+      if (current.data.comments.some((item) => item.id === addedComment.id)) {
         return current;
       }
 
       return {
-        ...current,
-        comments: [...current.comments, addedComment],
+        id: current.id,
+        data: {
+          ...current.data,
+          comments: [...current.data.comments, addedComment],
+        }
       };
     });
   }, []);
@@ -322,7 +330,7 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
                 ))}
               </ol>
             )}
-            <IncidentCommentForm incidentId={incident.id} onCommentAdded={handleCommentAdded} />
+            <IncidentCommentForm key={incident.id} incidentId={incident.id} onCommentAdded={handleCommentAdded} />
           </div>
         </div>
       ) : null}

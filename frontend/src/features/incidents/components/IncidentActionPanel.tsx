@@ -57,6 +57,13 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
     }
   }, [confirmationAction]);
 
+  const handleCancelConfirmation = () => {
+    setConfirmationAction(null);
+    if (triggerBtnRef.current) {
+      triggerBtnRef.current.focus();
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && confirmationAction && !pendingAction) {
@@ -66,13 +73,6 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [confirmationAction, pendingAction]);
-
-  const handleCancelConfirmation = () => {
-    setConfirmationAction(null);
-    if (triggerBtnRef.current) {
-      triggerBtnRef.current.focus();
-    }
-  };
 
   const getErrorMessage = (error: unknown, isClaim: boolean): string => {
     if (error instanceof DOMException && error.name === 'AbortError') {

@@ -12,10 +12,19 @@ export interface IncidentCommentFormProps {
 export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incidentId, onCommentAdded }) => {
   const { isAuthenticated, accessToken, user } = useAuth();
   
+  const [prevIncidentId, setPrevIncidentId] = useState(incidentId);
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  if (incidentId !== prevIncidentId) {
+    setPrevIncidentId(incidentId);
+    setCommentText('');
+    setFormError(null);
+    setSuccessMessage(null);
+    setIsSubmitting(false);
+  }
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -25,10 +34,6 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    setCommentText('');
-    setFormError(null);
-    setSuccessMessage(null);
-    setIsSubmitting(false);
 
     return () => {
       if (abortControllerRef.current) {
