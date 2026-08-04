@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/useAuth';
 import { listIncidents } from '../api';
 import type { IncidentListItem, IncidentStatus, IncidentSeverity } from '../types';
 import { ApiError } from '../../../api/types';
+import { Link } from 'react-router';
 
 const PAGE_SIZE = 20;
 
@@ -332,6 +333,16 @@ export const IncidentList: React.FC = () => {
                     <span className="block font-semibold text-slate-500 mb-0.5">Son Güncelleme</span>
                     {formatDate(incident.updated_at)}
                   </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    to={`/incidents/${incident.id}`}
+                    aria-label={`"${incident.title}" olayının detayını görüntüle`}
+                    className="px-4 py-2 bg-ai-teal hover:bg-teal-500 text-deep-dark text-sm font-bold rounded-lg transition-colors"
+                  >
+                    Detayı Gör
+                  </Link>
                 </div>
               </li>
             ))}

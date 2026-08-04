@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { IncidentList } from './IncidentList';
 import { listIncidents } from '../api';
 import { useAuth } from '../../auth/useAuth';
@@ -51,12 +52,12 @@ describe('IncidentList', () => {
 
   describe('Başlangıç ve API', () => {
     it('1. Authenticated kullanıcı için liste çağrılır', async () => {
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
     });
 
     it('2. Endpoint çağrısında skip 0 korunur, 3. Limit 21 gönderilir, 4. Token aktarılır, 5. AbortSignal aktarılır', async () => {
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => {
         expect(listIncidents).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -79,7 +80,7 @@ describe('IncidentList', () => {
         logoutUser: vi.fn(),
         error: null,
       });
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(listIncidents).not.toHaveBeenCalled();
     });
 
@@ -93,7 +94,7 @@ describe('IncidentList', () => {
         logoutUser: vi.fn(),
         error: null,
       });
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(listIncidents).not.toHaveBeenCalled();
     });
 
@@ -107,7 +108,7 @@ describe('IncidentList', () => {
         logoutUser: vi.fn(),
         error: null,
       });
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(listIncidents).not.toHaveBeenCalled();
     });
   });
@@ -115,7 +116,7 @@ describe('IncidentList', () => {
   describe('Liste render', () => {
     it('9. Olay başlığı ve açıklaması gösterilir', async () => {
       vi.mocked(listIncidents).mockResolvedValue([createMockIncident(1, { title: 'My Custom Title', description: 'My Custom Desc' })]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(await screen.findByText('My Custom Title')).toBeInTheDocument();
       expect(screen.getByText('My Custom Desc')).toBeInTheDocument();
     });
@@ -127,7 +128,7 @@ describe('IncidentList', () => {
         createMockIncident(3, { status: 'RESOLVED' }),
         createMockIncident(4, { status: 'FALSE_POSITIVE' }),
       ]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 1');
       expect(screen.getAllByText('Açık')).toHaveLength(2); // In select and in list
       expect(screen.getAllByText('İnceleniyor').length).toBeGreaterThan(0);
@@ -142,7 +143,7 @@ describe('IncidentList', () => {
         createMockIncident(3, { severity: 'HIGH' }),
         createMockIncident(4, { severity: 'CRITICAL' }),
       ]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 1');
       expect(screen.getAllByText('Düşük')).toHaveLength(2); // In select and in list
       expect(screen.getAllByText('Orta').length).toBeGreaterThan(0);
@@ -156,7 +157,7 @@ describe('IncidentList', () => {
         createMockIncident(2, { assigned_analyst_id: 101 }),
         createMockIncident(3, { assigned_analyst_id: 999 }),
       ]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(await screen.findByText('Atanmamış')).toBeInTheDocument();
       expect(screen.getByText('Size Atanmış')).toBeInTheDocument();
       expect(screen.getByText('Analist #999')).toBeInTheDocument();
@@ -166,7 +167,7 @@ describe('IncidentList', () => {
       vi.mocked(listIncidents).mockResolvedValue([
         createMockIncident(1, { created_at: '2023-05-10T10:00:00Z', updated_at: 'invalid-date' }),
       ]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       const validDate = new Date('2023-05-10T10:00:00Z').toLocaleString('tr-TR');
       expect(await screen.findByText(validDate)).toBeInTheDocument();
@@ -175,7 +176,7 @@ describe('IncidentList', () => {
 
     it('17. detection_result_id kullanıcıya gösterilmez', async () => {
       vi.mocked(listIncidents).mockResolvedValue([createMockIncident(1, { detection_result_id: 98765 })]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 1');
       expect(screen.queryByText(/98765/)).not.toBeInTheDocument();
     });
@@ -184,7 +185,7 @@ describe('IncidentList', () => {
   describe('Filtreler', () => {
     it('18. Status filtresi backend parametresine dönüşür', async () => {
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
 
       await user.selectOptions(screen.getByLabelText(/Olay Durumu/i), 'OPEN');
@@ -200,7 +201,7 @@ describe('IncidentList', () => {
 
     it('19. Severity filtresi backend parametresine dönüşür', async () => {
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
 
       await user.selectOptions(screen.getByLabelText(/Önem Seviyesi/i), 'HIGH');
@@ -216,7 +217,7 @@ describe('IncidentList', () => {
 
     it('20. "Yalnız Bana Atananlar" user.id gönderir, 21. Kapatıldığında göndermez', async () => {
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
 
       const checkbox = screen.getByLabelText(/Yalnız Bana Atananlar/i);
@@ -243,7 +244,7 @@ describe('IncidentList', () => {
       let resolveApi: (val: IncidentListItem[]) => void = () => {};
       vi.mocked(listIncidents).mockImplementation(() => new Promise((res) => { resolveApi = res; }));
 
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       const statusSelect = screen.getByLabelText(/Olay Durumu/i);
       const severitySelect = screen.getByLabelText(/Önem Seviyesi/i);
@@ -274,7 +275,7 @@ describe('IncidentList', () => {
       const mockData = Array.from({ length: 21 }).map((_, i) => createMockIncident(i));
       vi.mocked(listIncidents).mockResolvedValue(mockData);
 
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       expect(await screen.findByText('Test Incident 0')).toBeInTheDocument();
       expect(screen.getByText('Test Incident 19')).toBeInTheDocument();
@@ -288,7 +289,7 @@ describe('IncidentList', () => {
       const mockData = Array.from({ length: 20 }).map((_, i) => createMockIncident(i));
       vi.mocked(listIncidents).mockResolvedValue(mockData);
 
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 0');
 
       const nextBtn = screen.getByRole('button', { name: /Sonraki/i });
@@ -300,7 +301,7 @@ describe('IncidentList', () => {
       vi.mocked(listIncidents).mockResolvedValue(mockData);
 
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 0');
 
       const prevBtn = screen.getByRole('button', { name: /Önceki/i });
@@ -327,7 +328,7 @@ describe('IncidentList', () => {
 
     it('30. Sahte total metni gösterilmez, 31. Görünür kayıt aralığı doğru gösterilir', async () => {
       vi.mocked(listIncidents).mockResolvedValue(Array.from({ length: 5 }).map((_, i) => createMockIncident(i)));
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       expect(await screen.findByText('1 - 5 arası gösteriliyor')).toBeInTheDocument();
       // "total" keyword should not be present as false total
@@ -338,7 +339,7 @@ describe('IncidentList', () => {
   describe('Lifecycle', () => {
     it('32. Yeni filtre isteği eski isteği abort eder', async () => {
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       // Wait for initial render to trigger fetch
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
@@ -361,7 +362,7 @@ describe('IncidentList', () => {
         .mockImplementationOnce(() => new Promise((res) => { resolveFirst = res; }))
         .mockImplementationOnce(() => new Promise((res) => { resolveSecond = res; }));
 
-      const { rerender } = render(<IncidentList />);
+      const { rerender } = render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       // First fetch is pending
       expect(screen.getByText(/Olaylar yükleniyor/i)).toBeInTheDocument();
@@ -376,7 +377,7 @@ describe('IncidentList', () => {
         logoutUser: vi.fn(),
         error: null,
       });
-      rerender(<IncidentList />);
+      rerender(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       // Resolve first fetch with old data
       resolveFirst([createMockIncident(1, { title: 'STALE DATA' })]);
@@ -394,7 +395,7 @@ describe('IncidentList', () => {
     });
 
     it('34. Unmount aktif isteği abort eder', async () => {
-      const { unmount } = render(<IncidentList />);
+      const { unmount } = render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await waitFor(() => expect(listIncidents).toHaveBeenCalledTimes(1));
 
       const signal = vi.mocked(listIncidents).mock.calls[0][2];
@@ -405,7 +406,7 @@ describe('IncidentList', () => {
 
     it('35. AbortError kullanıcı hatası göstermez', async () => {
       vi.mocked(listIncidents).mockRejectedValueOnce(new DOMException('Aborted', 'AbortError'));
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       // Should not show error alert
       await waitFor(() => {
@@ -422,7 +423,7 @@ describe('IncidentList', () => {
       let resolveApi: (value: IncidentListItem[]) => void = () => {};
       vi.mocked(listIncidents).mockImplementation(() => new Promise((res) => { resolveApi = res; }));
 
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       const statusElement = screen.getByRole('status');
       expect(statusElement).toBeInTheDocument();
@@ -434,14 +435,14 @@ describe('IncidentList', () => {
 
     it('38. Filtre yokken boş state doğru görünür', async () => {
       vi.mocked(listIncidents).mockResolvedValueOnce([]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(await screen.findByText('Henüz oluşturulmuş bir olay bulunmuyor.')).toBeInTheDocument();
     });
 
     it('39. Filtre varken filtreli empty state görünür', async () => {
       const user = userEvent.setup();
       vi.mocked(listIncidents).mockResolvedValueOnce([createMockIncident(1)]).mockResolvedValueOnce([]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       await screen.findByText('Test Incident 1');
 
@@ -453,7 +454,7 @@ describe('IncidentList', () => {
     const testErrorMapping = async (status: number, code: string, expectedMessage: string) => {
       cleanup();
       vi.mocked(listIncidents).mockRejectedValueOnce(new ApiError(status, { code, message: 'Backend error message', details: null }));
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent(expectedMessage);
@@ -483,7 +484,7 @@ describe('IncidentList', () => {
     it('45. Bilinmeyen hata sabit mesaj gösterir', async () => {
       cleanup();
       vi.mocked(listIncidents).mockRejectedValueOnce(new Error('Some weird error stack trace from backend db...'));
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('Olaylar güvenli biçimde yüklenemedi.');
       expect(alert).not.toHaveTextContent('db...'); // req 46
@@ -496,7 +497,7 @@ describe('IncidentList', () => {
         .mockRejectedValueOnce(new Error('Fail'))
         .mockResolvedValueOnce([createMockIncident(2, { title: 'Retried Data' })]);
 
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       await screen.findByText('Test Incident 1');
 
       // Cause a fail
@@ -513,7 +514,7 @@ describe('IncidentList', () => {
 
   describe('Erişilebilirlik', () => {
     it('48. Filtre label bağlantıları doğrudur', () => {
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       // Implicitly tested if getByLabelText works.
       expect(screen.getByLabelText(/Olay Durumu/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Önem Seviyesi/i)).toBeInTheDocument();
@@ -522,7 +523,7 @@ describe('IncidentList', () => {
 
     it('49. Liste semantik ul/li yapısındadır', async () => {
       vi.mocked(listIncidents).mockResolvedValue([createMockIncident(1)]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       const list = await screen.findByRole('list'); // <ul>
       expect(list.tagName).toBe('UL');
@@ -534,13 +535,13 @@ describe('IncidentList', () => {
 
     it('50. Hata role=alert kullanır', async () => {
       vi.mocked(listIncidents).mockRejectedValueOnce(new Error('fail'));
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       expect(await screen.findByRole('alert')).toBeInTheDocument();
     });
 
     it('51. Empty state aria-live kullanır', async () => {
       vi.mocked(listIncidents).mockResolvedValue([]);
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
       const emptyContainer = await screen.findByText('Henüz oluşturulmuş bir olay bulunmuyor.');
       expect(emptyContainer).toHaveAttribute('aria-live', 'polite');
     });
@@ -548,7 +549,7 @@ describe('IncidentList', () => {
     it('53. Butonlar klavye ile kullanılabilir', async () => {
       vi.mocked(listIncidents).mockResolvedValue(Array.from({ length: 21 }).map((_, i) => createMockIncident(i)));
       const user = userEvent.setup();
-      render(<IncidentList />);
+      render(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       await screen.findByText('Test Incident 0');
 

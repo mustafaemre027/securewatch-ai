@@ -130,6 +130,12 @@ vi.mock('../pages/HomePage', () => ({
 vi.mock('../features/auth/LoginPage', () => ({
   LoginPage: vi.fn(() => <div data-testid="mock-login-page">Login Page Mock</div>)
 }));
+vi.mock('../features/incidents/components/IncidentList', () => ({
+  IncidentList: vi.fn(() => <div data-testid="mock-incident-list">Incident List Mock</div>)
+}));
+vi.mock('../features/incidents/IncidentDetailPage', () => ({
+  IncidentDetailPage: vi.fn(() => <div data-testid="mock-incident-detail-page">Incident Detail Page Mock</div>)
+}));
 
 describe('App Route Integration', () => {
   beforeEach(() => {
@@ -188,5 +194,72 @@ describe('App Route Integration', () => {
     renderApp('/analysis');
     expect(screen.getByTestId('mock-analysis-page')).toBeInTheDocument();
     expect(screen.queryByTestId('mock-detection-results')).not.toBeInTheDocument();
+  });
+
+  it('1. Unauthenticated kullanıcı /incidents rotasından login’e yönlendirilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents');
+    expect(screen.getByTestId('mock-login-page')).toBeInTheDocument();
+  });
+
+  it('2. Unauthenticated kullanıcı /incidents/12 rotasından login’e yönlendirilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents/12');
+    expect(screen.getByTestId('mock-login-page')).toBeInTheDocument();
+  });
+
+  it('3. Authenticated ANALYST /incidents listesini açabilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents');
+    expect(screen.getByTestId('mock-incident-list')).toBeInTheDocument();
+  });
+
+  it('4. Authenticated ADMIN /incidents listesini açabilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ADMIN', username: 'admin1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents');
+    expect(screen.getByTestId('mock-incident-list')).toBeInTheDocument();
+  });
+
+  it('5. Authenticated ANALYST geçerli detail rotasını açabilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents/12');
+    expect(screen.getByTestId('mock-incident-detail-page')).toBeInTheDocument();
+  });
+
+  it('6. Authenticated ADMIN geçerli detail rotasını açabilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ADMIN', username: 'admin1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents/12');
+    expect(screen.getByTestId('mock-incident-detail-page')).toBeInTheDocument();
+  });
+
+  it('7. Incident rotaları AppLayout içindeki main alanında render edilir.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'a' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/incidents/12');
+    expect(screen.getByTestId('mock-incident-detail-page')).toBeInTheDocument();
+    expect(document.querySelector('main')).toBeInTheDocument();
+  });
+
+  it('10. Bilinmeyen URL fallback davranışı korunur.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'a' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/unknown-route-123');
+    expect(screen.getByTestId('mock-home-page')).toBeInTheDocument();
   });
 });

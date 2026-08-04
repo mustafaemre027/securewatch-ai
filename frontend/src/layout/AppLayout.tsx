@@ -7,6 +7,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isAnalysisActive = location.pathname.startsWith('/analysis');
+  const isIncidentsActive = location.pathname.startsWith('/incidents');
 
   const handleLogout = () => {
     logoutUser();
@@ -36,19 +37,32 @@ export function AppLayout() {
               <SecureWatchBrand className="h-8 w-auto flex-shrink-0" />
               <span className="font-semibold text-lg hidden sm:block truncate">SecureWatch AI</span>
             </div>
-            <div className="flex items-center sm:border-l border-space-blue sm:pl-6">
+            <div className="flex items-center sm:border-l border-space-blue sm:pl-6 gap-2">
               <NavLink
                 to="/analysis"
                 aria-current={isAnalysisActive ? 'page' : undefined}
-                className={({ isActive }) =>
+                className={() =>
                   `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive
+                    isAnalysisActive
                       ? 'bg-space-blue text-white'
                       : 'text-muted-blue hover:text-white hover:bg-space-blue/50'
                   }`
                 }
               >
                 Analiz
+              </NavLink>
+              <NavLink
+                to="/incidents"
+                aria-current={isIncidentsActive ? 'page' : undefined}
+                className={() =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isIncidentsActive
+                      ? 'bg-space-blue text-white'
+                      : 'text-muted-blue hover:text-white hover:bg-space-blue/50'
+                  }`
+                }
+              >
+                Olaylar
               </NavLink>
             </div>
           </div>
