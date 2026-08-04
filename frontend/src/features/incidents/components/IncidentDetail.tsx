@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../auth/useAuth';
 import { getIncident } from '../api';
-import type { IncidentDetail as IncidentDetailType, IncidentStatus, IncidentSeverity } from '../types';
+import type { IncidentDetail as IncidentDetailType, IncidentStatus, IncidentSeverity, IncidentListItem } from '../types';
 import { ApiError } from '../../../api/types';
+import { IncidentActionPanel } from './IncidentActionPanel';
 
 export interface IncidentDetailProps {
   incidentId: number;
@@ -106,6 +107,19 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
       fetchDetail();
     }
   };
+
+  const handleIncidentUpdate = useCallback((updatedIncident: IncidentListItem) => {
+    setIncident((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        ...updatedIncident,
+        comments: current.comments,
+      };
+    });
+  }, []);
 
   const getStatusLabel = (status: IncidentStatus) => {
     switch (status) {
@@ -261,6 +275,8 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
               </span>
             </div>
           </div>
+
+          <IncidentActionPanel incident={incident} onUpdated={handleIncidentUpdate} />
 
           <div>
             <h3 className="text-lg font-bold text-white mb-4">Yorum Geçmişi</h3>
