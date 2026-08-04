@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/useAuth';
 import { listDetectionResults } from '../api';
 import type { DetectionResult, DetectionRiskLevel, DetectionResultListParams } from '../types';
 import { ApiError } from '../../../api/types';
+import { IncidentCreateForm } from '../../incidents/components/IncidentCreateForm';
 
 interface DetectionResultsListProps {
   jobId: number;
@@ -11,7 +12,7 @@ interface DetectionResultsListProps {
 const PAGE_SIZE = 20;
 
 export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobId }) => {
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken, user } = useAuth();
 
   const [results, setResults] = useState<DetectionResult[] | null>(null);
   const [total, setTotal] = useState<number>(0);
@@ -21,6 +22,10 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
   const [skip, setSkip] = useState<number>(0);
   const [isAttackFilter, setIsAttackFilter] = useState<boolean | undefined>(undefined);
   const [riskFilter, setRiskFilter] = useState<DetectionRiskLevel | undefined>(undefined);
+
+  const [activeConversionDetectionId, setActiveConversionDetectionId] = useState<number | null>(null);
+  const [convertedDetectionIds, setConvertedDetectionIds] = useState<Set<number>>(new Set());
+  const conversionTriggerRefs = useRef<{ [key: number]: HTMLButtonElement | null }>({});
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isLoadingRef = useRef<boolean>(false);
@@ -185,6 +190,8 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
     setResults(null);
     setTotal(0);
     setApiError(null);
+    setActiveConversionDetectionId(null);
+    setConvertedDetectionIds(new Set());
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -224,6 +231,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
   const handleAttackFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     setSkip(0);
+    setActiveConversionDetectionId(null);
     if (val === 'ALL') setIsAttackFilter(undefined);
     else if (val === 'ATTACK') setIsAttackFilter(true);
     else setIsAttackFilter(false);
@@ -232,6 +240,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
   const handleRiskFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     setSkip(0);
+    setActiveConversionDetectionId(null);
     if (val === 'ALL') setRiskFilter(undefined);
     else setRiskFilter(val as DetectionRiskLevel);
   };
@@ -354,42 +363,82 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
         {!apiError && results && results.length > 0 && (
           <div className="flex-1 flex flex-col" aria-live="polite">
             <ul className="grid grid-cols-1 gap-4 mb-6">
-              {results.map((result) => (
-                <li key={result.id} className={`bg-deep-dark border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${getRiskBorder(result.risk_level)}`}>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-300 uppercase">CSV Satırı</span>
-                    <span className="text-lg font-bold text-white">Satır {result.row_index + 1}</span>
-                  </div>
+              {results.map((result) => {
+                const isConverted = convertedDetectionIds.has(result.id);
+                const canConvert = result.is_attack && user?.role === 'ANALYST' && accessToken && !isConverted;
+                const isConverting = activeConversionDetectionId === result.id;
+                
+                return (
+                <li key={result.id} className={`bg-deep-dark border rounded-xl p-4 flex flex-col gap-4 transition-colors ${getRiskBorder(result.risk_level)}`}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-slate-300 uppercase">CSV Satırı</span>
+                      <span className="text-lg font-bold text-white">Satır {result.row_index + 1}</span>
+                    </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-300 uppercase">Tahmin</span>
-                    <span className={`text-base font-bold ${result.is_attack ? 'text-red-400' : 'text-green-400'}`}>
-                      {result.is_attack ? 'Saldırı' : 'Normal'}
-                    </span>
-                  </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-slate-300 uppercase">Tahmin</span>
+                      <span className={`text-base font-bold ${result.is_attack ? 'text-red-400' : 'text-green-400'}`}>
+                        {result.is_attack ? 'Saldırı' : 'Normal'}
+                      </span>
+                    </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-300 uppercase">Saldırı Olasılığı</span>
-                    <span className="text-base font-bold text-white">
-                      %{(result.attack_probability * 100).toFixed(2).replace(/\.00$/, '')}
-                    </span>
-                  </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-slate-300 uppercase">Saldırı Olasılığı</span>
+                      <span className="text-base font-bold text-white">
+                        %{(result.attack_probability * 100).toFixed(2).replace(/\.00$/, '')}
+                      </span>
+                    </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-300 uppercase">Risk Seviyesi</span>
-                    <span className={`text-base font-bold ${getRiskColor(result.risk_level)}`}>
-                      {getRiskLabel(result.risk_level)}
-                    </span>
-                  </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-slate-300 uppercase">Risk Seviyesi</span>
+                      <span className={`text-base font-bold ${getRiskColor(result.risk_level)}`}>
+                        {getRiskLabel(result.risk_level)}
+                      </span>
+                    </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-bold text-slate-300 uppercase">Oluşturulma Zamanı</span>
-                    <span className="text-sm font-medium text-gray-300">
-                      {formatDate(result.created_at)}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-bold text-slate-300 uppercase">Oluşturulma Zamanı</span>
+                      <span className="text-sm font-medium text-gray-300">
+                        {formatDate(result.created_at)}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 justify-center min-w-[120px]">
+                      {canConvert && !isConverting && (
+                        <button
+                          ref={(el) => { conversionTriggerRefs.current[result.id] = el; }}
+                          type="button"
+                          onClick={() => setActiveConversionDetectionId(result.id)}
+                          className="py-1.5 px-3 bg-ai-teal text-white text-xs font-bold rounded hover:bg-teal-500 transition-colors self-start md:self-end"
+                        >
+                          Olaya Dönüştür
+                        </button>
+                      )}
+                      {isConverted && (
+                        <span className="text-ai-teal font-bold text-sm flex items-center justify-start md:justify-end gap-1 self-start md:self-end" role="status" aria-live="polite">
+                          Olaya Dönüştürüldü
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {isConverting && accessToken && (
+                    <IncidentCreateForm
+                      detectionResult={result}
+                      accessToken={accessToken}
+                      onCreated={() => {
+                        setConvertedDetectionIds((prev) => new Set(prev).add(result.id));
+                        setActiveConversionDetectionId(null);
+                        setTimeout(() => conversionTriggerRefs.current[result.id]?.focus(), 0);
+                      }}
+                      onCancel={() => {
+                        setActiveConversionDetectionId(null);
+                        setTimeout(() => conversionTriggerRefs.current[result.id]?.focus(), 0);
+                      }}
+                    />
+                  )}
                 </li>
-              ))}
+              )})}
             </ul>
           </div>
         )}
@@ -401,7 +450,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setSkip(Math.max(0, skip - PAGE_SIZE))}
+              onClick={() => { setSkip(Math.max(0, skip - PAGE_SIZE)); setActiveConversionDetectionId(null); }}
               disabled={isLoading || skip === 0}
               className="py-1.5 px-3 bg-space-blue text-white text-sm font-semibold rounded hover:bg-muted-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -409,7 +458,7 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
             </button>
             <button
               type="button"
-              onClick={() => setSkip(skip + PAGE_SIZE)}
+              onClick={() => { setSkip(skip + PAGE_SIZE); setActiveConversionDetectionId(null); }}
               disabled={isLoading || (results ? skip + results.length >= total : true)}
               className="py-1.5 px-3 bg-space-blue text-white text-sm font-semibold rounded hover:bg-muted-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
