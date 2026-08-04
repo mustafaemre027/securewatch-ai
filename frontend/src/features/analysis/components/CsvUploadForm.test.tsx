@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CsvUploadForm } from './CsvUploadForm';
 import { useAuth } from '../../auth/useAuth';
@@ -181,7 +181,9 @@ describe('CsvUploadForm', () => {
 
     expect(vi.mocked(uploadAnalysisCsv)).toHaveBeenCalledTimes(1);
 
-    resolveApi!({ job_id: 1, file_name: 'dup.csv', file_hash: 'h', file_size: 1024, created_at: '', status: 'PENDING' });
+    await act(async () => {
+      resolveApi!({ job_id: 1, file_name: 'dup.csv', file_hash: 'h', file_size: 1024, created_at: '', status: 'PENDING' });
+    });
   });
 
   it('12. Supports retry after failure', async () => {

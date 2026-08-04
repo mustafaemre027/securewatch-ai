@@ -36,3 +36,8 @@ frontend/.vite/
 npm-debug.log*
 .env.local
 .env.*.local
+
+# Local runtime model artifacts (never commit)
+/backend/app/ml_models/*.joblib
+/backend/app/ml_models/*.pkl
+/backend/app/ml_models/*.pickle

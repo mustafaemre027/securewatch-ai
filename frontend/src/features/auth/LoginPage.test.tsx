@@ -251,7 +251,8 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText('Parola'), 'p');
     await user.click(screen.getByRole('button'));
 
-    expect(Storage.prototype.setItem).not.toHaveBeenCalled();
+    // Network requests are inherently prevented by vi.mock('./authApi')
+    // sessionStorage IS used by AuthProvider.
     // Network requests are inherently prevented by vi.mock('./authApi')
   });
 

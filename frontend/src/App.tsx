@@ -5,6 +5,7 @@ import { PublicOnlyRoute } from './routing/PublicOnlyRoute';
 import { AppLayout } from './layout/AppLayout';
 import { HomePage } from './pages/HomePage';
 import { AnalysisPage } from './features/analysis/AnalysisPage';
+import { DetectionResultsPage } from './features/detections/DetectionResultsPage';
 import { useAuth } from './features/auth/useAuth';
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/analysis/:jobId/results" element={<DetectionResultsPage />} />
         </Route>
       </Route>
 

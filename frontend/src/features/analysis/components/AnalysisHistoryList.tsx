@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import { listAnalysisJobs } from '../api';
 import type { AnalysisJobListItem, AnalysisJobStatus } from '../types';
@@ -263,8 +264,19 @@ export function AnalysisHistoryList() {
                     <span>Boyut: {formatBytes(job.file_size)}</span>
                   </div>
                 </div>
-                <div className="flex-shrink-0 bg-deep-dark p-3 rounded-lg border border-space-blue">
-                  {renderStatus(job.status)}
+                <div className="flex-shrink-0 flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                  <div className="bg-deep-dark p-3 rounded-lg border border-space-blue">
+                    {renderStatus(job.status)}
+                  </div>
+                  {job.status === 'COMPLETED' && typeof job.id === 'number' && Number.isSafeInteger(job.id) && job.id > 0 && (
+                    <Link
+                      to={`/analysis/${job.id}/results`}
+                      aria-label={`Analiz #${job.id} sonuçlarını görüntüle`}
+                      className="px-4 py-2 bg-ai-teal text-deep-dark text-sm font-bold rounded-lg hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rich-navy focus:ring-ai-teal truncate max-w-[200px] text-center"
+                    >
+                      Sonuçları görüntüle
+                    </Link>
+                  )}
                 </div>
               </li>
             ))}
