@@ -33,6 +33,8 @@ Her günün sonunda aşağıdaki bilgileri kaydetmek:
 | `day-09.md` | Gün 9 kaydı — Random Forest eğitim servisi, kontrollü deneyler, model karşılaştırması ve özellik önem dereceleri |
 | `day-10.md` | Gün 10 kaydı — Model değerlendirme ve seçim altyapısı, OOF karar eşiği, deterministik seçim, risk seviyeleri ve CLI entegrasyonu |
 | `day-11.md` | Gün 11 kaydı — Güvenli model tahmini, analiz işleme servisi, API uç noktaları, atomik sahiplenme ve RBAC kontrolleri |
+| `day-13.md` | Gün 13 kaydı — Frontend mimarisi, bellek içi authentication, responsive login ve korumalı rota altyapısı |
+| `day-14.md` | Gün 14 kaydı — Analiz ekranları, CSV yükleme iş akışı, yürütme paneli ve güvenli hata eşleme mimarisi |
 
 ## Format
 

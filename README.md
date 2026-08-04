@@ -67,7 +67,7 @@ Ayrıntılı API uç nokta sözleşmeleri ve hata kodları için bkz. [docs/arch
 ### Genel Gereksinimler
 
 - Python 3.10+ (Yerel geliştirme Python 3.14 ile doğrulanmıştır)
-- Node.js 18+
+- Node.js `^20.19.0 || >=22.12.0` (Vite 8 gereksinimi; yerel geliştirme `v24.18.1` ile doğrulanmıştır)
 - PostgreSQL 15+ (Yerel geliştirme PostgreSQL 18 ile doğrulanmıştır)
 - Docker (opsiyonel)
 
@@ -162,13 +162,48 @@ python -m scripts.train_baseline_models \
 
 Opsiyonel model seçim parametreleri: `--min-recall`, `--max-fpr`, `--cv-splits`. Ayrıntılı teknik belgeler için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
 
-### Frontend Kurulumu (planlandı / henüz doğrulanmadı)
+### Frontend Kurulumu ve Çalıştırma (Doğrulandı)
 
-```bash
+Geliştirme ortamında test edilmiş ve doğrulanmış frontend çalıştırma adımları:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+
+> **Not:** Windows PowerShell execution policy kısıtlaması olan sistemlerde `npm.cmd` (ör. `npm.cmd run dev`) kullanılabilir.
+
+#### Frontend Kalite ve Test Komutları
+
+```powershell
+# Type-check
+npm run type-check
+
+# ESLint denetimi
+npm run lint
+
+# Vitest unit ve bileşen testleri
+npm run test
+
+# Production build
+npm run build
+
+# Güvenlik zafiyet taraması
+npm audit --audit-level=high
+```
+
+*(Windows PowerShell execution policy kısıtlamaları olan ortamlarda `npm.cmd` örneğin `npm.cmd run dev`, `npm.cmd run test` kullanılabilir).*
+
+#### Frontend Mimari, Analiz İş Akışı ve Güvenlik Notları
+- **Bellek İçi Oturum Yönetimi:** Access token yalnızca React state (`AuthProvider`) içinde tutulur. `localStorage`, `sessionStorage`, IndexedDB veya cookie gibi kalıcı depolama alanlarına yazılmaz.
+- **Yönlendirme ve Sayfa Yenileme:** Sayfa yenilendiğinde token bellekte tutulduğu için oturum sıfırlanır ve korumalı rotalar (`/`, `/analysis`) kullanıcıyı `/login` sayfasına yönlendirir.
+- **Analiz Ekranı İş Akışı (`/analysis`):** ANALYST rolündeki kullanıcılar CIC-IDS2017 formatında CSV dosyası yükleyebilir (en fazla 50 MB, `.csv` uzantılı, sürükle-bırak ve klavye destekli), yüklenen dosya için `job_id` alarak analizi manuel başlatabilir. Analiz tamamlandığında özet sonuçlar ve güncellenen analiz geçmişi listelenir.
+- **API Sözleşmeleri ve Listeleme:** Analiz işleri `GET /api/v1/analysis?skip=0&limit=20` üzerinden listelenir. Yanıt sahte bir `total` alanı içermez, doğrudan dizi olarak döner.
+- **Hata Maskeleme & Güvenlik:** Backend'den dönen teknik hatalar, stack trace, dosya yolları veya `DUPLICATE_FILE` / `MODEL_NOT_FOUND` gibi hata kodları kullanıcı arayüzüne sızdırılmaz. Güvenli Türkçe mesajlara (`Bu CSV dosyası daha önce yüklenmiş.`, `Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.`) dönüştürülür. İptal edilen istekler `AbortController` ile yönetilir; duplicate-submit ve stale-response korumaları uygulanır.
+- **Erişilebilirlik ve Responsive:** Semantik HTML5 başlıkları, ARIA canlı bölgeleri (`role="status"`, `role="alert"`), klavye odağı (`focus-visible`) ve 320px mobil genişliğe kadar responsive tasarım desteklenmektedir. Durumlar yalnızca renk ile ifade edilmez.
+- **Yetkilendirme:** Frontend rol bilgisi kullanıcı arayüzü sunumu içindir (ör. ADMIN kullanıcıya yükleme formu gösterilmez). Gerçek yetkilendirme ve sahiplik denetimi backend RBAC sorumluluğundadır.
+- **Development Proxy:** Geliştirme ortamında Vite dev/preview sunucusu bağıl `/api/v1` isteklerini yerel backend sunucusuna (`http://127.0.0.1:8000`) iletir.
 
 ### Docker ile Kurulum (planlandı / henüz doğrulanmadı)
 

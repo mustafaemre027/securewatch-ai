@@ -1,0 +1,12 @@
+import { Navigate, Outlet } from 'react-router';
+import { useAuth } from '../features/auth/useAuth';
+
+export function PublicOnlyRoute() {
+  const { isAuthenticated } = useAuth();
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+}
