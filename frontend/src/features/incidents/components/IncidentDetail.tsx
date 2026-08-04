@@ -5,6 +5,7 @@ import type { IncidentDetail as IncidentDetailType, IncidentStatus, IncidentSeve
 import { ApiError } from '../../../api/types';
 import { IncidentActionPanel } from './IncidentActionPanel';
 import { IncidentCommentForm } from './IncidentCommentForm';
+import { IncidentAssignmentPanel } from './IncidentAssignmentPanel';
 import type { IncidentComment } from '../types';
 
 export interface IncidentDetailProps {
@@ -302,6 +303,7 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
             </div>
           </div>
 
+          <IncidentAssignmentPanel key={incident.id} incident={incident} onUpdated={handleIncidentUpdate} />
           <IncidentActionPanel incident={incident} onUpdated={handleIncidentUpdate} />
 
           <div>

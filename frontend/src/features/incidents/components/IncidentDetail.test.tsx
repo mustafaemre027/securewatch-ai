@@ -6,11 +6,16 @@ import { getIncident } from '../api';
 import { useAuth } from '../../auth/useAuth';
 import { ApiError } from '../../../api/types';
 import type { IncidentDetail as IncidentDetailType } from '../types';
+import { listAssignableAnalysts } from '../analystApi';
 
 vi.mock('../api', () => ({
   getIncident: vi.fn(),
   updateIncident: vi.fn(),
   addIncidentComment: vi.fn(),
+}));
+
+vi.mock('../analystApi', () => ({
+  listAssignableAnalysts: vi.fn(),
 }));
 
 vi.mock('../../auth/useAuth', () => ({
@@ -49,6 +54,7 @@ describe('IncidentDetail', () => {
       logoutUser: vi.fn(),
       error: null,
     });
+    vi.mocked(listAssignableAnalysts).mockResolvedValue([]);
     vi.mocked(getIncident).mockResolvedValue(createMockDetail(1));
   });
 
@@ -604,6 +610,86 @@ describe('IncidentDetail', () => {
       
       const comments = screen.getAllByText('Tek Yorum');
       expect(comments).toHaveLength(1);
+    });
+  });
+
+  describe('IncidentAssignmentPanel Entegrasyonu', () => {
+    it('1, 4, 17. ADMIN kullanıcıda assignment panel görünür ve doğru incidenti alır, route bağımsız', async () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        accessToken: 'test-token',
+        user: { id: 99, username: 'admin', role: 'ADMIN' } as never,
+        isLoading: false,
+        loginUser: vi.fn(),
+        logoutUser: vi.fn(),
+        error: null,
+      });
+      vi.mocked(listAssignableAnalysts).mockResolvedValue([]);
+
+      render(<IncidentDetail incidentId={1} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Analist Atama')).toBeInTheDocument();
+      });
+    });
+
+    it('2, 3. ANALYST kullanıcıda assignment panel görünmez, Action panel korunur', async () => {
+      render(<IncidentDetail incidentId={1} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Olay İşlemleri')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Analist Atama')).not.toBeInTheDocument();
+    });
+
+    it('5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16. Atama statei mutate etmeden günceller, getIncident çağrılmaz, alanlar korunur', async () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        accessToken: 'test-token',
+        user: { id: 99, username: 'admin', role: 'ADMIN' } as never,
+        isLoading: false,
+        loginUser: vi.fn(),
+        logoutUser: vi.fn(),
+        error: null,
+      });
+      
+      vi.mocked(listAssignableAnalysts).mockResolvedValue([
+        { id: 2, username: 'analyst2', email: 'a@a.com', role: 'ANALYST', created_at: 'd' }
+      ] as unknown as import('../../auth/types').UserResponse[]);
+
+      const initialDetail = createMockDetail(1, { 
+        comments: [{ id: 1, incident_id: 1, user_id: 99, comment_text: 'İlk Yorum', created_at: '2023-01-01T10:00:00Z' }] 
+      });
+      vi.mocked(getIncident).mockResolvedValue(initialDetail);
+
+      const { updateIncident } = await import('../api');
+      vi.mocked(updateIncident).mockResolvedValue({
+        ...initialDetail,
+        assigned_analyst_id: 2
+      });
+
+      render(<IncidentDetail incidentId={1} />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Atanacak Analist')).toBeInTheDocument();
+      });
+
+      expect(getIncident).toHaveBeenCalledTimes(1); // İlk yükleme
+
+      await userEvent.selectOptions(screen.getByLabelText('Atanacak Analist'), '2');
+      await userEvent.click(screen.getByRole('button', { name: 'Analisti Ata' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Olay analiste başarıyla atandı.')).toBeInTheDocument();
+      });
+
+      // Assertions
+      expect(getIncident).toHaveBeenCalledTimes(1); // Tekrar çağrılmamalı
+      expect(screen.getByText(initialDetail.title)).toBeInTheDocument(); // Title korunur
+      expect(screen.getByText(initialDetail.description)).toBeInTheDocument(); // Desc korunur
+      expect(screen.getByText('İlk Yorum')).toBeInTheDocument(); // Yorum korunur
+      expect(screen.getByLabelText('Yorum')).toBeInTheDocument(); // Yorum formu korunur
+      expect(screen.getByText('Analist #2')).toBeInTheDocument(); // Atanan kişi güncellendi
     });
   });
 });
