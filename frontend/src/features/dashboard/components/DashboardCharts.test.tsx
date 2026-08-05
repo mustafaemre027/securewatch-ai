@@ -4,14 +4,21 @@ import { describe, it, expect, vi } from 'vitest';
 import { DashboardCharts } from './DashboardCharts';
 import type { DashboardSummaryResponse } from '../types';
 
+interface ResponsiveChildProps {
+  width?: number;
+  height?: number;
+}
+
 // Mock Recharts ResponsiveContainer to avoid JSDOM sizing issues
 vi.mock('recharts', async () => {
   const Actual = await vi.importActual<typeof import('recharts')>('recharts');
   return {
     ...Actual,
-    ResponsiveContainer: ({ children }: { children: React.ReactElement }) => (
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
       <div data-testid="responsive-container">
-        {React.cloneElement(children, { width: 500, height: 300 })}
+        {React.isValidElement<ResponsiveChildProps>(children)
+          ? React.cloneElement(children, { width: 500, height: 300 })
+          : children}
       </div>
     ),
   };

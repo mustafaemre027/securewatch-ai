@@ -70,7 +70,7 @@ describe('Dashboard Validators', () => {
         title: 'High Risk Incident',
         status: 'OPEN',
         severity: 'CRITICAL',
-        assigned_analyst_id: null,
+        assigned_analyst_id: null as number | null,
         created_at: '2024-01-01T12:00:00.000Z',
         updated_at: '2024-01-01T12:00:00.000Z',
       }
