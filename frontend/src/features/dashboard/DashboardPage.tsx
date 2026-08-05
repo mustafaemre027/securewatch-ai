@@ -5,6 +5,7 @@ import type { DashboardSummaryResponse } from './types';
 import { ApiError } from '../../api/types';
 import { DashboardSummaryCards } from './components/DashboardSummaryCards';
 import { DashboardCharts } from './components/DashboardCharts';
+import { DashboardRecentActivity } from './components/DashboardRecentActivity';
 import './dashboard.css';
 
 export const DashboardPage: React.FC = () => {
@@ -141,6 +142,11 @@ export const DashboardPage: React.FC = () => {
              summary.incident_summary.total_incidents === 0) && (
             <DashboardCharts summary={summary} />
           )}
+
+          <DashboardRecentActivity 
+            recentDetections={summary.recent_detections} 
+            recentIncidents={summary.recent_incidents} 
+          />
         </section>
       )}
     </div>

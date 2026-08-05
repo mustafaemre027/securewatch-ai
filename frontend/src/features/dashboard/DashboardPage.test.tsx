@@ -17,6 +17,10 @@ vi.mock('./components/DashboardCharts', () => ({
   DashboardCharts: () => <div data-testid="dashboard-charts" />
 }));
 
+vi.mock('./components/DashboardRecentActivity', () => ({
+  DashboardRecentActivity: () => <div data-testid="dashboard-recent-activity" />
+}));
+
 const getMockSummary = (): DashboardSummaryResponse => ({
   generated_at: '2026-08-05T12:00:00Z',
   analysis_summary: {
@@ -839,6 +843,47 @@ describe('DashboardPage', () => {
       const signal = vi.mocked(getDashboardSummary).mock.calls[0][1];
       unmount();
       expect(signal?.aborted).toBe(true);
+    });
+  });
+
+  // 12. Etkinlik Listesi Entegrasyon Testleri
+  describe('Etkinlik Listesi Entegrasyonu', () => {
+    it('Dolu response sonrasında listeler görünür', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('Tamamen boş response durumunda (empty dashboard) listeler render edilir', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getEmptySummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('Loading sırasında listeler görünmez', () => {
+      vi.mocked(getDashboardSummary).mockImplementation(() => new Promise(() => {}));
+      render(<DashboardPage />);
+      expect(screen.queryByTestId('dashboard-recent-activity')).not.toBeInTheDocument();
+    });
+
+    it('Error sırasında listeler görünmez', async () => {
+      vi.mocked(getDashboardSummary).mockRejectedValue(new ApiError(500, { code: '', message: '', details: null }));
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+      expect(screen.queryByTestId('dashboard-recent-activity')).not.toBeInTheDocument();
+    });
+
+    it('Etkinlik entegrasyonu yeni API isteği oluşturmaz', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+      expect(getDashboardSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it('Etkinlik listeleri son güncelleme bilgisini korur', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByText(/Son güncelleme:/i)).toBeInTheDocument());
     });
   });
 });
