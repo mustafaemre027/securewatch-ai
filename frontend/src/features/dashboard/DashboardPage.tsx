@@ -30,7 +30,7 @@ export const DashboardPage: React.FC = () => {
 
     try {
       const response = await getDashboardSummary(accessToken, currentController.signal);
-      
+
       if (abortControllerRef.current !== currentController) return;
 
       setSummary(response);
@@ -118,7 +118,21 @@ export const DashboardPage: React.FC = () => {
 
       {summary && !isLoading && !error && (
         <section aria-labelledby="summary-cards-heading">
-          <h2 id="summary-cards-heading" className="sr-only">Özet İstatistikler</h2>
+          <div className="flex justify-between items-end mb-4">
+            <h2 id="summary-cards-heading" className="sr-only">Özet İstatistikler</h2>
+            <span className="text-xs text-slate-400">
+              Son güncelleme: {new Date(summary.generated_at).toLocaleString('tr-TR', { dateStyle: 'long', timeStyle: 'short' })}
+            </span>
+          </div>
+
+          {summary.analysis_summary.total_jobs === 0 &&
+           summary.detection_summary.total_detections === 0 &&
+           summary.incident_summary.total_incidents === 0 && (
+            <div className="mb-6 p-4 bg-space-blue/30 border border-space-blue rounded-lg text-center text-muted-blue">
+              Henüz sistemde gösterilecek veri bulunmuyor.
+            </div>
+          )}
+
           <DashboardSummaryCards summary={summary} />
         </section>
       )}
