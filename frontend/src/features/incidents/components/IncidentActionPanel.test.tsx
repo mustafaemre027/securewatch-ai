@@ -164,7 +164,7 @@ describe('IncidentActionPanel', () => {
       
       expect(updateIncident).toHaveBeenCalledTimes(1);
       
-      act(() => {
+      await act(async () => {
         resolveApi(updatedIncidentResponse);
       });
     });
@@ -390,7 +390,7 @@ describe('IncidentActionPanel', () => {
       
       expect(screen.getByRole('alertdialog')).toBeInTheDocument();
       
-      act(() => {
+      await act(async () => {
         resolveApi(updatedIncidentResponse);
       });
     });
@@ -565,7 +565,15 @@ describe('IncidentActionPanel', () => {
 
     it('54. Stale response onUpdated çağırmaz', async () => {
       let resolveApi: (value: IncidentListItem) => void = () => {};
-      vi.mocked(updateIncident).mockImplementation(() => new Promise(res => { resolveApi = res; }));
+      let rejectApi: (err: unknown) => void = () => {};
+      let signal: AbortSignal | undefined;
+      vi.mocked(updateIncident).mockImplementation((_id, _payload, _token, sig) => {
+        signal = sig;
+        return new Promise((res, rej) => { 
+          resolveApi = res; 
+          rejectApi = rej;
+        });
+      });
       
       const { rerender } = render(<IncidentActionPanel incident={baseIncident} onUpdated={onUpdatedMock} />);
       fireEvent.click(screen.getByRole('button', { name: 'Olayı Üzerime Al' }));
@@ -573,8 +581,12 @@ describe('IncidentActionPanel', () => {
       const nextIncident = { ...baseIncident, id: 2 };
       rerender(<IncidentActionPanel incident={nextIncident} onUpdated={onUpdatedMock} />);
       
-      act(() => {
-        resolveApi(updatedIncidentResponse);
+      await act(async () => {
+        if (signal?.aborted) {
+          rejectApi(new DOMException('Aborted', 'AbortError'));
+        } else {
+          resolveApi(updatedIncidentResponse);
+        }
       });
       
       expect(onUpdatedMock).not.toHaveBeenCalled();
@@ -593,7 +605,7 @@ describe('IncidentActionPanel', () => {
       
       expect(container).toHaveAttribute('aria-busy', 'true');
       
-      act(() => {
+      await act(async () => {
         resolveApi(updatedIncidentResponse);
       });
     });
@@ -638,12 +650,12 @@ describe('IncidentActionPanel', () => {
       fireEvent.click(btn);
       expect(btn).toBeDisabled();
       
-      act(() => {
+      await act(async () => {
         resolveApi(updatedIncidentResponse);
       });
     });
 
-    it('60. Klavye ile butonlar kullanılabilir', () => {
+    it('60. Klavye ile butonlar kullanılabilir', async () => {
       render(<IncidentActionPanel incident={baseIncident} onUpdated={onUpdatedMock} />);
       const btn = screen.getByRole('button', { name: 'Olayı Üzerime Al' });
       
@@ -652,7 +664,9 @@ describe('IncidentActionPanel', () => {
       });
       
       expect(document.activeElement).toBe(btn);
-      fireEvent.click(btn); // Testing library allows click via fireEvent on focused buttons which simulates keyboard enter
+      await act(async () => {
+        fireEvent.click(btn); // Testing library allows click via fireEvent on focused buttons which simulates keyboard enter
+      });
       
       expect(updateIncident).toHaveBeenCalled();
     });

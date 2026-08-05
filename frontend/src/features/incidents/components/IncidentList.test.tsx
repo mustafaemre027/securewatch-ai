@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { IncidentList } from './IncidentList';
@@ -254,7 +254,7 @@ describe('IncidentList', () => {
       expect(severitySelect).toBeDisabled();
       expect(checkbox).toBeDisabled();
 
-      resolveApi([]);
+      await act(async () => { resolveApi([]); });
       await waitFor(() => expect(statusSelect).not.toBeDisabled());
 
       // We will test skip reset by paginating first
@@ -380,7 +380,7 @@ describe('IncidentList', () => {
       rerender(<MemoryRouter><IncidentList /></MemoryRouter>);
 
       // Resolve first fetch with old data
-      resolveFirst([createMockIncident(1, { title: 'STALE DATA' })]);
+      await act(async () => { resolveFirst([createMockIncident(1, { title: 'STALE DATA' })]); });
 
       // Second fetch still pending, so stale data shouldn't be rendered
       // We should still see loading or not see stale data
@@ -389,7 +389,7 @@ describe('IncidentList', () => {
       });
 
       // Resolve second fetch
-      resolveSecond([createMockIncident(2, { title: 'FRESH DATA' })]);
+      await act(async () => { resolveSecond([createMockIncident(2, { title: 'FRESH DATA' })]); });
 
       expect(await screen.findByText('FRESH DATA')).toBeInTheDocument();
     });
@@ -419,7 +419,7 @@ describe('IncidentList', () => {
   });
 
   describe('Durumlar', () => {
-    it('37. Loading metni ve role=status bulunur, 52. Loading aria-busy davranışı korunur', () => {
+    it('37. Loading metni ve role=status bulunur, 52. Loading aria-busy davranışı korunur', async () => {
       let resolveApi: (value: IncidentListItem[]) => void = () => {};
       vi.mocked(listIncidents).mockImplementation(() => new Promise((res) => { resolveApi = res; }));
 
@@ -430,7 +430,7 @@ describe('IncidentList', () => {
       expect(statusElement).toHaveAttribute('aria-busy', 'true');
       expect(statusElement).toHaveTextContent(/Olaylar yükleniyor/i);
 
-      resolveApi([]);
+      await act(async () => { resolveApi([]); });
     });
 
     it('38. Filtre yokken boş state doğru görünür', async () => {
@@ -513,12 +513,14 @@ describe('IncidentList', () => {
   });
 
   describe('Erişilebilirlik', () => {
-    it('48. Filtre label bağlantıları doğrudur', () => {
+    it('48. Filtre label bağlantıları doğrudur', async () => {
       render(<MemoryRouter><IncidentList /></MemoryRouter>);
       // Implicitly tested if getByLabelText works.
       expect(screen.getByLabelText(/Olay Durumu/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Önem Seviyesi/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/Yalnız Bana Atananlar/i)).toBeInTheDocument();
+      
+      await waitFor(() => expect(listIncidents).toHaveBeenCalled());
     });
 
     it('49. Liste semantik ul/li yapısındadır', async () => {

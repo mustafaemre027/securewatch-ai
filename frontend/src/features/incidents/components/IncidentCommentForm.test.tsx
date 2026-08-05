@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IncidentCommentForm } from './IncidentCommentForm';
 import { useAuth } from '../../auth/useAuth';
@@ -185,7 +185,9 @@ describe('IncidentCommentForm', () => {
       expect(btn).toBeDisabled();
       expect(btn).toHaveTextContent('Yorum Ekleniyor...');
       
-      resolvePromise({ id: 1, incident_id: 1, user_id: 1, comment_text: 'a', created_at: '2023' });
+      await act(async () => {
+        resolvePromise({ id: 1, incident_id: 1, user_id: 1, comment_text: 'a', created_at: '2023' });
+      });
     });
   });
 
@@ -246,8 +248,16 @@ describe('IncidentCommentForm', () => {
 
     it('33. Stale response callback çağırmaz', async () => {
       let resolvePromise: (val: IncidentComment) => void = () => {};
-      const promise = new Promise<IncidentComment>((resolve) => { resolvePromise = resolve; });
-      vi.mocked(addIncidentComment).mockReturnValue(promise);
+      let rejectPromise: (err: unknown) => void = () => {};
+      let signal: AbortSignal | undefined;
+      const promise = new Promise<IncidentComment>((resolve, reject) => { 
+        resolvePromise = resolve; 
+        rejectPromise = reject;
+      });
+      vi.mocked(addIncidentComment).mockImplementation((_a, _b, _c, sig) => {
+        signal = sig;
+        return promise;
+      });
       
       const { unmount } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), 'text');
@@ -255,7 +265,13 @@ describe('IncidentCommentForm', () => {
       
       unmount();
       
-      resolvePromise({ id: 1, incident_id: 1, user_id: 1, comment_text: 'text', created_at: '2023' });
+      await act(async () => {
+        if (signal?.aborted) {
+          rejectPromise(new DOMException('aborted', 'AbortError'));
+        } else {
+          resolvePromise({ id: 1, incident_id: 1, user_id: 1, comment_text: 'text', created_at: '2023' });
+        }
+      });
       await waitFor(() => {
         expect(mockOnCommentAdded).not.toHaveBeenCalled();
       });

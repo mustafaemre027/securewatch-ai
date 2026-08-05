@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IncidentDetail } from './IncidentDetail';
 import { getIncident } from '../api';
@@ -297,13 +297,13 @@ describe('IncidentDetail', () => {
       
       cleanup(); render(<IncidentDetail incidentId={2} />);
       
-      resolveFirst(createMockDetail(1, { title: 'STALE DATA' }));
+      await act(async () => { resolveFirst(createMockDetail(1, { title: 'STALE DATA' })); });
       
       await waitFor(() => {
         expect(screen.queryByText('STALE DATA')).not.toBeInTheDocument();
       });
       
-      resolveSecond(createMockDetail(2, { title: 'FRESH DATA' }));
+      await act(async () => { resolveSecond(createMockDetail(2, { title: 'FRESH DATA' })); });
       expect(await screen.findByText('FRESH DATA')).toBeInTheDocument();
     });
 
@@ -387,7 +387,7 @@ describe('IncidentDetail', () => {
       
       expect(screen.queryByRole('button', { name: /Tekrar Dene/i })).not.toBeInTheDocument();
       
-      resolveApi(createMockDetail(1, { title: 'Retried Data' }));
+      await act(async () => { resolveApi(createMockDetail(1, { title: 'Retried Data' })); });
       expect(await screen.findByText('Retried Data')).toBeInTheDocument();
     });
   });
@@ -423,7 +423,7 @@ describe('IncidentDetail', () => {
       expect(document.querySelector('dl')).toBeInTheDocument();
     });
 
-    it('55. Loading role=status kullanır', () => {
+    it('55. Loading role=status kullanır', async () => {
       let resolveApi: (value: IncidentDetailType) => void = () => {};
       vi.mocked(getIncident).mockImplementation(() => new Promise((res) => { resolveApi = res; }));
       render(<IncidentDetail incidentId={1} />);
@@ -431,7 +431,7 @@ describe('IncidentDetail', () => {
       const statusElement = screen.getByRole('status');
       expect(statusElement).toBeInTheDocument();
       
-      resolveApi(createMockDetail(1));
+      await act(async () => { resolveApi(createMockDetail(1)); });
     });
 
     it('56. Error role=alert kullanır', async () => {

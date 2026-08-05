@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IncidentAssignmentPanel } from './IncidentAssignmentPanel';
 import { listAssignableAnalysts } from '../analystApi';
@@ -56,6 +56,7 @@ describe('IncidentAssignmentPanel', () => {
     it('1. ADMIN kullanıcıda panel görünür', async () => {
       render(<IncidentAssignmentPanel incident={mockIncident} onUpdated={onUpdatedMock} />);
       expect(screen.getByText('Analist Atama')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(/Analistler yükleniyor/i)).not.toBeInTheDocument());
     });
 
     it('2, 3, 4, 5, 6. Yetkisiz veya ANALYST ise panel görünmez ve API çağrılmaz', () => {
@@ -121,7 +122,8 @@ describe('IncidentAssignmentPanel', () => {
     });
 
     it('18, 21. Unmount abort eder, abort error gizlenir', async () => {
-      const promise = new Promise<UserResponse[]>(() => { /* pending */ });
+      let rejectPromise: (reason?: unknown) => void = () => {};
+      const promise = new Promise<UserResponse[]>((_, reject) => { rejectPromise = reject; });
       vi.mocked(listAssignableAnalysts).mockReturnValue(promise);
 
       const { unmount } = render(<IncidentAssignmentPanel incident={mockIncident} onUpdated={onUpdatedMock} />);
@@ -132,6 +134,9 @@ describe('IncidentAssignmentPanel', () => {
       
       // Normally promise would reject with AbortError if aborted by signal, we manually simulate it
       // Since it's unmounted, we can't easily check DOM, but we can verify it doesn't crash
+      await act(async () => {
+        rejectPromise(abortError);
+      });
     });
   });
 
@@ -171,9 +176,11 @@ describe('IncidentAssignmentPanel', () => {
       expect(screen.getByRole('button', { name: 'Atanıyor...' })).toBeDisabled();
       expect(screen.getByLabelText('Atanacak Analist')).toBeDisabled(); // 32
 
-      if (typeof resolveUpdate === 'function') {
-        resolveUpdate(updatedInc);
-      }
+      await act(async () => {
+        if (typeof resolveUpdate === 'function') {
+          (resolveUpdate as (val: IncidentDetail) => void)(updatedInc);
+        }
+      });
 
       await waitFor(() => {
         expect(onUpdatedMock).toHaveBeenCalledWith(updatedInc);
