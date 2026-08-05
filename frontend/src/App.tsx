@@ -3,6 +3,7 @@ import { LoginPage } from './features/auth/LoginPage';
 import { ProtectedRoute } from './routing/ProtectedRoute';
 import { PublicOnlyRoute } from './routing/PublicOnlyRoute';
 import { AppLayout } from './layout/AppLayout';
+import { DashboardPage } from './features/dashboard';
 import { HomePage } from './pages/HomePage';
 import { AnalysisPage } from './features/analysis/AnalysisPage';
 import { DetectionResultsPage } from './features/detections/DetectionResultsPage';
@@ -22,6 +23,7 @@ export function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/analysis/:jobId/results" element={<DetectionResultsPage />} />
           <Route path="/incidents" element={<IncidentList />} />

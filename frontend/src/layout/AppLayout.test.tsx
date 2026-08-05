@@ -116,4 +116,41 @@ describe('AppLayout', () => {
     expect(inactiveNavLink).toHaveAttribute('href', '/analysis');
     expect(inactiveNavLink).not.toHaveAttribute('aria-current');
   });
+
+  it('21. Navigation link for Dashboard has correct href and aria-current when active', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { username: 'u', role: 'ANALYST' },
+      logoutUser: mockLogout,
+      isAuthenticated: true
+    } as unknown as ReturnType<typeof useAuth>);
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+             <Route path="/dashboard" element={<div />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const navLink = screen.getByRole('link', { name: 'Panel' });
+    expect(navLink).toHaveAttribute('href', '/dashboard');
+    expect(navLink).toHaveAttribute('aria-current', 'page');
+    unmount();
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+             <Route path="/" element={<div />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const inactiveNavLink = screen.getByRole('link', { name: 'Panel' });
+    expect(inactiveNavLink).toHaveAttribute('href', '/dashboard');
+    expect(inactiveNavLink).not.toHaveAttribute('aria-current');
+  });
 });

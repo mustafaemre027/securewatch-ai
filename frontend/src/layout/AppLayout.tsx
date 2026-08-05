@@ -6,6 +6,7 @@ export function AppLayout() {
   const { user, logoutUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isDashboardActive = location.pathname.startsWith('/dashboard');
   const isAnalysisActive = location.pathname.startsWith('/analysis');
   const isIncidentsActive = location.pathname.startsWith('/incidents');
 
@@ -38,6 +39,19 @@ export function AppLayout() {
               <span className="font-semibold text-lg hidden sm:block truncate">SecureWatch AI</span>
             </div>
             <div className="flex items-center sm:border-l border-space-blue sm:pl-6 gap-2">
+              <NavLink
+                to="/dashboard"
+                aria-current={isDashboardActive ? 'page' : undefined}
+                className={() =>
+                  `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isDashboardActive
+                      ? 'bg-space-blue text-white'
+                      : 'text-muted-blue hover:text-white hover:bg-space-blue/50'
+                  }`
+                }
+              >
+                Panel
+              </NavLink>
               <NavLink
                 to="/analysis"
                 aria-current={isAnalysisActive ? 'page' : undefined}
