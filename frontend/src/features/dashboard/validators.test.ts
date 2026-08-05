@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseDashboardSummary } from './validators';
 
 describe('Dashboard Validators', () => {
-  const createValidResponse = (): unknown => ({
+  const createValidResponse = () => ({
     generated_at: '2024-01-01T12:00:00.000Z',
     analysis_summary: {
       total_jobs: 10,
@@ -88,50 +88,63 @@ describe('Dashboard Validators', () => {
   });
 
   it('rejects if generated_at is missing', () => {
-    const valid = createValidResponse() as any;
+    const valid: Record<string, unknown> = { ...createValidResponse() };
     delete valid.generated_at;
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects if generated_at is invalid', () => {
-    const valid = createValidResponse() as any;
-    valid.generated_at = 'invalid-date';
+    const valid = { ...createValidResponse(), generated_at: 'invalid-date' };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects if analysis summary is missing', () => {
-    const valid = createValidResponse() as any;
+    const valid: Record<string, unknown> = { ...createValidResponse() };
     delete valid.analysis_summary;
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects negative analysis total', () => {
-    const valid = createValidResponse() as any;
-    valid.analysis_summary.total_jobs = -1;
+    const base = createValidResponse();
+    const valid = { ...base, analysis_summary: { ...base.analysis_summary, total_jobs: -1 } };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects float counters', () => {
-    const valid = createValidResponse() as any;
-    valid.analysis_summary.completed_jobs = 1.5;
+    const base = createValidResponse();
+    const valid = { ...base, analysis_summary: { ...base.analysis_summary, completed_jobs: 1.5 } };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects unknown analysis status', () => {
-    const valid = createValidResponse() as any;
-    valid.analysis_summary.status_distribution['UNKNOWN'] = 1;
+    const base = createValidResponse();
+    const valid = { 
+      ...base, 
+      analysis_summary: { 
+        ...base.analysis_summary, 
+        status_distribution: { ...base.analysis_summary.status_distribution, UNKNOWN: 1 } 
+      } 
+    };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects missing analysis status category', () => {
-    const valid = createValidResponse() as any;
-    delete valid.analysis_summary.status_distribution['PENDING'];
+    const base = createValidResponse();
+    const status_distribution: Record<string, unknown> = { ...base.analysis_summary.status_distribution };
+    delete status_distribution.PENDING;
+    const valid = { 
+      ...base, 
+      analysis_summary: { 
+        ...base.analysis_summary, 
+        status_distribution 
+      } 
+    };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects negative detection total', () => {
-    const valid = createValidResponse() as any;
-    valid.detection_summary.total_detections = -10;
+    const base = createValidResponse();
+    const valid = { ...base, detection_summary: { ...base.detection_summary, total_detections: -10 } };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
@@ -143,26 +156,40 @@ describe('Dashboard Validators', () => {
   });
 
   it('rejects unknown risk level', () => {
-    const valid = createValidResponse() as any;
-    valid.risk_distribution['MEGA_CRITICAL'] = 1;
+    const base = createValidResponse();
+    const valid = { ...base, risk_distribution: { ...base.risk_distribution, MEGA_CRITICAL: 1 } };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects missing risk category', () => {
-    const valid = createValidResponse() as any;
-    delete valid.risk_distribution['LOW'];
+    const base = createValidResponse();
+    const risk_distribution: Record<string, unknown> = { ...base.risk_distribution };
+    delete risk_distribution.LOW;
+    const valid = { ...base, risk_distribution };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects unknown incident status', () => {
-    const valid = createValidResponse() as any;
-    valid.incident_summary.status_distribution['UNKNOWN'] = 1;
+    const base = createValidResponse();
+    const valid = { 
+      ...base, 
+      incident_summary: { 
+        ...base.incident_summary, 
+        status_distribution: { ...base.incident_summary.status_distribution, UNKNOWN: 1 } 
+      } 
+    };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects unknown incident severity', () => {
-    const valid = createValidResponse() as any;
-    valid.incident_summary.severity_distribution['UNKNOWN'] = 1;
+    const base = createValidResponse();
+    const valid = { 
+      ...base, 
+      incident_summary: { 
+        ...base.incident_summary, 
+        severity_distribution: { ...base.incident_summary.severity_distribution, UNKNOWN: 1 } 
+      } 
+    };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
@@ -173,40 +200,46 @@ describe('Dashboard Validators', () => {
   });
 
   it('rejects trend with 6 points', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days.pop();
+    const base = createValidResponse();
+    const valid = { ...base, trend_7_days: base.trend_7_days.slice(0, 6) };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects trend with 8 points', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days.push({ date: '2024-01-08', total: 0, benign: 0, attack: 0 });
+    const base = createValidResponse();
+    const valid = { ...base, trend_7_days: [...base.trend_7_days, { date: '2024-01-08', total: 0, benign: 0, attack: 0 }] };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects trend invalid date', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days[0].date = 'invalid-date';
+    const base = createValidResponse();
+    const newTrend = [...base.trend_7_days];
+    newTrend[0] = { ...newTrend[0], date: 'invalid-date' };
+    const valid = { ...base, trend_7_days: newTrend };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects unordered trend', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days[0].date = '2024-01-08'; // out of order
+    const base = createValidResponse();
+    const newTrend = [...base.trend_7_days];
+    newTrend[0] = { ...newTrend[0], date: '2024-01-08' }; // out of order
+    const valid = { ...base, trend_7_days: newTrend };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects duplicated date in trend', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days[1].date = '2024-01-01'; // duplicate
+    const base = createValidResponse();
+    const newTrend = [...base.trend_7_days];
+    newTrend[1] = { ...newTrend[1], date: '2024-01-01' }; // duplicate
+    const valid = { ...base, trend_7_days: newTrend };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects bad trend sum', () => {
-    const valid = createValidResponse() as any;
-    valid.trend_7_days[0].total = 10;
-    valid.trend_7_days[0].benign = 5;
-    valid.trend_7_days[0].attack = 6; // sum = 11 != 10
+    const base = createValidResponse();
+    const newTrend = [...base.trend_7_days];
+    newTrend[0] = { ...newTrend[0], total: 10, benign: 5, attack: 6 }; // sum = 11 != 10
+    const valid = { ...base, trend_7_days: newTrend };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
@@ -217,32 +250,40 @@ describe('Dashboard Validators', () => {
   });
 
   it('rejects recent detection array > 5', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_detections = Array(6).fill(valid.recent_detections[0]);
+    const base = createValidResponse();
+    const valid = { ...base, recent_detections: Array(6).fill(base.recent_detections[0]) };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects non-positive detection ID', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_detections[0].id = 0;
+    const base = createValidResponse();
+    const newDetections = [...base.recent_detections];
+    newDetections[0] = { ...newDetections[0], id: 0 };
+    const valid = { ...base, recent_detections: newDetections };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects invalid row_index', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_detections[0].row_index = -1;
+    const base = createValidResponse();
+    const newDetections = [...base.recent_detections];
+    newDetections[0] = { ...newDetections[0], row_index: -1 };
+    const valid = { ...base, recent_detections: newDetections };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects negative attack_probability', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_detections[0].attack_probability = -0.1;
+    const base = createValidResponse();
+    const newDetections = [...base.recent_detections];
+    newDetections[0] = { ...newDetections[0], attack_probability: -0.1 };
+    const valid = { ...base, recent_detections: newDetections };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects attack_probability > 1', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_detections[0].attack_probability = 1.1;
+    const base = createValidResponse();
+    const newDetections = [...base.recent_detections];
+    newDetections[0] = { ...newDetections[0], attack_probability: 1.1 };
+    const valid = { ...base, recent_detections: newDetections };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
@@ -253,42 +294,48 @@ describe('Dashboard Validators', () => {
   });
 
   it('rejects recent incident array > 5', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_incidents = Array(6).fill(valid.recent_incidents[0]);
+    const base = createValidResponse();
+    const valid = { ...base, recent_incidents: Array(6).fill(base.recent_incidents[0]) };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('rejects empty incident title', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_incidents[0].title = '   ';
+    const base = createValidResponse();
+    const newIncidents = [...base.recent_incidents];
+    newIncidents[0] = { ...newIncidents[0], title: '   ' };
+    const valid = { ...base, recent_incidents: newIncidents };
     expect(() => parseDashboardSummary(valid)).toThrow(getInvalidErrorMsg());
   });
 
   it('accepts nullable analyst field properly', () => {
-    const valid = createValidResponse() as any;
-    valid.recent_incidents[0].assigned_analyst_id = null;
-    let result = parseDashboardSummary(valid);
+    const base = createValidResponse();
+    const newIncidents1 = [...base.recent_incidents];
+    newIncidents1[0] = { ...newIncidents1[0], assigned_analyst_id: null };
+    const valid1 = { ...base, recent_incidents: newIncidents1 };
+    
+    let result = parseDashboardSummary(valid1);
     expect(result.recent_incidents[0].assigned_analyst_id).toBeNull();
     
-    valid.recent_incidents[0].assigned_analyst_id = 10;
-    result = parseDashboardSummary(valid);
+    const newIncidents2 = [...base.recent_incidents];
+    newIncidents2[0] = { ...newIncidents2[0], assigned_analyst_id: 10 };
+    const valid2 = { ...base, recent_incidents: newIncidents2 };
+    result = parseDashboardSummary(valid2);
     expect(result.recent_incidents[0].assigned_analyst_id).toBe(10);
   });
 
   it('does not leak unexpected protocol field', () => {
-    const valid = createValidResponse() as any;
-    valid.protocol = 'TCP';
+    const base = createValidResponse();
+    const valid = { ...base, protocol: 'TCP' };
     const result = parseDashboardSummary(valid);
-    expect((result as any).protocol).toBeUndefined();
+    expect('protocol' in result).toBe(false);
   });
 
   it('does not leak password or token in response', () => {
-    const valid = createValidResponse() as any;
-    valid.password = 'supersecret';
-    valid.token = 'mytoken';
+    const base = createValidResponse();
+    const valid = { ...base, password: 'supersecret', token: 'mytoken' };
     const result = parseDashboardSummary(valid);
-    expect((result as any).password).toBeUndefined();
-    expect((result as any).token).toBeUndefined();
+    expect('password' in result).toBe(false);
+    expect('token' in result).toBe(false);
   });
 
   it('rejects null response', () => {
@@ -300,14 +347,18 @@ describe('Dashboard Validators', () => {
   });
 
   it('does not leak raw payload in error message', () => {
-    const valid = createValidResponse() as any;
-    valid.incident_summary.total_incidents = -100;
+    const base = createValidResponse();
+    const valid = { ...base, incident_summary: { ...base.incident_summary, total_incidents: -100 } };
     try {
       parseDashboardSummary(valid);
       expect.fail('Should have thrown');
-    } catch (e: any) {
-      expect(e.message).toBe(getInvalidErrorMsg());
-      expect(e.message).not.toContain('-100');
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        expect(e.message).toBe(getInvalidErrorMsg());
+        expect(e.message).not.toContain('-100');
+      } else {
+        expect.fail('Thrown object is not an Error');
+      }
     }
   });
 

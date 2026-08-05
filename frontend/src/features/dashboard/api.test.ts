@@ -95,8 +95,8 @@ describe('Dashboard API Client', () => {
   });
 
   it('rejects if response lacks required fields (validator rejects)', async () => {
-    const invalidResp = { ...validResponse };
-    delete (invalidResp as any).analysis_summary;
+    const invalidResp: Record<string, unknown> = { ...validResponse };
+    delete invalidResp.analysis_summary;
     vi.mocked(globalThis.fetch).mockResolvedValueOnce(mockResponse(200, true, invalidResp));
     await expect(getDashboardSummary()).rejects.toThrow('Invalid dashboard response');
   });
@@ -120,10 +120,12 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(401);
-      expect(e.message).toBe('Unauthorized');
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(401);
+        expect(e.message).toBe('Unauthorized');
+      }
     }
   });
 
@@ -132,9 +134,11 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(403);
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(403);
+      }
     }
   });
 
@@ -143,9 +147,11 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(422);
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(422);
+      }
     }
   });
 
@@ -154,9 +160,11 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(500);
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(500);
+      }
     }
   });
 
@@ -165,10 +173,12 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(0);
-      expect(e.code).toBe('NETWORK_ERROR');
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(0);
+        expect(e.code).toBe('NETWORK_ERROR');
+      }
     }
   });
 
@@ -178,9 +188,11 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(e.status).toBe(0);
+      if (e instanceof ApiError) {
+        expect(e.status).toBe(0);
+      }
     }
   });
 
@@ -218,9 +230,11 @@ describe('Dashboard API Client', () => {
     try {
       await getDashboardSummary();
       expect.fail('Should throw');
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ApiError);
-      expect(JSON.stringify(e)).not.toContain('secret123');
+      if (e instanceof ApiError) {
+        expect(JSON.stringify(e)).not.toContain('secret123');
+      }
     }
   });
 
