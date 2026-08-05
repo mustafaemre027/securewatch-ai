@@ -16,62 +16,61 @@ export const DashboardPage: React.FC = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchSummary = async () => {
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
     if (!isAuthenticated || !accessToken) {
-      setError('Oturum bilgisi bulunamadı.');
-      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    setSummary(null);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-    abortControllerRef.current = new AbortController();
-    const currentController = abortControllerRef.current;
+    const executeFetch = async () => {
+      try {
+        const response = await getDashboardSummary(accessToken, controller.signal);
 
-    try {
-      const response = await getDashboardSummary(accessToken, currentController.signal);
+        if (abortControllerRef.current !== controller) return;
 
-      if (abortControllerRef.current !== currentController) return;
+        setSummary(response);
+      } catch (err: unknown) {
+        if (abortControllerRef.current !== controller) return;
 
-      setSummary(response);
-    } catch (err: unknown) {
-      if (abortControllerRef.current !== currentController) return;
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
 
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
+        let errorMessage = 'Dashboard verileri yüklenirken beklenmeyen bir hata oluştu.';
 
-      let errorMessage = 'Dashboard verileri yüklenirken beklenmeyen bir hata oluştu.';
-
-      if (err instanceof ApiError) {
-        if (err.status === 401) {
-          errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
-        } else if (err.status === 403) {
-          errorMessage = 'Dashboard verilerini görüntüleme yetkiniz bulunmuyor.';
-        } else if (err.status === 0 || err.code === 'NETWORK_ERROR') {
-          errorMessage = 'Sunucuya ulaşılamıyor. Lütfen bağlantınızı kontrol edin.';
-        } else if (err.status >= 500) {
-          errorMessage = 'Dashboard hizmeti geçici olarak kullanılamıyor.';
-        } else {
+        if (err instanceof ApiError) {
+          if (err.status === 401) {
+            errorMessage = 'Oturumunuz geçersiz. Lütfen yeniden giriş yapın.';
+          } else if (err.status === 403) {
+            errorMessage = 'Dashboard verilerini görüntüleme yetkiniz bulunmuyor.';
+          } else if (err.status === 0 || err.code === 'NETWORK_ERROR') {
+            errorMessage = 'Sunucuya ulaşılamıyor. Lütfen bağlantınızı kontrol edin.';
+          } else if (err.status >= 500) {
+            errorMessage = 'Dashboard hizmeti geçici olarak kullanılamıyor.';
+          } else {
+            errorMessage = 'Dashboard verileri doğrulanamadı.';
+          }
+        } else if (err instanceof Error) {
           errorMessage = 'Dashboard verileri doğrulanamadı.';
         }
-      } else if (err instanceof Error) {
-        errorMessage = 'Dashboard verileri doğrulanamadı.';
-      }
 
-      setError(errorMessage);
-    } finally {
-      if (abortControllerRef.current === currentController) {
-        setIsLoading(false);
-        abortControllerRef.current = null;
+        setError(errorMessage);
+      } finally {
+        if (abortControllerRef.current === controller) {
+          setIsLoading(false);
+          abortControllerRef.current = null;
+        }
       }
-    }
-  };
+    };
 
-  useEffect(() => {
-    fetchSummary();
+    executeFetch();
 
     return () => {
       if (abortControllerRef.current) {
@@ -79,14 +78,18 @@ export const DashboardPage: React.FC = () => {
         abortControllerRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, accessToken]);
+  }, [isAuthenticated, accessToken, retryCount]);
 
   const handleRetry = () => {
-    fetchSummary();
+    if (!isAuthenticated || !accessToken) return;
+
+    setIsLoading(true);
+    setError(null);
+    setSummary(null);
+    setRetryCount(c => c + 1);
   };
 
-  const isDashboardEmpty = summary 
+  const isDashboardEmpty = summary
     ? summary.analysis_summary.total_jobs === 0 &&
       summary.detection_summary.total_detections === 0 &&
       summary.incident_summary.total_incidents === 0
@@ -146,9 +149,9 @@ export const DashboardPage: React.FC = () => {
           )}
 
           {!isDashboardEmpty && (
-            <DashboardRecentActivity 
-              recentDetections={summary.recent_detections} 
-              recentIncidents={summary.recent_incidents} 
+            <DashboardRecentActivity
+              recentDetections={summary.recent_detections}
+              recentIncidents={summary.recent_incidents}
             />
           )}
         </section>

@@ -25,7 +25,7 @@ const COLORS = {
 };
 
 const numberFormatter = new Intl.NumberFormat('tr-TR');
-const formatTooltipValue = (value: any) => typeof value === 'number' ? numberFormatter.format(value) : value;
+const formatTooltipValue = (value: unknown) => typeof value === 'number' ? numberFormatter.format(value) : String(value);
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ summary }) => {
   // 1. Detection Distribution
