@@ -13,6 +13,10 @@ vi.mock('./components/DashboardSummaryCards', () => ({
   DashboardSummaryCards: () => <div data-testid="dashboard-summary-cards" />
 }));
 
+vi.mock('./components/DashboardCharts', () => ({
+  DashboardCharts: () => <div data-testid="dashboard-charts" />
+}));
+
 const getMockSummary = (): DashboardSummaryResponse => ({
   generated_at: '2026-08-05T12:00:00Z',
   analysis_summary: {
@@ -759,6 +763,82 @@ describe('DashboardPage', () => {
       });
       expect(componentCalls).toHaveLength(0);
       setIntervalSpy.mockRestore();
+    });
+  });
+
+  // 11. Grafik Entegrasyon Testleri
+  describe('Grafik Entegrasyonu', () => {
+    it('Dolu response sonrasında grafik bölümü görünür', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument());
+    });
+
+    it('Tamamen boş response’ta grafik bölümü görünmez', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getEmptySummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-summary-cards')).toBeInTheDocument());
+      expect(screen.queryByTestId('dashboard-charts')).not.toBeInTheDocument();
+    });
+
+    it('Loading sırasında grafik bölümü görünmez', () => {
+      vi.mocked(getDashboardSummary).mockImplementation(() => new Promise(() => {}));
+      render(<DashboardPage />);
+      expect(screen.queryByTestId('dashboard-charts')).not.toBeInTheDocument();
+    });
+
+    it('Error sırasında grafik bölümü görünmez', async () => {
+      vi.mocked(getDashboardSummary).mockRejectedValue(new ApiError(500, { code: '', message: '', details: null }));
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+      expect(screen.queryByTestId('dashboard-charts')).not.toBeInTheDocument();
+    });
+
+    it('Kısmen dolu response’ta grafik bölümü görünür', async () => {
+      const summary = getEmptySummary();
+      summary.detection_summary.total_detections = 10;
+      vi.mocked(getDashboardSummary).mockResolvedValue(summary);
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument());
+    });
+
+    it('Grafik entegrasyonu yeni API isteği oluşturmaz', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument());
+      expect(getDashboardSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it('Retry sonrası başarılı response grafik bölümünü gösterir', async () => {
+      const user = userEvent.setup();
+      vi.mocked(getDashboardSummary)
+        .mockRejectedValueOnce(new ApiError(500, { code: '', message: '', details: null }))
+        .mockResolvedValueOnce(getMockSummary());
+      render(<DashboardPage />);
+      const retryBtn = await screen.findByRole('button', { name: 'Tekrar Dene' });
+      await user.click(retryBtn);
+      await waitFor(() => expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument());
+    });
+
+    it('Grafik entegrasyonu mevcut empty-state davranışını bozmaz', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getEmptySummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByText('Henüz sistemde gösterilecek veri bulunmuyor.')).toBeInTheDocument());
+    });
+
+    it('Grafik entegrasyonu son güncelleme bilgisini korur', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByText(/Son güncelleme:/i)).toBeInTheDocument());
+    });
+
+    it('Grafik entegrasyonu request abort mantığını değiştirmez', () => {
+      const deferred = createDeferred<DashboardSummaryResponse>();
+      vi.mocked(getDashboardSummary).mockReturnValue(deferred.promise);
+      const { unmount } = render(<DashboardPage />);
+      const signal = vi.mocked(getDashboardSummary).mock.calls[0][1];
+      unmount();
+      expect(signal?.aborted).toBe(true);
     });
   });
 });

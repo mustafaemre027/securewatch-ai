@@ -4,6 +4,7 @@ import { getDashboardSummary } from './api';
 import type { DashboardSummaryResponse } from './types';
 import { ApiError } from '../../api/types';
 import { DashboardSummaryCards } from './components/DashboardSummaryCards';
+import { DashboardCharts } from './components/DashboardCharts';
 import './dashboard.css';
 
 export const DashboardPage: React.FC = () => {
@@ -134,6 +135,12 @@ export const DashboardPage: React.FC = () => {
           )}
 
           <DashboardSummaryCards summary={summary} />
+
+          {!(summary.analysis_summary.total_jobs === 0 &&
+             summary.detection_summary.total_detections === 0 &&
+             summary.incident_summary.total_incidents === 0) && (
+            <DashboardCharts summary={summary} />
+          )}
         </section>
       )}
     </div>
