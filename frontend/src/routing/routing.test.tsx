@@ -231,6 +231,16 @@ describe('App Route Integration', () => {
     expect(document.querySelector('main')).toBeInTheDocument();
   });
 
+  it('10. /dashboard/unknown route does not match dashboard page.', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      isAuthenticated: true,
+      user: { role: 'ANALYST', username: 'analyst1' }
+    } as unknown as ReturnType<typeof useAuth>);
+    renderApp('/dashboard/unknown');
+    expect(screen.queryByTestId('mock-dashboard-page')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-home-page')).toBeInTheDocument();
+  });
+
   it('2. Unauthenticated kullanıcı /incidents/12 rotasından login’e yönlendirilir.', async () => {
     vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as unknown as ReturnType<typeof useAuth>);
     renderApp('/incidents/12');

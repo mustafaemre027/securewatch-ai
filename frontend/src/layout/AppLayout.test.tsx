@@ -100,6 +100,9 @@ describe('AppLayout', () => {
     const navLink = screen.getByRole('link', { name: 'Analiz' });
     expect(navLink).toHaveAttribute('href', '/analysis');
     expect(navLink).toHaveAttribute('aria-current', 'page');
+
+    const panelLink = screen.getByRole('link', { name: 'Panel' });
+    expect(panelLink).not.toHaveAttribute('aria-current');
     unmount();
 
     render(
@@ -137,9 +140,23 @@ describe('AppLayout', () => {
     const navLink = screen.getByRole('link', { name: 'Panel' });
     expect(navLink).toHaveAttribute('href', '/dashboard');
     expect(navLink).toHaveAttribute('aria-current', 'page');
+    expect(navLink).not.toHaveAttribute('tabIndex');
+
+    const analizLink = screen.getByRole('link', { name: 'Analiz' });
+    expect(analizLink).not.toHaveAttribute('aria-current');
+
+    const olaylarLink = screen.getByRole('link', { name: 'Olaylar' });
+    expect(olaylarLink).not.toHaveAttribute('aria-current');
     unmount();
 
-    render(
+    // Verify ADMIN sees Panel link too
+    vi.mocked(useAuth).mockReturnValue({
+      user: { username: 'admin_user', role: 'ADMIN' },
+      logoutUser: mockLogout,
+      isAuthenticated: true
+    } as unknown as ReturnType<typeof useAuth>);
+
+    const { unmount: unmountAdmin } = render(
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route element={<AppLayout />}>
@@ -152,5 +169,32 @@ describe('AppLayout', () => {
     const inactiveNavLink = screen.getByRole('link', { name: 'Panel' });
     expect(inactiveNavLink).toHaveAttribute('href', '/dashboard');
     expect(inactiveNavLink).not.toHaveAttribute('aria-current');
+    unmountAdmin();
+  });
+
+  it('22. Navigation link for Incidents has correct href and aria-current when active', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { username: 'u', role: 'ANALYST' },
+      logoutUser: mockLogout,
+      isAuthenticated: true
+    } as unknown as ReturnType<typeof useAuth>);
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/incidents']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+             <Route path="/incidents" element={<div />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const navLink = screen.getByRole('link', { name: 'Olaylar' });
+    expect(navLink).toHaveAttribute('href', '/incidents');
+    expect(navLink).toHaveAttribute('aria-current', 'page');
+
+    const panelLink = screen.getByRole('link', { name: 'Panel' });
+    expect(panelLink).not.toHaveAttribute('aria-current');
+    unmount();
   });
 });
