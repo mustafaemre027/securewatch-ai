@@ -6,6 +6,7 @@ from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.analysis import router as analysis_router
 from app.api.v1.endpoints.incidents import router as incidents_router
+from app.api.v1.endpoints.dashboard import router as dashboard_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, prefix="/health", tags=["health"])
@@ -18,3 +19,4 @@ api_router.include_router(
     prefix="/incidents",
     tags=["incidents"],
 )
+api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
