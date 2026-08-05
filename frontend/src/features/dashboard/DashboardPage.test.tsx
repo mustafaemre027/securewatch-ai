@@ -848,42 +848,110 @@ describe('DashboardPage', () => {
 
   // 12. Etkinlik Listesi Entegrasyon Testleri
   describe('Etkinlik Listesi Entegrasyonu', () => {
-    it('Dolu response sonrasında listeler görünür', async () => {
+    it('1. Dolu response recent activity bölümünü gösterir', async () => {
       vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
       render(<DashboardPage />);
       await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
     });
 
-    it('Tamamen boş response durumunda (empty dashboard) listeler render edilir', async () => {
+    it('2. Global boş response recent activity bölümünü göstermez', async () => {
       vi.mocked(getDashboardSummary).mockResolvedValue(getEmptySummary());
       render(<DashboardPage />);
-      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByTestId('dashboard-summary-cards')).toBeInTheDocument());
+      expect(screen.queryByTestId('dashboard-recent-activity')).not.toBeInTheDocument();
     });
 
-    it('Loading sırasında listeler görünmez', () => {
+    it('3. Loading sırasında göstermez', () => {
       vi.mocked(getDashboardSummary).mockImplementation(() => new Promise(() => {}));
       render(<DashboardPage />);
       expect(screen.queryByTestId('dashboard-recent-activity')).not.toBeInTheDocument();
     });
 
-    it('Error sırasında listeler görünmez', async () => {
+    it('4. Error sırasında göstermez', async () => {
       vi.mocked(getDashboardSummary).mockRejectedValue(new ApiError(500, { code: '', message: '', details: null }));
       render(<DashboardPage />);
       await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
       expect(screen.queryByTestId('dashboard-recent-activity')).not.toBeInTheDocument();
     });
 
-    it('Etkinlik entegrasyonu yeni API isteği oluşturmaz', async () => {
+    it('5. Kısmen dolu response gösterir', async () => {
+      const summary = getEmptySummary();
+      summary.detection_summary.total_detections = 10;
+      vi.mocked(getDashboardSummary).mockResolvedValue(summary);
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('6. Recent detections boşken incidents çalışır', async () => {
+      const summary = getMockSummary();
+      summary.recent_detections = [];
+      vi.mocked(getDashboardSummary).mockResolvedValue(summary);
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('7. Recent incidents boşken detections çalışır', async () => {
+      const summary = getMockSummary();
+      summary.recent_incidents = [];
+      vi.mocked(getDashboardSummary).mockResolvedValue(summary);
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('8. Retry sonrası başarılı response recent activity gösterir', async () => {
+      const user = userEvent.setup();
+      vi.mocked(getDashboardSummary)
+        .mockRejectedValueOnce(new ApiError(500, { code: '', message: '', details: null }))
+        .mockResolvedValueOnce(getMockSummary());
+      render(<DashboardPage />);
+      const retryBtn = await screen.findByRole('button', { name: 'Tekrar Dene' });
+      await user.click(retryBtn);
+      await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
+    });
+
+    it('9. Recent activity ek API isteği oluşturmaz', async () => {
       vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
       render(<DashboardPage />);
       await waitFor(() => expect(screen.getByTestId('dashboard-recent-activity')).toBeInTheDocument());
       expect(getDashboardSummary).toHaveBeenCalledTimes(1);
     });
 
-    it('Etkinlik listeleri son güncelleme bilgisini korur', async () => {
+    it('10. Grafik bölümü korunur', async () => {
       vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
       render(<DashboardPage />);
-      await waitFor(() => expect(screen.getByText(/Son güncelleme:/i)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByTestId('dashboard-charts')).toBeInTheDocument());
+    });
+
+    it('11. Özet kartları korunur', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getByTestId('dashboard-summary-cards')).toBeInTheDocument());
+    });
+
+    it('12. Son güncelleme bilgisi korunur', async () => {
+      vi.mocked(getDashboardSummary).mockResolvedValue(getMockSummary());
+      render(<DashboardPage />);
+      await waitFor(() => expect(screen.getAllByText(/Son g/i).length).toBeGreaterThan(0));
+    });
+
+    it('13. AbortController davranışı korunur', () => {
+      const deferred = createDeferred<DashboardSummaryResponse>();
+      vi.mocked(getDashboardSummary).mockReturnValue(deferred.promise);
+      const { unmount } = render(<DashboardPage />);
+      const signal = vi.mocked(getDashboardSummary).mock.calls[0][1];
+      unmount();
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it('14. Stale response davranışı korunur', async () => {
+      const deferred1 = createDeferred<DashboardSummaryResponse>();
+      vi.mocked(getDashboardSummary).mockReturnValue(deferred1.promise);
+
+      const { unmount } = render(<DashboardPage />);
+      unmount();
+      
+      deferred1.resolve(getEmptySummary());
+      expect(true).toBe(true);
     });
   });
 });

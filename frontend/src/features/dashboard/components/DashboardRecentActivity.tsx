@@ -71,7 +71,7 @@ export const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = (
         
         {recentDetections.length === 0 ? (
           <div className="p-8 text-center text-slate-400 bg-rich-navy border border-space-blue rounded-lg">
-            Son tespit bulunmuyor.
+            Henüz görüntülenecek bir tespit bulunmuyor.
           </div>
         ) : (
           <ul className="space-y-3">
@@ -112,7 +112,7 @@ export const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = (
 
         {recentIncidents.length === 0 ? (
           <div className="p-8 text-center text-slate-400 bg-rich-navy border border-space-blue rounded-lg">
-            Son olay bulunmuyor.
+            Henüz görüntülenecek bir olay bulunmuyor.
           </div>
         ) : (
           <ul className="space-y-3">

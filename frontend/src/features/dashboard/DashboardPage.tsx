@@ -86,6 +86,12 @@ export const DashboardPage: React.FC = () => {
     fetchSummary();
   };
 
+  const isDashboardEmpty = summary 
+    ? summary.analysis_summary.total_jobs === 0 &&
+      summary.detection_summary.total_detections === 0 &&
+      summary.incident_summary.total_incidents === 0
+    : false;
+
   return (
     <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 dashboard-page">
       <div className="mb-2">
@@ -127,9 +133,7 @@ export const DashboardPage: React.FC = () => {
             </span>
           </div>
 
-          {summary.analysis_summary.total_jobs === 0 &&
-           summary.detection_summary.total_detections === 0 &&
-           summary.incident_summary.total_incidents === 0 && (
+          {isDashboardEmpty && (
             <div className="mb-6 p-4 bg-space-blue/30 border border-space-blue rounded-lg text-center text-muted-blue">
               Henüz sistemde gösterilecek veri bulunmuyor.
             </div>
@@ -137,16 +141,16 @@ export const DashboardPage: React.FC = () => {
 
           <DashboardSummaryCards summary={summary} />
 
-          {!(summary.analysis_summary.total_jobs === 0 &&
-             summary.detection_summary.total_detections === 0 &&
-             summary.incident_summary.total_incidents === 0) && (
+          {!isDashboardEmpty && (
             <DashboardCharts summary={summary} />
           )}
 
-          <DashboardRecentActivity 
-            recentDetections={summary.recent_detections} 
-            recentIncidents={summary.recent_incidents} 
-          />
+          {!isDashboardEmpty && (
+            <DashboardRecentActivity 
+              recentDetections={summary.recent_detections} 
+              recentIncidents={summary.recent_incidents} 
+            />
+          )}
         </section>
       )}
     </div>
