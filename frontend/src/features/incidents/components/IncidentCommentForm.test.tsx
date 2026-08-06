@@ -120,24 +120,24 @@ describe('IncidentCommentForm', () => {
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       const textarea = screen.getByLabelText('Yorum');
       const submitBtn = screen.getByRole('button', { name: 'Yorum Ekle' });
-      
+
       // Empty
       expect(submitBtn).toBeDisabled();
-      
+
       // Whitespace
       await userEvent.type(textarea, '   ');
       expect(submitBtn).toBeDisabled();
-      
+
       expect(addIncidentComment).not.toHaveBeenCalled();
     });
 
     it('10. Yorum trim edilerek gönderilir, 13, 14, 15', async () => {
       vi.mocked(addIncidentComment).mockResolvedValue({ id: 1, incident_id: 1, user_id: 1, comment_text: 'trimmed', created_at: '2023' });
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
-      
+
       await userEvent.type(screen.getByLabelText('Yorum'), '   test comment   ');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       expect(addIncidentComment).toHaveBeenCalledWith(
         1,
         { comment_text: 'test comment' }, // no user_id, no incident_id inside body
@@ -145,16 +145,29 @@ describe('IncidentCommentForm', () => {
         expect.any(AbortSignal)
       );
     });
+
+    it('11. Eski form-control, btn ve btn-primary sınıfları render edilmez', () => {
+      const { container } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
+
+      const textarea = screen.getByLabelText('Yorum');
+      expect(textarea).not.toHaveClass('form-control');
+
+      const btn = screen.getByRole('button', { name: 'Yorum Ekle' });
+      expect(btn).not.toHaveClass('btn');
+      expect(btn).not.toHaveClass('btn-primary');
+
+      expect(container.querySelector('.form-hint')).not.toBeInTheDocument();
+    });
   });
 
   describe('API çağrısı', () => {
     it('16. Doğru incident ID kullanılır, 17. Token aktarılır, 18. AbortSignal aktarılır, 19. Gerçek network kullanılmaz', async () => {
       vi.mocked(addIncidentComment).mockResolvedValue({ id: 1, incident_id: 123, user_id: 1, comment_text: 'a', created_at: '2023' });
       render(<IncidentCommentForm incidentId={123} onCommentAdded={mockOnCommentAdded} />);
-      
+
       await userEvent.type(screen.getByLabelText('Yorum'), 'a');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       expect(addIncidentComment).toHaveBeenCalledWith(
         123,
         { comment_text: 'a' },
@@ -167,24 +180,24 @@ describe('IncidentCommentForm', () => {
       let resolvePromise: (val: IncidentComment) => void = () => {};
       const promise = new Promise<IncidentComment>((resolve) => { resolvePromise = resolve; });
       vi.mocked(addIncidentComment).mockReturnValue(promise);
-      
+
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), 'a');
       const btn = screen.getByRole('button', { name: 'Yorum Ekle' });
-      
+
       fireEvent.click(btn); // First submit
       fireEvent.click(btn); // Second submit attempts to happen synchronously
-      
+
       expect(addIncidentComment).toHaveBeenCalledTimes(1);
-      
+
       const form = screen.getByRole('form');
       expect(form).toHaveAttribute('aria-busy', 'true');
-      
+
       const textarea = screen.getByLabelText('Yorum');
       expect(textarea).toBeDisabled();
       expect(btn).toBeDisabled();
       expect(btn).toHaveTextContent('Yorum Ekleniyor...');
-      
+
       await act(async () => {
         resolvePromise({ id: 1, incident_id: 1, user_id: 1, comment_text: 'a', created_at: '2023' });
       });
@@ -196,19 +209,19 @@ describe('IncidentCommentForm', () => {
       const mockComment = { id: 99, incident_id: 1, user_id: 1, comment_text: 'a', created_at: '2023' };
       vi.mocked(addIncidentComment).mockResolvedValue(mockComment);
       const mockGetIncident = vi.fn();
-      
+
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       const textarea = screen.getByLabelText('Yorum');
       await userEvent.type(textarea, 'a');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       expect(mockOnCommentAdded).toHaveBeenCalledWith(mockComment);
-      
+
       expect(textarea).toHaveValue(''); // Textarea temizlendi
-      
+
       const successMsg = await screen.findByText('Yorum başarıyla eklendi.');
       expect(successMsg).toHaveAttribute('role', 'status');
-      
+
       expect(textarea).toHaveFocus();
       expect(mockGetIncident).not.toHaveBeenCalled();
     });
@@ -217,7 +230,7 @@ describe('IncidentCommentForm', () => {
   describe('Lifecycle', () => {
     it('30. Unmount aktif isteği abort eder', () => {
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
-      
+
       // Need a way to spy on AbortController, but standard test is that component doesn't crash
       // Let's just ensure unmount doesn't throw.
     });
@@ -226,7 +239,7 @@ describe('IncidentCommentForm', () => {
       const { rerender } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       const textarea = screen.getByLabelText('Yorum');
       await userEvent.type(textarea, 'text');
-      
+
       rerender(<IncidentCommentForm incidentId={2} onCommentAdded={mockOnCommentAdded} />);
       expect(textarea).toHaveValue('');
     });
@@ -250,21 +263,21 @@ describe('IncidentCommentForm', () => {
       let resolvePromise: (val: IncidentComment) => void = () => {};
       let rejectPromise: (err: unknown) => void = () => {};
       let signal: AbortSignal | undefined;
-      const promise = new Promise<IncidentComment>((resolve, reject) => { 
-        resolvePromise = resolve; 
+      const promise = new Promise<IncidentComment>((resolve, reject) => {
+        resolvePromise = resolve;
         rejectPromise = reject;
       });
       vi.mocked(addIncidentComment).mockImplementation((_a, _b, _c, sig) => {
         signal = sig;
         return promise;
       });
-      
+
       const { unmount } = render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), 'text');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       unmount();
-      
+
       await act(async () => {
         if (signal?.aborted) {
           rejectPromise(new DOMException('aborted', 'AbortError'));
@@ -281,11 +294,11 @@ describe('IncidentCommentForm', () => {
       const abortError = new Error('aborted');
       abortError.name = 'AbortError';
       vi.mocked(addIncidentComment).mockRejectedValue(abortError);
-      
+
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), 'text');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       await waitFor(() => {
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       });
@@ -306,14 +319,14 @@ describe('IncidentCommentForm', () => {
       it(msg, async () => {
         const error = new ApiError(code, { code: String(code), message: 'HAM_API_MESAJI', details: null });
         vi.mocked(addIncidentComment).mockRejectedValue(error);
-        
+
         render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
         await userEvent.type(screen.getByLabelText('Yorum'), 'text');
         await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-        
+
         const alert = await screen.findByRole('alert');
         expect(alert).toHaveTextContent(text);
-        
+
         // 42. Ham backend mesajı DOM'a yazılmaz
         expect(screen.queryByText(/HAM_API_MESAJI/)).not.toBeInTheDocument();
         // 43. Token DOM'a yazılmaz
@@ -326,7 +339,7 @@ describe('IncidentCommentForm', () => {
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), 'text');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent('Yorum güvenli biçimde eklenemedi.');
     });
@@ -338,7 +351,7 @@ describe('IncidentCommentForm', () => {
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
       await userEvent.type(screen.getByLabelText('Yorum'), '<b>test</b>');
       await userEvent.click(screen.getByRole('button', { name: 'Yorum Ekle' }));
-      
+
       expect(addIncidentComment).toHaveBeenCalledWith(
         1,
         { comment_text: '<b>test</b>' },
@@ -350,15 +363,15 @@ describe('IncidentCommentForm', () => {
     it('49. Klavye ile submit yapılabilir', async () => {
       vi.mocked(addIncidentComment).mockResolvedValue({ id: 1, incident_id: 1, user_id: 1, comment_text: 'text', created_at: '2023' });
       render(<IncidentCommentForm incidentId={1} onCommentAdded={mockOnCommentAdded} />);
-      
+
       const textarea = screen.getByLabelText('Yorum');
       await userEvent.type(textarea, 'text');
-      
+
       // submit via keyboard on button
       const btn = screen.getByRole('button', { name: 'Yorum Ekle' });
       btn.focus();
       await userEvent.keyboard('{Enter}');
-      
+
       expect(addIncidentComment).toHaveBeenCalled();
     });
   });

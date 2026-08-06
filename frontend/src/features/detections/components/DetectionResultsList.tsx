@@ -265,16 +265,6 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
     }
   };
 
-  const getRiskBorder = (risk: DetectionRiskLevel) => {
-    switch (risk) {
-      case 'LOW': return 'border-blue-500/30';
-      case 'MEDIUM': return 'border-yellow-500/30';
-      case 'HIGH': return 'border-orange-500/30';
-      case 'CRITICAL': return 'border-red-500/50';
-      default: return 'border-space-blue';
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     return isNaN(d.getTime()) ? 'Bilinmiyor' : d.toLocaleString('tr-TR');
@@ -362,14 +352,14 @@ export const DetectionResultsList: React.FC<DetectionResultsListProps> = ({ jobI
 
         {!apiError && results && results.length > 0 && (
           <div className="flex-1 flex flex-col" aria-live="polite">
-            <ul className="grid grid-cols-1 gap-4 mb-6">
+            <ul className="grid grid-cols-1 gap-3 mb-6">
               {results.map((result) => {
                 const isConverted = convertedDetectionIds.has(result.id);
                 const canConvert = result.is_attack && user?.role === 'ANALYST' && accessToken && !isConverted;
                 const isConverting = activeConversionDetectionId === result.id;
                 
                 return (
-                <li key={result.id} className={`bg-deep-dark border rounded-xl p-4 flex flex-col gap-4 transition-colors ${getRiskBorder(result.risk_level)}`}>
+                <li key={result.id} className="bg-deep-dark border border-space-blue rounded-xl p-3 flex flex-col gap-3 hover:bg-space-blue/30 transition-colors">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-bold text-slate-300 uppercase">CSV Satırı</span>
