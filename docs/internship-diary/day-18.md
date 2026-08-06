@@ -18,7 +18,7 @@ Bugünkü temel hedefim; önceki aşamalarda geliştirilen özelliklerin (analiz
 ## Yapılanlar
 
 ### 1. Test ve Regresyon Doğrulaması
-Geliştirilen backend test paketi eksiksiz koşturuldu ve 499 testin tümü başarıyla geçti. Kritik backend güvenlik senaryolarını test eden 212 test başarıyla tamamlandı. Frontend tarafında oluşturduğumuz test ortamında ise 791 adet test hatasız çalıştı. TypeScript derleme kuralları ve ESLint statik analiz süreçleri sıfır hata ve sıfır uyarı ile onaylandı. 
+Geliştirilen backend test paketi eksiksiz koşturuldu ve 499 testin tümü başarıyla geçti. Kritik backend güvenlik senaryolarını test eden 212 test başarıyla tamamlandı. Frontend tarafında oluşturduğumuz test ortamında ise 791 adet test hatasız çalıştı. TypeScript derleme kuralları ve ESLint statik analiz süreçleri sıfır hata ve sıfır uyarı ile onaylandı.
 
 ### 2. Backend Güvenlik Bütünlüğü
 Authentication ve JWT token yönetimi detaylıca denetlendi. Sistem içindeki ADMIN ve ANALYST rolleri için uygulanan rol tabanlı erişim kontrollerinin (RBAC) aşılmaz olduğu kanıtlandı. Ağ trafiği analizi veri yükleme ekranındaki CSV dosya doğrulama, path traversal saldırılarını engelleme ve SHA-256 hash tabanlı duplicate (çift kopya) dosya denetimi mekanizmaları çalıştırıldı. Veritabanı transaction işlemleri ve hata durumundaki rollback mimarisi sorunsuz doğrulandı; API'den sunucu detaylarını dışarı sızdırmayan güvenli hata yanıtları gözlemlendi. Alembic veritabanı göçlerinde tek-head kuralı korundu ve schema drift (şema kayması) yaşanmadığı kesinleştirildi.
@@ -31,4 +31,3 @@ SecureWatch AI projesinin kurumsal kimliğini yansıtan açık ve koyu tema uyum
 
 ### 5. Production Build ve Bağımlılık Güvenliği
 Frontend tarafında Vite üzerinden üretim (production) build komutu sorunsuz çalıştırıldı. Beklenen bir teknik borç olan ve ileride çözülmesi gereken büyük JavaScript bundle (500 kB üstü) uyarısı dışında hata gözlemlenmedi. NPM bağımlılıklarını denetleyen audit aracı (npm audit) çalıştırıldı ve sistemin production ortamı için "critical, high, moderate, low" seviyelerinde hiçbir açık barındırmadığı onaylandı. Repository içerisinde log, veritabanı dump, private key, JWT secret veya gizli env dosyası sızıntısı kalmadığı titiz taramalarla kanıtlandı.
-
