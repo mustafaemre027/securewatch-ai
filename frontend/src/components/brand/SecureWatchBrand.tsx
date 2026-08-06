@@ -16,10 +16,17 @@ export function SecureWatchBrand({
   ariaHidden = false,
 }: SecureWatchBrandProps) {
   let src: string
+  let imgWidth: number
+  let imgHeight: number
+
   if (compact) {
     src = variant === 'dark' ? '/brand/securewatch-ai-mark-dark.png' : '/brand/securewatch-ai-mark-light.png'
+    imgWidth = variant === 'dark' ? 256 : 185
+    imgHeight = variant === 'dark' ? 256 : 210
   } else {
     src = variant === 'dark' ? '/brand/securewatch-ai-logo-dark.png' : '/brand/securewatch-ai-logo-light.png'
+    imgWidth = variant === 'dark' ? 915 : 960
+    imgHeight = variant === 'dark' ? 245 : 225
   }
 
   // Use provided alt, otherwise fallback based on context.
@@ -31,15 +38,12 @@ export function SecureWatchBrand({
       src={src}
       alt={resolvedAlt}
       aria-hidden={ariaHidden || undefined}
-      className={className}
+      width={imgWidth}
+      height={imgHeight}
+      className={`block w-auto max-w-full object-contain select-none ${className}`.trim()}
       draggable={false}
       loading={eager ? 'eager' : 'lazy'}
       fetchPriority={eager ? 'high' : 'auto'}
-      style={{
-        maxWidth: '100%',
-        height: 'auto',
-        objectFit: 'contain'
-      }}
     />
   )
 }

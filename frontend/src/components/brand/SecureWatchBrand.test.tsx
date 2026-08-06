@@ -55,4 +55,34 @@ describe('SecureWatchBrand Component', () => {
     // fetchPriority is reflected as an attribute in some versions, or React prop
     expect(img.getAttribute('fetchpriority')).toBe('high')
   })
+
+  it('does not apply inline width/height/max-width styles that break caller sizing', () => {
+    render(<SecureWatchBrand />)
+    const img = screen.getByRole('img', { name: 'SecureWatch AI' })
+    expect(img.style.width).toBe('')
+    expect(img.style.maxWidth).toBe('')
+    expect(img.style.height).toBe('')
+  })
+
+  it('has correct intrinsic width and height for variants', () => {
+    const { rerender } = render(<SecureWatchBrand variant="dark" />)
+    let img = screen.getByRole('img', { name: 'SecureWatch AI' })
+    expect(img).toHaveAttribute('width', '915')
+    expect(img).toHaveAttribute('height', '245')
+
+    rerender(<SecureWatchBrand variant="light" />)
+    img = screen.getByRole('img', { name: 'SecureWatch AI' })
+    expect(img).toHaveAttribute('width', '960')
+    expect(img).toHaveAttribute('height', '225')
+
+    rerender(<SecureWatchBrand variant="dark" compact />)
+    img = screen.getByRole('img', { name: 'SecureWatch AI' })
+    expect(img).toHaveAttribute('width', '256')
+    expect(img).toHaveAttribute('height', '256')
+
+    rerender(<SecureWatchBrand variant="light" compact />)
+    img = screen.getByRole('img', { name: 'SecureWatch AI' })
+    expect(img).toHaveAttribute('width', '185')
+    expect(img).toHaveAttribute('height', '210')
+  })
 })
