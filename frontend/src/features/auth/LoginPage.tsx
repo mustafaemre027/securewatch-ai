@@ -51,8 +51,8 @@ export function LoginPage() {
 
         {/* Header Section */}
         <div className="bg-space-blue/30 p-8 flex flex-col items-center border-b border-space-blue">
-          <SecureWatchBrand className="h-16 w-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white">SecureWatch AI</h1>
+          <SecureWatchBrand variant="dark" eager className="w-full max-w-[320px] h-auto mb-2" />
+          <h1 className="sr-only">SecureWatch AI</h1>
           <p className="text-sm text-gray-400 mt-1">Platform Girişi</p>
         </div>
 

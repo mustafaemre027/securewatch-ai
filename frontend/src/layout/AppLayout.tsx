@@ -34,9 +34,10 @@ export function AppLayout() {
       <header className="bg-rich-navy border-b border-space-blue sticky top-0 z-40">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[4rem] py-2 sm:py-0 flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex items-center justify-between w-full sm:w-auto gap-2 sm:gap-6 min-w-0">
-            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <SecureWatchBrand className="h-6 w-auto sm:h-8 flex-shrink-0" />
-              <span className="font-semibold text-lg hidden sm:block truncate">SecureWatch AI</span>
+            <div className="flex items-center flex-shrink-0">
+              <SecureWatchBrand variant="dark" compact className="h-6 w-auto sm:hidden" ariaHidden />
+              <SecureWatchBrand variant="dark" className="hidden sm:block h-7 w-auto" ariaHidden />
+              <span className="sr-only">SecureWatch AI</span>
             </div>
             <div className="flex items-center sm:border-l border-space-blue sm:pl-6 gap-1 sm:gap-2">
               <NavLink
