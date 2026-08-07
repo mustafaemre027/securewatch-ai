@@ -9,6 +9,8 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.analysis_job import AnalysisJob
     from app.models.audit_log import AuditLog
+    from app.models.incident import Incident
+    from app.models.incident_comment import IncidentComment
 
 
 class UserRole(str, enum.Enum):
@@ -61,6 +63,16 @@ class User(Base):
     )
     analysis_jobs: Mapped[List["AnalysisJob"]] = relationship(
         "AnalysisJob",
+        back_populates="user",
+        passive_deletes=True,
+    )
+    assigned_incidents: Mapped[List["Incident"]] = relationship(
+        "Incident",
+        back_populates="assigned_analyst",
+        passive_deletes=True,
+    )
+    incident_comments: Mapped[List["IncidentComment"]] = relationship(
+        "IncidentComment",
         back_populates="user",
         passive_deletes=True,
     )

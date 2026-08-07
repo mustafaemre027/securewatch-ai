@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -19,6 +19,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.analysis_job import AnalysisJob
+    from app.models.incident import Incident
 
 
 class DetectionResult(Base):
@@ -35,6 +36,7 @@ class DetectionResult(Base):
         risk_level (str): Categorized risk level (LOW, MEDIUM, HIGH, CRITICAL).
         created_at (datetime): Timestamp when the result was saved.
         analysis_job (AnalysisJob): Relationship back to the parent job.
+        incident (Incident): Optional relationship to an incident.
     """
     __tablename__ = "detection_results"
 
@@ -56,6 +58,11 @@ class DetectionResult(Base):
     analysis_job: Mapped["AnalysisJob"] = relationship(
         "AnalysisJob",
         back_populates="detection_results",
+    )
+    incident: Mapped[Optional["Incident"]] = relationship(
+        "Incident",
+        back_populates="detection_result",
+        uselist=False,
     )
 
     __table_args__ = (

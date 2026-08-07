@@ -315,13 +315,13 @@ describe('DetectionResultsList', () => {
   });
 
   it('18. Authentication yoksa API çağrılmaz', () => {
-    vi.mocked(useAuth).mockReturnValueOnce({ isAuthenticated: false, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
+    vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
     render(<DetectionResultsList jobId={123} />);
     expect(listDetectionResults).not.toHaveBeenCalled();
   });
 
   it('19. Token yoksa API çağrılmaz', () => {
-    vi.mocked(useAuth).mockReturnValueOnce({ isAuthenticated: true, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
+    vi.mocked(useAuth).mockReturnValue({ isAuthenticated: true, accessToken: null, user: null, isLoading: false, loginUser: vi.fn(), logoutUser: vi.fn(), error: null });
     render(<DetectionResultsList jobId={123} />);
     expect(listDetectionResults).not.toHaveBeenCalled();
   });
@@ -537,9 +537,132 @@ describe('DetectionResultsList', () => {
 
     await waitFor(() => {
       const liveRegions = screen.getAllByRole('status', { hidden: true });
-      // Initially, loading might add one, then it's gone.
-      // We shouldn't have one per item.
       expect(liveRegions.length).toBeLessThan(10);
+    });
+  });
+
+  describe('Integration with IncidentCreateForm', () => {
+    beforeEach(() => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        accessToken: mockToken,
+        user: { id: 1, username: 'test', email: 'test@t.com', role: 'ANALYST', created_at: '' },
+        isLoading: false,
+        loginUser: vi.fn(),
+        logoutUser: vi.fn(),
+        error: null,
+      });
+      vi.mocked(listDetectionResults).mockResolvedValue(validPage);
+    });
+
+    it('41. ANALYST kullanıcının saldırı kaydında “Olaya Dönüştür” görünür', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => {
+        const buttons = screen.getAllByRole('button', { name: /Olaya Dönüştür/i });
+        // items: 1 (attack), 2 (normal), 3 (attack), 4 (attack)
+        // expected: 3 buttons
+        expect(buttons).toHaveLength(3);
+      });
+    });
+
+    it('42. ANALYST kullanıcının normal kaydında buton görünmez', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => {
+        // items[1] is normal (id 2)
+        expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3);
+      });
+    });
+
+    it('43. ADMIN kullanıcının saldırı kaydında buton görünmez', async () => {
+      vi.mocked(useAuth).mockReturnValue({
+        isAuthenticated: true,
+        accessToken: mockToken,
+        user: { id: 1, username: 'admin', email: 'a@a.com', role: 'ADMIN', created_at: '' },
+        isLoading: false,
+        loginUser: vi.fn(),
+        logoutUser: vi.fn(),
+        error: null,
+      });
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /Olaya Dönüştür/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('44. Butona basınca yalnız ilgili kaydın formu açılır, 45. Aynı anda yalnız bir form açık kalır', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      const buttons = screen.getAllByRole('button', { name: /Olaya Dönüştür/i });
+      fireEvent.click(buttons[0]);
+      
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+      expect(screen.getAllByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toHaveLength(1);
+      
+      fireEvent.click(buttons[1]);
+      await waitFor(() => expect(screen.getAllByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toHaveLength(1));
+    });
+
+    it('46. İptal formu kapatır, 47. İptal sonrası odak tetikleyici butona döner', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      const buttons = screen.getAllByRole('button', { name: /Olaya Dönüştür/i });
+      fireEvent.click(buttons[0]);
+      
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+      
+      const cancelBtn = screen.getByRole('button', { name: /İptal/i });
+      fireEvent.click(cancelBtn);
+      
+      await waitFor(() => expect(screen.queryByRole('region', { name: /Tespiti Olaya Dönüştür/i })).not.toBeInTheDocument());
+      await waitFor(() => expect(document.activeElement).toBe(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })[0]));
+    });
+
+    it('48. Başarılı oluşturma sonrası “Olaya Dönüştürüldü” görünür, 49. buton kaybolur', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      const buttons = screen.getAllByRole('button', { name: /Olaya Dönüştür/i });
+      fireEvent.click(buttons[0]);
+      
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+    });
+
+    it('50. Filtre değişince açık form kapanır', async () => {
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      fireEvent.click(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })[0]);
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+      
+      fireEvent.change(screen.getByLabelText(/Risk Seviyesi/i), { target: { value: 'HIGH' } });
+      await waitFor(() => expect(screen.queryByRole('region', { name: /Tespiti Olaya Dönüştür/i })).not.toBeInTheDocument());
+    });
+
+    it('51. Sayfa değişince açık form kapanır', async () => {
+      vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, total: 40, skip: 0, items: validItems });
+      render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      fireEvent.click(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })[0]);
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+      
+      vi.mocked(listDetectionResults).mockResolvedValueOnce({ ...validPage, total: 40, skip: 20, items: validItems });
+      fireEvent.click(screen.getByRole('button', { name: 'Sonraki' }));
+      
+      await waitFor(() => expect(screen.queryByRole('region', { name: /Tespiti Olaya Dönüştür/i })).not.toBeInTheDocument());
+    });
+
+    it('52. jobId değişince conversion state temizlenir', async () => {
+      const { rerender } = render(<DetectionResultsList jobId={123} />);
+      await waitFor(() => expect(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })).toHaveLength(3));
+      
+      fireEvent.click(screen.getAllByRole('button', { name: /Olaya Dönüştür/i })[0]);
+      await waitFor(() => expect(screen.getByRole('region', { name: /Tespiti Olaya Dönüştür/i })).toBeInTheDocument());
+      
+      rerender(<DetectionResultsList jobId={124} />);
+      await waitFor(() => expect(screen.queryByRole('region', { name: /Tespiti Olaya Dönüştür/i })).not.toBeInTheDocument());
     });
   });
 });

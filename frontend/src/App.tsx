@@ -6,6 +6,8 @@ import { AppLayout } from './layout/AppLayout';
 import { HomePage } from './pages/HomePage';
 import { AnalysisPage } from './features/analysis/AnalysisPage';
 import { DetectionResultsPage } from './features/detections/DetectionResultsPage';
+import { IncidentList } from './features/incidents/components/IncidentList';
+import { IncidentDetailPage } from './features/incidents/IncidentDetailPage';
 import { useAuth } from './features/auth/useAuth';
 
 export function App() {
@@ -22,6 +24,8 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/analysis/:jobId/results" element={<DetectionResultsPage />} />
+          <Route path="/incidents" element={<IncidentList />} />
+          <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
         </Route>
       </Route>
 
