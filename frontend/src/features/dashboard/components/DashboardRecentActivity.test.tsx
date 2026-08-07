@@ -270,7 +270,7 @@ describe('DashboardRecentActivity', () => {
 
     it('28. Boş tespit listesi tam belirlenen Türkçe mesajı gösterir', () => {
       renderComponent([], mockIncidents);
-      expect(screen.getByText('Henüz görüntülenecek bir tespit bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz tespit kaydı bulunmuyor.')).toBeInTheDocument();
     });
   });
 
@@ -342,7 +342,7 @@ describe('DashboardRecentActivity', () => {
 
     it('40. Boş olay listesi tam belirlenen Türkçe mesajı gösterir', () => {
       renderComponent(mockDetections, []);
-      expect(screen.getByText('Henüz görüntülenecek bir olay bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz olay kaydı bulunmuyor.')).toBeInTheDocument();
     });
   });
 
@@ -350,19 +350,19 @@ describe('DashboardRecentActivity', () => {
     it('41. Tespitler boşken olaylar gösterilir', () => {
       renderComponent([], mockIncidents);
       expect(screen.getByText('Şüpheli SSH Girişi')).toBeInTheDocument();
-      expect(screen.getByText('Henüz görüntülenecek bir tespit bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz tespit kaydı bulunmuyor.')).toBeInTheDocument();
     });
 
     it('42. Olaylar boşken tespitler gösterilir', () => {
       renderComponent(mockDetections, []);
       expect(screen.getByText('Satır: 42')).toBeInTheDocument();
-      expect(screen.getByText('Henüz görüntülenecek bir olay bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz olay kaydı bulunmuyor.')).toBeInTheDocument();
     });
 
     it('43. İki liste boşken iki doğru mesaj gösterilir', () => {
       renderComponent([], []);
-      expect(screen.getByText('Henüz görüntülenecek bir tespit bulunmuyor.')).toBeInTheDocument();
-      expect(screen.getByText('Henüz görüntülenecek bir olay bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz tespit kaydı bulunmuyor.')).toBeInTheDocument();
+      expect(screen.getByText('Henüz olay kaydı bulunmuyor.')).toBeInTheDocument();
     });
 
     it('44. Password DOM’a yazılmaz', () => {

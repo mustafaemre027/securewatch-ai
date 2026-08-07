@@ -244,15 +244,22 @@ export const IncidentList: React.FC = () => {
           </select>
         </div>
         <div className="flex-1 flex items-end pb-2">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer group">
             <input
               type="checkbox"
               checked={assignedToMeOnly}
               onChange={handleAssignedChange}
               disabled={isLoading}
-              className="w-4 h-4 rounded bg-rich-navy border-space-blue text-ai-teal focus:ring-ai-teal focus:ring-2 disabled:opacity-50"
+              className="sr-only peer"
             />
-            <span className="text-sm font-semibold text-slate-300">Yalnız Bana Atananlar</span>
+            <div className="w-5 h-5 rounded border border-slate-600 bg-deep-dark flex items-center justify-center peer-checked:bg-cyber-cyan peer-checked:border-cyber-cyan peer-focus-visible:ring-2 peer-focus-visible:ring-cyber-cyan/50 peer-disabled:opacity-60 transition-colors">
+              {assignedToMeOnly && (
+                <svg className="w-3.5 h-3.5 text-deep-dark pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-semibold text-slate-300 peer-disabled:opacity-60 select-none">Yalnız Bana Atananlar</span>
           </label>
         </div>
       </div>
@@ -320,17 +327,17 @@ export const IncidentList: React.FC = () => {
                   {incident.description}
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pt-3 border-t border-space-blue/50 text-xs text-slate-400">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pt-3 border-t border-space-blue/50 text-xs text-slate-300">
                   <div>
-                    <span className="block font-semibold text-slate-500 mb-0.5">Atanan Analist</span>
+                    <span className="block font-semibold text-slate-400 mb-0.5">Atanan Analist</span>
                     {renderAnalyst(incident.assigned_analyst_id)}
                   </div>
                   <div>
-                    <span className="block font-semibold text-slate-500 mb-0.5">Oluşturulma</span>
+                    <span className="block font-semibold text-slate-400 mb-0.5">Oluşturulma</span>
                     {formatDate(incident.created_at)}
                   </div>
                   <div>
-                    <span className="block font-semibold text-slate-500 mb-0.5">Son Güncelleme</span>
+                    <span className="block font-semibold text-slate-400 mb-0.5">Son Güncelleme</span>
                     {formatDate(incident.updated_at)}
                   </div>
                 </div>
@@ -360,14 +367,14 @@ export const IncidentList: React.FC = () => {
           <button
             onClick={handlePrevPage}
             disabled={isLoading || skip === 0}
-            className="px-4 py-2 bg-deep-dark border border-space-blue text-white text-sm font-bold rounded-lg hover:bg-space-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-deep-dark border border-space-blue text-slate-300 text-sm font-bold rounded-lg hover:bg-space-blue hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Önceki
           </button>
           <button
             onClick={handleNextPage}
             disabled={isLoading || !hasNextPage}
-            className="px-4 py-2 bg-deep-dark border border-space-blue text-white text-sm font-bold rounded-lg hover:bg-space-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-deep-dark border border-space-blue text-slate-300 text-sm font-bold rounded-lg hover:bg-space-blue hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Sonraki
           </button>

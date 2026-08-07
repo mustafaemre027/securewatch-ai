@@ -120,25 +120,26 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
       onSubmit={handleSubmit} 
       aria-labelledby="comment-form-heading"
       aria-busy={isSubmitting}
-      className="incident-comment-form"
+      className="flex flex-col gap-4 mt-6 pt-6 border-t border-space-blue/30"
     >
-      <h3 id="comment-form-heading">Olaya Yorum Ekle</h3>
+      <h3 id="comment-form-heading" className="text-lg font-medium text-white">Olaya Yorum Ekle</h3>
       
       {formError && (
-        <div role="alert" className="error-message">
+        <div role="alert" className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded text-sm">
           {formError}
         </div>
       )}
 
       {successMessage && (
-        <div role="status" aria-live="polite" className="success-message">
+        <div role="status" aria-live="polite" className="bg-green-500/10 border border-green-500/50 text-green-200 px-4 py-3 rounded text-sm">
           {successMessage}
         </div>
       )}
 
-      <div className="form-group">
-        <label htmlFor="comment_text">Yorum</label>
-        <p id="comment_hint" className="form-hint">Olay incelemesiyle ilgili notunuzu yazın.</p>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="comment_text" className="text-sm font-medium text-slate-300">
+          Yorum
+        </label>
         <textarea
           id="comment_text"
           ref={textareaRef}
@@ -146,9 +147,9 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
           onChange={(e) => setCommentText(e.target.value)}
           disabled={isSubmitting}
           required
-          aria-describedby={`comment_hint ${formError ? 'comment-error' : ''}`.trim()}
-          className="form-control"
-          rows={4}
+          aria-describedby={formError ? 'comment-error' : undefined}
+          className="w-full min-h-32 resize-y rounded-lg border border-slate-600 bg-deep-dark px-4 py-3 text-slate-100 placeholder:text-slate-400 focus-visible:border-cyber-cyan focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder="Olay incelemesiyle ilgili notunuzu yazın."
         />
         {formError && <span id="comment-error" className="sr-only">{formError}</span>}
       </div>
@@ -156,7 +157,7 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
       <button 
         type="submit" 
         disabled={isSubmitting || !commentText.trim()}
-        className="btn btn-primary"
+        className="self-start bg-cyber-cyan hover:bg-ai-teal text-deep-dark font-bold py-2 px-6 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[40px]"
       >
         {isSubmitting ? 'Yorum Ekleniyor...' : 'Yorum Ekle'}
       </button>

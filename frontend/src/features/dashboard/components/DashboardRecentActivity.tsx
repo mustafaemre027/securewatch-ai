@@ -63,90 +63,94 @@ export const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = (
   recentIncidents
 }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-      
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 items-stretch">
+
       {/* Son Tespitler */}
-      <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-        <h3 className="text-lg font-bold text-white mb-4">Son Tespitler</h3>
-        
+      <div className="p-5 bg-deep-dark border border-space-blue rounded-xl flex flex-col h-full">
+        <h3 className="text-lg font-bold text-white mb-4 shrink-0">Son Tespitler</h3>
+
         {recentDetections.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 bg-rich-navy border border-space-blue rounded-lg">
-            Henüz görüntülenecek bir tespit bulunmuyor.
+          <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-300">
+            Henüz tespit kaydı bulunmuyor.
           </div>
         ) : (
-          <ul className="space-y-3">
-            {recentDetections.map(det => (
-              <li key={det.id} className="bg-rich-navy border border-space-blue rounded-lg hover:border-ai-teal transition-colors overflow-hidden">
-                <Link 
-                  to={`/analysis/${det.job_id}/results`} 
-                  className="block p-3 focus:outline-none focus:ring-2 focus:ring-ai-teal"
-                  aria-label={`Analiz ${det.job_id}, satır ${det.row_index} için tespit detayı`}
-                >
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <span className="text-sm font-medium text-slate-200">
-                      {det.is_attack ? 'Saldırı Tespit Edildi' : 'Normal Aktivite'}
-                    </span>
-                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full shrink-0 ${getRiskColor(det.risk_level)}`}>
-                      {getRiskLabel(det.risk_level)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>Satır: {det.row_index}</span>
-                    <span>{formatDate(det.created_at)}</span>
-                  </div>
-                  {det.is_attack && det.attack_probability != null && (
-                    <div className="mt-2 text-xs font-medium text-red-400">
-                      Olasılık: {percentFormatter.format(det.attack_probability)}
+          <div className="flex-1 overflow-y-auto max-h-[380px] pr-1">
+            <ul className="space-y-3">
+              {recentDetections.map(det => (
+                <li key={det.id} className="bg-rich-navy border border-space-blue rounded-lg hover:bg-space-blue/30 transition-colors">
+                  <Link
+                    to={`/analysis/${det.job_id}/results`}
+                    className="block p-4 focus:outline-none focus:ring-2 focus:ring-cyber-cyan/50 rounded-lg"
+                    aria-label={`Analiz ${det.job_id}, satır ${det.row_index} için tespit detayı`}
+                  >
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <span className="text-sm font-bold text-slate-200">
+                        {det.is_attack ? 'Saldırı Tespit Edildi' : 'Normal Aktivite'}
+                      </span>
+                      <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full shrink-0 ${getRiskColor(det.risk_level)}`}>
+                        {getRiskLabel(det.risk_level)}
+                      </span>
                     </div>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    <div className="flex justify-between items-center text-xs text-slate-300">
+                      <span>Satır: {det.row_index}</span>
+                      <span>{formatDate(det.created_at)}</span>
+                    </div>
+                    {det.is_attack && det.attack_probability != null && (
+                      <div className="mt-2 text-xs font-bold text-red-400">
+                        Olasılık: {percentFormatter.format(det.attack_probability)}
+                      </div>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
       {/* Son Olaylar */}
-      <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-        <h3 className="text-lg font-bold text-white mb-4">Son Olaylar</h3>
+      <div className="p-5 bg-deep-dark border border-space-blue rounded-xl flex flex-col h-full">
+        <h3 className="text-lg font-bold text-white mb-4 shrink-0">Son Olaylar</h3>
 
         {recentIncidents.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 bg-rich-navy border border-space-blue rounded-lg">
-            Henüz görüntülenecek bir olay bulunmuyor.
+          <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-300">
+            Henüz olay kaydı bulunmuyor.
           </div>
         ) : (
-          <ul className="space-y-3">
-            {recentIncidents.map(inc => (
-              <li key={inc.id} className="bg-rich-navy border border-space-blue rounded-lg hover:border-ai-teal transition-colors overflow-hidden">
-                <Link 
-                  to={`/incidents/${inc.id}`} 
-                  className="block p-3 focus:outline-none focus:ring-2 focus:ring-ai-teal"
-                  aria-label={`"${inc.title}" olayı detayları`}
-                >
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <span className="text-sm font-medium text-slate-200 truncate" title={inc.title}>
-                      {inc.title}
-                    </span>
-                    <div className="flex gap-2 shrink-0">
-                      <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-space-blue text-slate-300">
-                        {getStatusLabel(inc.status)}
+          <div className="flex-1 overflow-y-auto max-h-[380px] pr-1">
+            <ul className="space-y-3">
+              {recentIncidents.map(inc => (
+                <li key={inc.id} className="bg-rich-navy border border-space-blue rounded-lg hover:bg-space-blue/30 transition-colors">
+                  <Link
+                    to={`/incidents/${inc.id}`}
+                    className="block p-4 focus:outline-none focus:ring-2 focus:ring-cyber-cyan/50 rounded-lg"
+                    aria-label={`"${inc.title}" olayı detayları`}
+                  >
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <span className="text-sm font-bold text-slate-200 truncate" title={inc.title}>
+                        {inc.title}
                       </span>
-                      <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getRiskColor(inc.severity)}`}>
-                        {getRiskLabel(inc.severity)}
-                      </span>
+                      <div className="flex gap-2 shrink-0">
+                        <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-space-blue text-slate-300">
+                          {getStatusLabel(inc.status)}
+                        </span>
+                        <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${getRiskColor(inc.severity)}`}>
+                          {getRiskLabel(inc.severity)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs text-slate-400">
-                    <span>{inc.assigned_analyst_id ? 'Atandı' : 'Atanmadı'}</span>
-                    <span>{formatDate(inc.created_at)}</span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    <div className="flex justify-between items-center text-xs text-slate-300">
+                      <span className="font-semibold text-slate-400">{inc.assigned_analyst_id ? 'Atandı' : 'Atanmadı'}</span>
+                      <span>{formatDate(inc.created_at)}</span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
-      
+
     </div>
   );
 };

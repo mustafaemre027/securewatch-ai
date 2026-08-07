@@ -127,9 +127,6 @@ vi.mock('../features/dashboard/DashboardPage', () => ({
 vi.mock('../features/analysis/AnalysisPage', () => ({
   AnalysisPage: vi.fn(() => <div data-testid="mock-analysis-page">Analysis Page Mock</div>)
 }));
-vi.mock('../pages/HomePage', () => ({
-  HomePage: vi.fn(() => <div data-testid="mock-home-page">Home Page Mock</div>)
-}));
 vi.mock('../features/auth/LoginPage', () => ({
   LoginPage: vi.fn(() => <div data-testid="mock-login-page">Login Page Mock</div>)
 }));
@@ -231,14 +228,13 @@ describe('App Route Integration', () => {
     expect(document.querySelector('main')).toBeInTheDocument();
   });
 
-  it('10. /dashboard/unknown route does not match dashboard page.', async () => {
+  it('10. /dashboard/unknown route falls back to dashboard page via redirect.', async () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       user: { role: 'ANALYST', username: 'analyst1' }
     } as unknown as ReturnType<typeof useAuth>);
     renderApp('/dashboard/unknown');
-    expect(screen.queryByTestId('mock-dashboard-page')).not.toBeInTheDocument();
-    expect(screen.getByTestId('mock-home-page')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-dashboard-page')).toBeInTheDocument();
   });
 
   it('2. Unauthenticated kullanıcı /incidents/12 rotasından login’e yönlendirilir.', async () => {
@@ -293,12 +289,12 @@ describe('App Route Integration', () => {
     expect(document.querySelector('main')).toBeInTheDocument();
   });
 
-  it('10. Bilinmeyen URL fallback davranışı korunur.', async () => {
+  it('10. Bilinmeyen URL fallback davranışı korunur ve dashboard yönlendirmesi çalışır.', async () => {
     vi.mocked(useAuth).mockReturnValue({
       isAuthenticated: true,
       user: { role: 'ANALYST', username: 'a' }
     } as unknown as ReturnType<typeof useAuth>);
     renderApp('/unknown-route-123');
-    expect(screen.getByTestId('mock-home-page')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-dashboard-page')).toBeInTheDocument();
   });
 });

@@ -197,4 +197,21 @@ describe('AppLayout', () => {
     expect(panelLink).not.toHaveAttribute('aria-current');
     unmount();
   });
+
+  it('23. Renders both mobile and desktop logos with correct responsive classes', () => {
+    renderLayout({ username: 'u', role: 'ADMIN' });
+    const images = Array.from(document.querySelectorAll('img'));
+    expect(images).toHaveLength(2);
+
+    const markLogo = images.find(img => img.getAttribute('src')?.includes('mark'));
+    const fullLogo = images.find(img => img.getAttribute('src')?.includes('logo'));
+
+    expect(markLogo).toBeInTheDocument();
+    expect(fullLogo).toBeInTheDocument();
+
+    // Verify compact mark is hidden on desktop (sm:hidden)
+    expect(markLogo).toHaveClass('sm:hidden');
+    // Verify full logo is hidden on mobile (hidden sm:block)
+    expect(fullLogo).toHaveClass('hidden sm:block');
+  });
 });
