@@ -206,13 +206,15 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
   };
 
   return (
-    <section aria-labelledby="incident-detail-heading" className="w-full max-w-4xl mx-auto bg-rich-navy border border-space-blue rounded-xl p-6 text-white min-w-[320px] overflow-hidden">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-space-blue">
-        <h2 id="incident-detail-heading" className="text-xl font-bold">Olay Detayı</h2>
+    <section aria-labelledby="incident-detail-heading" className="w-full max-w-5xl mx-auto bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] rounded-xl p-4 md:p-6 text-[var(--color-text-primary)] min-w-[320px] overflow-hidden">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[var(--color-border-subtle)]">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <h2 id="incident-detail-heading" className="text-lg md:text-xl font-bold text-[var(--color-text-primary)]">Olay Detayı</h2>
+        </div>
         {onBack && (
           <button
             onClick={onBack}
-            className="px-4 py-2 bg-deep-dark border border-space-blue text-white text-sm font-bold rounded-lg hover:bg-space-blue transition-colors"
+            className="w-full sm:w-auto px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] text-sm font-bold rounded-lg hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] transition-colors focus:ring-2 focus:ring-[var(--color-text-accent)] focus:outline-none shrink-0"
           >
             Olay Listesine Dön
           </button>
@@ -220,85 +222,92 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
       </div>
 
       {apiError ? (
-        <div role="alert" className="p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-red-200 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <span>{apiError}</span>
+        <div role="alert" className="p-4 bg-[var(--color-semantic-danger)]/10 border border-[var(--color-semantic-danger)]/20 rounded-lg text-[var(--color-semantic-danger)] mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span className="font-medium text-sm">{apiError}</span>
           {!isLoading && (
             <button
               onClick={handleRetry}
               disabled={isLoading}
-              className="px-4 py-2 bg-red-800 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50 shrink-0"
+              className="px-4 py-2 bg-[var(--color-semantic-danger)] text-white text-sm font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0 w-full sm:w-auto"
             >
               Tekrar Dene
             </button>
           )}
         </div>
       ) : isLoading && !incident ? (
-        <div role="status" aria-live="polite" aria-busy="true" className="p-12 flex flex-col items-center justify-center text-slate-300 gap-4">
-          <svg className="animate-spin h-8 w-8 text-ai-teal" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <div role="status" aria-live="polite" aria-busy="true" className="p-12 flex flex-col items-center justify-center text-[var(--color-text-secondary)] gap-4">
+          <svg className="animate-spin h-8 w-8 text-[var(--color-text-accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span className="font-semibold text-lg">Olay detayı yükleniyor...</span>
+          <span className="font-bold text-sm">Olay detayı yükleniyor...</span>
         </div>
       ) : incident ? (
         <div className="flex flex-col gap-8 relative">
           {isLoading && (
-            <div className="absolute inset-0 bg-rich-navy/60 z-10 flex items-center justify-center backdrop-blur-[2px] rounded-lg">
-              <div role="status" aria-live="polite" aria-busy="true" className="bg-deep-dark p-4 rounded-lg shadow-xl flex items-center gap-3 border border-space-blue">
-                <svg className="animate-spin h-5 w-5 text-ai-teal" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <div className="absolute inset-0 bg-[var(--color-surface-base)]/60 z-10 flex items-center justify-center backdrop-blur-[2px] rounded-lg">
+              <div role="status" aria-live="polite" aria-busy="true" className="bg-[var(--color-surface-elevated)] p-4 rounded-lg shadow-xl flex items-center gap-3 border border-[var(--color-border-subtle)]">
+                <svg className="animate-spin h-5 w-5 text-[var(--color-text-accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span className="text-sm font-semibold">Olay detayı yükleniyor...</span>
+                <span className="text-sm font-bold text-[var(--color-text-primary)]">Olay detayı yükleniyor...</span>
               </div>
             </div>
           )}
           
-          <div className="bg-deep-dark p-6 rounded-xl border border-space-blue">
-            <h3 className="text-2xl font-bold text-white mb-4 break-words">{incident.title}</h3>
+          <div className="bg-[var(--color-surface-elevated)] p-5 md:p-6 rounded-xl border border-[var(--color-border-subtle)] flex flex-col gap-6">
+            <h3 className="text-xl md:text-2xl font-bold text-[var(--color-text-primary)] break-words leading-snug">{incident.title}</h3>
             
-            <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 bg-rich-navy rounded-lg border border-space-blue/50">
-              <div>
-                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Durum</dt>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 md:p-5 bg-[var(--color-surface-base)] rounded-xl border border-[var(--color-border-subtle)] w-full">
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">Durum</dt>
                 <dd>
-                  <span className="inline-block px-2.5 py-1 text-xs font-bold rounded-full bg-space-blue text-slate-200">
+                  <span className="inline-flex px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] border border-[var(--color-border-subtle)]">
                     {getStatusLabel(incident.status)}
                   </span>
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Önem Seviyesi</dt>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">Önem Seviyesi</dt>
                 <dd>
-                  <span className={`inline-block px-2.5 py-1 text-xs font-bold rounded-full text-white ${
-                    incident.severity === 'CRITICAL' ? 'bg-red-500' :
-                    incident.severity === 'HIGH' ? 'bg-orange-500' :
-                    incident.severity === 'MEDIUM' ? 'bg-yellow-500' :
-                    'bg-blue-500'
+                  <span className={`inline-flex px-2.5 py-1 text-[11px] font-bold rounded-md uppercase tracking-wide border ${
+                    incident.severity === 'CRITICAL' ? 'bg-[var(--color-semantic-danger)]/10 text-[var(--color-semantic-danger)] border-[var(--color-semantic-danger)]/20' :
+                    incident.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                    incident.severity === 'MEDIUM' ? 'bg-[var(--color-semantic-warning)]/10 text-[var(--color-semantic-warning)] border-[var(--color-semantic-warning)]/20' :
+                    'bg-[var(--color-semantic-info)]/10 text-[var(--color-semantic-info)] border-[var(--color-semantic-info)]/20'
                   }`}>
                     {getSeverityLabel(incident.severity)}
                   </span>
                 </dd>
               </div>
-              <div>
-                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Atanan Analist</dt>
-                <dd className="font-medium text-slate-200">{renderAnalyst(incident.assigned_analyst_id)}</dd>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">Atanan Analist</dt>
+                <dd className="text-sm font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
+                  <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  {renderAnalyst(incident.assigned_analyst_id)}
+                </dd>
               </div>
-              <div>
-                <dt className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Oluşturulma</dt>
-                <dd className="font-medium text-slate-200">{formatDate(incident.created_at)}</dd>
+              <div className="flex flex-col gap-1.5">
+                <dt className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">Oluşturulma</dt>
+                <dd className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {formatDate(incident.created_at)}
+                </dd>
               </div>
             </dl>
             
-            <div className="mb-2">
-              <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Açıklama</h4>
-              <p className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed break-words">
+            <div className="pt-2 border-t border-[var(--color-border-subtle)]">
+              <h4 className="text-xs font-bold text-[var(--color-text-primary)] mb-3">Açıklama</h4>
+              <p className="text-[var(--color-text-secondary)] text-sm whitespace-pre-wrap leading-relaxed break-words bg-[var(--color-surface-base)] p-4 rounded-xl border border-[var(--color-border-subtle)]">
                 {incident.description}
               </p>
             </div>
             
-            <div className="mt-4 pt-4 border-t border-space-blue/50">
-              <span className="text-xs font-semibold text-slate-500 uppercase">
-                Son Güncellenme: <span className="font-normal">{formatDate(incident.updated_at)}</span>
+            <div className="mt-1 pt-4 border-t border-[var(--color-border-subtle)]">
+              <span className="text-xs font-bold text-[var(--color-text-muted)] uppercase tracking-wider">
+                Son Güncellenme: <span className="font-medium text-[var(--color-text-primary)] normal-case">{formatDate(incident.updated_at)}</span>
               </span>
             </div>
           </div>
@@ -306,28 +315,34 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({ incidentId, onBa
           <IncidentAssignmentPanel key={incident.id} incident={incident} onUpdated={handleIncidentUpdate} />
           <IncidentActionPanel incident={incident} onUpdated={handleIncidentUpdate} />
 
-          <div>
-            <h3 className="text-lg font-bold text-white mb-4">Yorum Geçmişi</h3>
+          <div className="bg-[var(--color-surface-elevated)] p-5 md:p-6 rounded-xl border border-[var(--color-border-subtle)]">
+            <h3 className="text-base font-bold text-[var(--color-text-primary)] mb-5">Yorum Geçmişi</h3>
             
             {(!incident.comments || incident.comments.length === 0) ? (
-              <div aria-live="polite" className="p-8 text-center text-slate-400 bg-deep-dark border border-space-blue rounded-lg">
+              <div aria-live="polite" className="p-8 text-center text-[var(--color-text-muted)] bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] rounded-xl text-sm font-medium">
                 Henüz yorum eklenmemiş.
               </div>
             ) : (
-              <ol className="space-y-4">
+              <ol className="relative border-l border-[var(--color-border-subtle)] ml-3 sm:ml-4 space-y-6">
                 {incident.comments.map((comment) => (
-                  <li key={comment.id} className="p-4 bg-deep-dark border border-space-blue rounded-lg flex flex-col gap-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm text-ai-teal">
-                        {renderCommentAuthor(comment.user_id)}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500">
-                        {formatDate(comment.created_at)}
-                      </span>
+                  <li key={comment.id} className="pl-6 relative">
+                    <span className="absolute -left-[5px] top-1.5 w-[9px] h-[9px] bg-[var(--color-surface-base)] border-2 border-[var(--color-text-accent)] rounded-full"></span>
+                    <div className="bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] rounded-xl p-4 flex flex-col gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4 mb-1">
+                        <span className="font-bold text-sm text-[var(--color-text-primary)] flex items-center gap-1.5">
+                          <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          {renderCommentAuthor(comment.user_id)}
+                        </span>
+                        <span className="text-xs font-mono font-medium text-[var(--color-text-muted)]">
+                          {formatDate(comment.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap break-words leading-relaxed">
+                        {comment.comment_text}
+                      </p>
                     </div>
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap break-words">
-                      {comment.comment_text}
-                    </p>
                   </li>
                 ))}
               </ol>
