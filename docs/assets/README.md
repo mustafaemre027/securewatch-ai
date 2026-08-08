@@ -48,6 +48,7 @@ Bu bölüm, projenin gelişim sürecine ait doğrulamaları ve çalışan uygula
 
 *   **Gün 1 Proje Panosu ([github-project-board-day-01.png](screenshots/github-project-board-day-01.png)):** Gün 1 kapsamındaki Project Board durumunu ve iş akışını gösteren gerçek GitHub ekran görüntüsüdür.
 *   **PR #34 İnceleme ve Onay Kanıtı ([pr-34-documentation-review.png](screenshots/pr-34-documentation-review.png)):** PR #34 kapsamındaki dokümantasyon inceleme ve onay sürecini gösteren gerçek GitHub ekran görüntüsüdür.
-
-> [!NOTE]
-> Çalışan uygulamaya ait ekran görüntüleri (Dashboard, Analiz Sonuçları vb.), uygulamanın ilgili kod bileşenleri geliştirildikten sonra bu dizine eklenecektir. Şu anda geliştirme aşamasında olunduğu için herhangi bir sahte/temsili ekran görüntüsü eklenmemiştir.
+*   **Dashboard Genel Bakış ([dashboard-overview.png](screenshots/dashboard-overview.png)):** Dashboard genel güvenlik görünümü.
+*   **Analiz Çalışma Alanı ([analysis-workspace.png](screenshots/analysis-workspace.png)):** CSV analiz çalışma alanı.
+*   **Tespit Sonuçları ([detection-results.png](screenshots/detection-results.png)):** Tespit sonuçları ve risk dağılımı.
+*   **Güvenlik Olayları Listesi ([incident-list.png](screenshots/incident-list.png)):** Güvenlik olayı listesi ve filtreleri.
