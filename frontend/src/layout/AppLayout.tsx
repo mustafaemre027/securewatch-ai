@@ -22,85 +22,92 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-deep-dark flex flex-col text-white">
+    <div className="min-h-screen bg-bg-base flex flex-col text-text-primary">
       {/* Skip link for accessibility */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 bg-cyber-cyan text-deep-dark px-4 py-2 rounded font-bold"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 bg-accent-primary text-deep-dark px-4 py-2 rounded font-bold"
       >
         Ana içeriğe atla
       </a>
 
-      <header className="bg-rich-navy border-b border-space-blue sticky top-0 z-40">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[4rem] py-3 sm:py-0 flex flex-wrap items-center justify-between gap-y-3 sm:gap-y-0">
+      {/* HEADER SHELL */}
+      <header className="bg-bg-elevated border-b border-border-subtle sticky top-0 z-40 shadow-sm">
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-auto sm:h-16 py-3 sm:py-0 flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-4 sm:gap-y-0">
 
-          {/* 1. Logo */}
+          {/* 1. BRAND ZONE */}
           <div className="flex items-center flex-none shrink-0 order-1">
             <SecureWatchBrand variant="dark" compact className="h-8 w-auto sm:hidden" ariaHidden />
-            <SecureWatchBrand variant="dark" className="hidden sm:block h-10 w-auto" ariaHidden />
+            <SecureWatchBrand variant="dark" className="hidden sm:block h-9 w-auto" ariaHidden />
             <span className="sr-only">SecureWatch AI</span>
           </div>
 
-          {/* 2. User & Logout (Order 2 on mobile to sit next to logo, Order 3 on desktop) */}
-          <div className="flex items-center justify-end gap-3 sm:gap-4 min-w-0 order-2 sm:order-3">
+          {/* 2. USER IDENTITY BLOCK & LOGOUT (Mobile: Order 2, Desktop: Order 3) */}
+          <div className="flex items-center justify-end gap-4 min-w-0 order-2 sm:order-3 shrink-0">
             <div className="flex flex-col items-end min-w-0">
-              <span className="text-sm font-medium truncate max-w-[120px] sm:max-w-[200px]" title={user?.username}>
+              <span className="text-sm font-medium text-text-primary truncate max-w-[120px] sm:max-w-[200px]" title={user?.username}>
                 {user?.username}
               </span>
-              <span className="text-xs text-cyber-cyan truncate">
+              <span className="text-[0.65rem] uppercase tracking-wider font-semibold text-text-secondary truncate">
                 {getRoleLabel(user?.role)}
               </span>
             </div>
+
+            {/* Divider */}
+            <div className="hidden sm:block w-px h-8 bg-border-default"></div>
+
             <button
               onClick={handleLogout}
-              className="flex-shrink-0 border border-space-blue hover:bg-space-blue/50 text-gray-300 hover:text-white px-3 py-1.5 rounded transition-colors text-xs sm:text-sm"
+              className="sw-button-secondary py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap"
               aria-label="Oturumu kapat"
             >
               Çıkış
             </button>
           </div>
 
-          {/* 3. Navigation Links (Order 3 on mobile -> takes full width, Order 2 on desktop) */}
-          <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto order-3 sm:order-2 sm:flex-1 sm:border-l border-space-blue sm:ml-6 sm:pl-6 gap-1 sm:gap-2">
-            <NavLink
-              to="/dashboard"
-              aria-current={isDashboardActive ? 'page' : undefined}
-              className={() =>
-                `flex-1 sm:flex-none text-center px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isDashboardActive
-                    ? 'bg-space-blue text-white'
-                    : 'text-slate-300 hover:text-white hover:bg-space-blue/50'
-                }`
-              }
-            >
-              Panel
-            </NavLink>
-            <NavLink
-              to="/analysis"
-              aria-current={isAnalysisActive ? 'page' : undefined}
-              className={() =>
-                `flex-1 sm:flex-none text-center px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isAnalysisActive
-                    ? 'bg-space-blue text-white'
-                    : 'text-slate-300 hover:text-white hover:bg-space-blue/50'
-                }`
-              }
-            >
-              Analiz
-            </NavLink>
-            <NavLink
-              to="/incidents"
-              aria-current={isIncidentsActive ? 'page' : undefined}
-              className={() =>
-                `flex-1 sm:flex-none text-center px-2 sm:px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isIncidentsActive
-                    ? 'bg-space-blue text-white'
-                    : 'text-slate-300 hover:text-white hover:bg-space-blue/50'
-                }`
-              }
-            >
-              Olaylar
-            </NavLink>
+          {/* 3. NAVIGATION - PREMIUM COMMAND GROUP (Mobile: Order 3, takes full width, grid-cols-3. Desktop: Order 2) */}
+          <div className="w-full sm:w-auto order-3 sm:order-2 sm:flex-1 sm:ml-8 sm:mr-4">
+            <div className="grid grid-cols-3 sm:flex items-center sm:justify-start gap-1 p-1 rounded-lg bg-surface-base border border-border-subtle">
+              <NavLink
+                to="/dashboard"
+                aria-current={isDashboardActive ? 'page' : undefined}
+                className={() =>
+                  `text-center px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    isDashboardActive
+                      ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent-primary)] font-medium shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover font-medium'
+                  }`
+                }
+              >
+                Panel
+              </NavLink>
+              <NavLink
+                to="/analysis"
+                aria-current={isAnalysisActive ? 'page' : undefined}
+                className={() =>
+                  `text-center px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    isAnalysisActive
+                      ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent-primary)] font-medium shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover font-medium'
+                  }`
+                }
+              >
+                Analiz
+              </NavLink>
+              <NavLink
+                to="/incidents"
+                aria-current={isIncidentsActive ? 'page' : undefined}
+                className={() =>
+                  `text-center px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    isIncidentsActive
+                      ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent-primary)] font-medium shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover font-medium'
+                  }`
+                }
+              >
+                Olaylar
+              </NavLink>
+            </div>
           </div>
 
         </nav>

@@ -96,31 +96,44 @@ export const DashboardPage: React.FC = () => {
     : false;
 
   return (
-    <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 dashboard-page">
-      <div className="mb-2">
-        <h1 className="text-3xl font-extrabold text-white mb-2">Genel Özet</h1>
-        <p className="text-muted-blue">
-          Sistem üzerindeki tüm ağ analizleri, güvenlik tespitleri ve olay raporlarının özet görünümü.
-        </p>
+    <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto dashboard-page pb-12">
+      {/* PAGE HEADER */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+        <div>
+          <div className="text-[10px] font-bold tracking-wider text-[var(--color-accent-primary)] uppercase mb-1">
+            Security Command Center
+          </div>
+          <h1 className="text-3xl font-extrabold text-text-primary mb-1 tracking-tight">Genel Özet</h1>
+          <p className="text-sm text-text-secondary max-w-2xl">
+            Sistem üzerindeki tüm ağ analizleri, güvenlik tespitleri ve olay raporlarının özet görünümü.
+          </p>
+        </div>
+
+        {summary && !isLoading && !error && (
+          <div className="text-xs font-medium text-text-muted bg-surface-base px-3 py-1.5 rounded border border-border-subtle inline-flex items-center gap-2 self-start md:self-auto">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-semantic-success)] animate-pulse"></span>
+            Son güncelleme: {new Date(summary.generated_at).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' })}
+          </div>
+        )}
       </div>
 
       {isLoading && (
-        <div role="status" aria-live="polite" aria-busy="true" className="flex items-center justify-center p-12 text-muted-blue">
-          <svg className="animate-spin -ml-1 mr-3 h-8 w-8 text-ai-teal" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <div role="status" aria-live="polite" aria-busy="true" className="flex flex-col items-center justify-center p-20 sw-surface-elevated text-text-muted">
+          <svg className="animate-spin mb-4 h-10 w-10 text-[var(--color-accent-primary)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span className="text-lg">Dashboard verileri yükleniyor...</span>
+          <span className="text-sm font-medium tracking-wide">Dashboard verileri yükleniyor...</span>
         </div>
       )}
 
       {error && !isLoading && (
-        <div role="alert" className="p-6 bg-deep-dark border-2 border-red-500/50 rounded-xl flex flex-col items-center justify-center text-center">
-          <p className="text-lg text-red-400 font-bold mb-4">{error}</p>
+        <div role="alert" className="p-8 bg-[var(--color-semantic-danger-bg)] border border-[var(--color-semantic-danger)]/30 rounded-xl flex flex-col items-center justify-center text-center">
+          <p className="text-base text-[var(--color-semantic-danger)] font-medium mb-6 max-w-md">{error}</p>
           <button
             onClick={handleRetry}
             disabled={isLoading}
-            className="py-2 px-6 bg-space-blue text-white font-bold rounded-lg hover:bg-muted-blue transition-colors focus:outline-none focus:ring-2 focus:ring-ai-teal focus:ring-offset-2 focus:ring-offset-deep-dark"
+            className="sw-button-primary"
           >
             Tekrar Dene
           </button>
@@ -128,16 +141,11 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {summary && !isLoading && !error && (
-        <section aria-labelledby="summary-cards-heading">
-          <div className="flex justify-between items-end mb-4">
-            <h2 id="summary-cards-heading" className="sr-only">Özet İstatistikler</h2>
-            <span className="text-xs text-slate-400">
-              Son güncelleme: {new Date(summary.generated_at).toLocaleString('tr-TR', { dateStyle: 'long', timeStyle: 'short' })}
-            </span>
-          </div>
+        <section aria-labelledby="summary-cards-heading" className="flex flex-col gap-6">
+          <h2 id="summary-cards-heading" className="sr-only">Özet İstatistikler</h2>
 
           {isDashboardEmpty && (
-            <div className="mb-6 p-4 bg-space-blue/30 border border-space-blue rounded-lg text-center text-muted-blue">
+            <div className="p-8 sw-surface text-center text-text-muted border-dashed border-2 border-border-default">
               Henüz sistemde gösterilecek veri bulunmuyor.
             </div>
           )}
