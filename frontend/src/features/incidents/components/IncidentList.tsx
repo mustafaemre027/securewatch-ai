@@ -204,21 +204,21 @@ export const IncidentList: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-rich-navy border border-space-blue rounded-xl p-6 text-white">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold mb-2">Olaylar</h2>
-        <p className="text-sm text-slate-300">Güvenlik tespitlerinden oluşturulan olay kayıtlarını inceleyin.</p>
+    <div className="w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-2xl font-extrabold text-[var(--color-text-primary)]">Olaylar</h2>
+        <p className="text-sm font-medium text-[var(--color-text-secondary)]">Güvenlik tespitlerinden oluşturulan olay kayıtlarını inceleyin.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-deep-dark border border-space-blue rounded-lg">
-        <div className="flex-1">
-          <label htmlFor="status-filter" className="block text-xs font-semibold text-slate-300 uppercase mb-2">Olay Durumu</label>
+      <div className="flex flex-col md:flex-row gap-4 p-4 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] rounded-xl items-end">
+        <div className="w-full md:flex-1">
+          <label htmlFor="status-filter" className="block text-xs font-bold text-[var(--color-text-secondary)] uppercase mb-1.5">Olay Durumu</label>
           <select
             id="status-filter"
             value={statusFilter || ''}
             onChange={handleStatusChange}
             disabled={isLoading}
-            className="w-full bg-rich-navy border border-space-blue text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-ai-teal outline-none disabled:opacity-50"
+            className="w-full bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-[var(--color-text-accent)] focus:border-transparent outline-none disabled:opacity-50 transition-shadow"
           >
             <option value="">Tüm Durumlar</option>
             <option value="OPEN">Açık</option>
@@ -227,14 +227,14 @@ export const IncidentList: React.FC = () => {
             <option value="FALSE_POSITIVE">Yanlış Pozitif</option>
           </select>
         </div>
-        <div className="flex-1">
-          <label htmlFor="severity-filter" className="block text-xs font-semibold text-slate-300 uppercase mb-2">Önem Seviyesi</label>
+        <div className="w-full md:flex-1">
+          <label htmlFor="severity-filter" className="block text-xs font-bold text-[var(--color-text-secondary)] uppercase mb-1.5">Önem Seviyesi</label>
           <select
             id="severity-filter"
             value={severityFilter || ''}
             onChange={handleSeverityChange}
             disabled={isLoading}
-            className="w-full bg-rich-navy border border-space-blue text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-ai-teal outline-none disabled:opacity-50"
+            className="w-full bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-[var(--color-text-accent)] focus:border-transparent outline-none disabled:opacity-50 transition-shadow"
           >
             <option value="">Tüm Seviyeler</option>
             <option value="LOW">Düşük</option>
@@ -243,48 +243,48 @@ export const IncidentList: React.FC = () => {
             <option value="CRITICAL">Kritik</option>
           </select>
         </div>
-        <div className="flex-1 flex items-end pb-2">
-          <label className="flex items-center gap-2 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={assignedToMeOnly}
-              onChange={handleAssignedChange}
-              disabled={isLoading}
-              className="sr-only peer"
-            />
-            <div className="w-5 h-5 rounded border border-slate-600 bg-deep-dark flex items-center justify-center peer-checked:bg-cyber-cyan peer-checked:border-cyber-cyan peer-focus-visible:ring-2 peer-focus-visible:ring-cyber-cyan/50 peer-disabled:opacity-60 transition-colors">
-              {assignedToMeOnly && (
-                <svg className="w-3.5 h-3.5 text-deep-dark pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <div className="w-full md:w-auto flex items-center h-[42px]">
+          <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+            <div className="relative flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={assignedToMeOnly}
+                onChange={handleAssignedChange}
+                disabled={isLoading}
+                className="peer sr-only"
+              />
+              <div className="w-5 h-5 rounded-md border-2 border-[var(--color-border-subtle)] bg-[var(--color-surface-base)] peer-checked:bg-[var(--color-text-accent)] peer-checked:border-[var(--color-text-accent)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-text-accent)] peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[var(--color-surface-elevated)] peer-disabled:opacity-50 transition-all flex items-center justify-center">
+                <svg className={`w-3 h-3 text-[var(--color-surface-base)] transition-opacity ${assignedToMeOnly ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-              )}
+              </div>
             </div>
-            <span className="text-sm font-semibold text-slate-300 peer-disabled:opacity-60 select-none">Yalnız Bana Atananlar</span>
+            <span className="text-sm font-bold text-[var(--color-text-primary)] group-disabled:opacity-50 transition-opacity">Yalnız Bana Atananlar</span>
           </label>
         </div>
       </div>
 
       {apiError ? (
-        <div role="alert" className="p-4 bg-red-900/50 border border-red-500/50 rounded-lg text-red-200 mb-6 flex items-center justify-between">
-          <span>{apiError}</span>
+        <div role="alert" className="p-4 bg-[var(--color-semantic-danger)]/10 border border-[var(--color-semantic-danger)]/30 rounded-xl text-[var(--color-semantic-danger)] flex items-center justify-between">
+          <span className="text-sm font-medium">{apiError}</span>
           <button
             onClick={handleRetry}
             disabled={isLoading}
-            className="px-4 py-2 bg-red-800 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-[var(--color-semantic-danger)] hover:bg-[var(--color-semantic-danger)]/80 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
           >
             Tekrar Dene
           </button>
         </div>
       ) : isLoading && !incidents ? (
-        <div role="status" aria-live="polite" aria-busy="true" className="p-8 flex items-center justify-center text-slate-300">
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-ai-teal" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <div role="status" aria-live="polite" aria-busy="true" className="p-12 flex flex-col items-center justify-center text-[var(--color-text-secondary)] gap-4">
+          <svg className="animate-spin h-8 w-8 text-[var(--color-text-accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          Olaylar yükleniyor...
+          <span className="font-semibold text-lg">Olaylar yükleniyor...</span>
         </div>
       ) : incidents?.length === 0 ? (
-        <div aria-live="polite" className="p-8 text-center text-slate-400 bg-deep-dark border border-space-blue rounded-lg mb-6">
+        <div aria-live="polite" className="p-8 text-center text-[var(--color-text-secondary)] font-medium bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] rounded-xl">
           {(statusFilter || severityFilter || assignedToMeOnly)
             ? 'Seçilen filtrelerle eşleşen olay bulunamadı.'
             : 'Henüz oluşturulmuş bir olay bulunmuyor.'}
@@ -292,64 +292,80 @@ export const IncidentList: React.FC = () => {
       ) : (
         <div className="relative">
           {isLoading && (
-            <div className="absolute inset-0 bg-rich-navy/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-              <div role="status" aria-live="polite" aria-busy="true" className="bg-deep-dark p-4 rounded-lg shadow-lg flex items-center gap-3">
-                <svg className="animate-spin h-5 w-5 text-ai-teal" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <div className="absolute inset-0 bg-[var(--color-surface-base)]/60 z-10 flex items-center justify-center backdrop-blur-[2px] rounded-xl">
+              <div role="status" aria-live="polite" aria-busy="true" className="bg-[var(--color-surface-elevated)] p-4 rounded-xl shadow-xl flex items-center gap-3 border border-[var(--color-border-subtle)]">
+                <svg className="animate-spin h-5 w-5 text-[var(--color-text-accent)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span className="text-sm font-semibold">Olaylar yükleniyor...</span>
+                <span className="text-sm font-bold text-[var(--color-text-primary)]">Olaylar yükleniyor...</span>
               </div>
             </div>
           )}
 
-          <ul className="space-y-4 mb-6">
+          <ul className="flex flex-col gap-3 mb-6">
             {incidents?.map((incident) => (
-              <li key={incident.id} className="p-4 bg-deep-dark border border-space-blue rounded-lg flex flex-col gap-3">
-                <div className="flex justify-between items-start gap-4">
-                  <h3 className="font-bold text-lg text-white break-words">{incident.title}</h3>
-                  <div className="flex gap-2 shrink-0">
-                    <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-space-blue text-slate-300">
-                      {getStatusLabel(incident.status)}
-                    </span>
-                    <span className={`px-2.5 py-1 text-xs font-bold rounded-full text-white ${
-                      incident.severity === 'CRITICAL' ? 'bg-red-500' :
-                      incident.severity === 'HIGH' ? 'bg-orange-500' :
-                      incident.severity === 'MEDIUM' ? 'bg-yellow-500' :
-                      'bg-blue-500'
+              <li key={incident.id} className="group flex flex-col gap-4 p-4 md:p-5 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] rounded-xl hover:bg-[var(--color-surface-hover)] transition-colors overflow-hidden">
+                <div className="flex flex-col md:grid md:grid-cols-12 gap-4 items-start md:items-center">
+
+                  {/* Sol Kısım: ID ve Başlık */}
+                  <div className="md:col-span-3 flex flex-col gap-1 w-full">
+                    <span className="text-xs font-mono font-medium text-[var(--color-text-muted)]">#{incident.id}</span>
+                    <h3 className="font-bold text-[var(--color-text-primary)] text-sm md:text-base leading-snug break-words line-clamp-2" title={incident.title}>
+                      {incident.title}
+                    </h3>
+                    <p className="text-sm text-[var(--color-text-secondary)] break-words line-clamp-2 mt-1" title={incident.description}>
+                      {incident.description}
+                    </p>
+                  </div>
+
+                  {/* Orta Kısım: Badges (Severity, Status, Assignee) */}
+                  <div className="md:col-span-4 flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3 w-full">
+                    <span className={`px-2.5 py-1 text-[11px] font-bold rounded-md uppercase tracking-wide border ${
+                      incident.severity === 'CRITICAL' ? 'bg-[var(--color-semantic-danger)]/10 text-[var(--color-semantic-danger)] border-[var(--color-semantic-danger)]/20' :
+                      incident.severity === 'HIGH' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
+                      incident.severity === 'MEDIUM' ? 'bg-[var(--color-semantic-warning)]/10 text-[var(--color-semantic-warning)] border-[var(--color-semantic-warning)]/20' :
+                      'bg-[var(--color-semantic-info)]/10 text-[var(--color-semantic-info)] border-[var(--color-semantic-info)]/20'
                     }`}>
                       {getSeverityLabel(incident.severity)}
                     </span>
+                    <span className="px-2.5 py-1 text-[11px] font-bold rounded-md bg-[var(--color-surface-base)] text-[var(--color-text-secondary)] border border-[var(--color-border-subtle)]">
+                      {getStatusLabel(incident.status)}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-muted)] border-l border-[var(--color-border-subtle)] pl-2 md:pl-3">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      {renderAnalyst(incident.assigned_analyst_id)}
+                    </div>
                   </div>
-                </div>
 
-                <p className="text-sm text-slate-300 break-words line-clamp-3">
-                  {incident.description}
-                </p>
+                  {/* Tarih / Metadata */}
+                  <div className="md:col-span-3 flex flex-col items-start md:items-end gap-1 min-w-0 w-full">
+                    <div className="flex items-center justify-between md:justify-end gap-1.5 w-full">
+                      <span className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider shrink-0">Oluşturulma</span>
+                      <span className="text-xs font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
+                        {formatDate(incident.created_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between md:justify-end gap-1.5 w-full">
+                      <span className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider shrink-0">Son Güncelleme</span>
+                      <span className="text-xs font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
+                        {formatDate(incident.updated_at)}
+                      </span>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 pt-3 border-t border-space-blue/50 text-xs text-slate-300">
-                  <div>
-                    <span className="block font-semibold text-slate-400 mb-0.5">Atanan Analist</span>
-                    {renderAnalyst(incident.assigned_analyst_id)}
+                  {/* Aksiyon */}
+                  <div className="md:col-span-2 flex items-center justify-start md:justify-end w-full mt-2 md:mt-0">
+                    <Link
+                      to={`/incidents/${incident.id}`}
+                      aria-label={`"${incident.title}" olayının detayını görüntüle`}
+                      className="shrink-0 px-4 py-2 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] hover:bg-[var(--color-text-accent)] hover:border-[var(--color-text-accent)] hover:text-slate-900 text-[var(--color-text-primary)] text-xs font-bold rounded-lg transition-all focus:ring-2 focus:ring-[var(--color-text-accent)] focus:outline-none focus:ring-offset-2 focus:ring-offset-[var(--color-surface-elevated)] w-full text-center md:w-auto"
+                    >
+                      Detayı Gör
+                    </Link>
                   </div>
-                  <div>
-                    <span className="block font-semibold text-slate-400 mb-0.5">Oluşturulma</span>
-                    {formatDate(incident.created_at)}
-                  </div>
-                  <div>
-                    <span className="block font-semibold text-slate-400 mb-0.5">Son Güncelleme</span>
-                    {formatDate(incident.updated_at)}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex justify-end">
-                  <Link
-                    to={`/incidents/${incident.id}`}
-                    aria-label={`"${incident.title}" olayının detayını görüntüle`}
-                    className="px-4 py-2 bg-ai-teal hover:bg-teal-500 text-deep-dark text-sm font-bold rounded-lg transition-colors"
-                  >
-                    Detayı Gör
-                  </Link>
                 </div>
               </li>
             ))}
@@ -357,24 +373,24 @@ export const IncidentList: React.FC = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-space-blue pt-4">
-        <div aria-live="polite" className="text-sm text-slate-400">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[var(--color-border-subtle)] pt-5 mt-auto">
+        <div aria-live="polite" className="text-sm font-medium text-[var(--color-text-muted)] w-full sm:w-auto text-center sm:text-left">
           {incidents && incidents.length > 0
             ? `${skip + 1} - ${skip + incidents.length} arası gösteriliyor`
             : '0 kayıt'}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handlePrevPage}
             disabled={isLoading || skip === 0}
-            className="px-4 py-2 bg-deep-dark border border-space-blue text-slate-300 text-sm font-bold rounded-lg hover:bg-space-blue hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm font-bold rounded-lg hover:bg-[var(--color-surface-hover)] focus:ring-2 focus:ring-[var(--color-text-accent)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Önceki
           </button>
           <button
             onClick={handleNextPage}
             disabled={isLoading || !hasNextPage}
-            className="px-4 py-2 bg-deep-dark border border-space-blue text-slate-300 text-sm font-bold rounded-lg hover:bg-space-blue hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-4 py-2 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm font-bold rounded-lg hover:bg-[var(--color-surface-hover)] focus:ring-2 focus:ring-[var(--color-text-accent)] focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Sonraki
           </button>
