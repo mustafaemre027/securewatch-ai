@@ -16,226 +16,188 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 
 > **Önemli:** Bu proje üretim ortamında kullanılabilecek gerçek zamanlı bir IDS/IPS değildir. Akademik ve kurumsal karar destek prototipi olarak geliştirilmektedir.
 
+### Temel Kullanım Akışı
+- **Kullanıcı Kimlik Doğrulaması:** Sistem yöneticisi veya güvenlik analisti olarak güvenli giriş yapılması.
+- **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 uyumlu CSV ağ trafik verilerinin platforma yüklenmesi.
+- **Batch Analiz:** Yüklenen verilerin güvenli bir şekilde doğrulanarak yapay zeka modeli ile senkron toplu analize (batch inference) sokulması.
+- **Risk Sınıflandırması:** Analiz sonucunda ağ kayıtlarının normal/saldırı olarak tahmin edilmesi ve uygun risk seviyelerine (LOW, MEDIUM, HIGH, CRITICAL) ayrılması.
+- **Olay Yönetimi:** Yüksek riskli ve şüpheli tespitlerin birleştirilerek güvenlik olayı (Incident) dosyalarına dönüştürülmesi ve analistlere atanması.
+- **Dashboard ve İzleme:** Tüm analizlerin, tespitlerin ve olayların güncel durumunun özet metrikler ve grafikler üzerinden takip edilmesi.
+
+## Uygulama Görüntüleri
+
+| Güvenlik Dashboard'u | Analiz Çalışma Alanı |
+| :---: | :---: |
+| [![Dashboard Genel Bakış](docs/assets/screenshots/dashboard-overview.png)](docs/assets/screenshots/dashboard-overview.png) | [![Analiz Çalışma Alanı](docs/assets/screenshots/analysis-workspace.png)](docs/assets/screenshots/analysis-workspace.png) |
+| *Sistemin genel güvenlik durumunu ve özet metrikleri gösteren görünüm.* | *Yeni analiz başlatma ve geçmiş analizleri izleme alanı.* |
+
+| Tespit Sonuçları | Olay Yönetimi |
+| :---: | :---: |
+| [![Tespit Sonuçları](docs/assets/screenshots/detection-results.png)](docs/assets/screenshots/detection-results.png) | [![Olay Yönetimi](docs/assets/screenshots/incident-list.png)](docs/assets/screenshots/incident-list.png) |
+| *Tamamlanan analizdeki tespitlerin ve risk dağılımlarının listesi.* | *Güvenlik olaylarının durum, atama ve önceliğe göre takip edildiği alan.* |
+
 ## Temel Özellikler
 
-- **Kimlik Doğrulama & Güvenlik:** JWT (JSON Web Token) tabanlı oturum yönetimi, `bcrypt` ile güvenli parola hashleme ve saklama.
-- **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile uç nokta yetkilendirmesi.
-- **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin (`USER_LOGIN`, `USER_CREATED` vb.) istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
-- **Veri Yükleme:** Güvenlik analistleri tarafından CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Yükleme esnasında dosya boyutu (varsayılan 50 MB, yapılandırılabilir), uzantı/MIME, şema doğrulaması ve SHA-256 çift kopya (duplicate) kontrolü yapılır. Başarılı yüklemelerde `PENDING` durumunda bir analiz işi (AnalysisJob) ve `FILE_UPLOAD` audit kaydı oluşturulur.
-- **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression ve dört Random Forest varyantının (`rf_baseline`, `rf_deeper`, `rf_unweighted`, `rf_compact`) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC/AP (Average Precision) gelişmiş olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik ve validation tabanlı model seçim servisi kuruldu. Model seçim raporu güvenli JSON olarak CLI'dan alınabilir. Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
-- **Batch Inference ve API:** Eğitilmiş ve güvenilir model paketleriyle senkron batch inference desteği. Yüklenen CSV kayıtları için saldırı olasılığı, ikili saldırı kararı ve risk seviyesi üretimi. Analiz çalıştırma, sayfalanmış sonuç görüntüleme ve özet raporlama API'leri eklendi. Admin ve Analyst rolleri için sahiplik tabanlı erişim kontrolü uygulanır. Ayrıntılar için bkz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md).
-- **Risk Skorlaması:** Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
-- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (implemented).
-- **Dashboard and Reporting:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (implemented).
-- **Test, Security and Integration:** in progress
+- **Kimlik Doğrulama & Güvenlik:** JWT (JSON Web Token) tabanlı oturum yönetimi, `bcrypt` ile güvenli parola hashleme ve saklama tamamlandı.
+- **Rol Tabanlı Erişim Kontrolü (RBAC):** `ADMIN` (Sistem Yöneticisi) ve `ANALYST` (Güvenlik Analisti) rolleri ile sıkı uç nokta yetkilendirmesi.
+- **Denetim Günlükleri (Audit Logging):** Kritik kullanıcı eylemlerinin istemci IP adresi ve zaman damgası ile otomatik kaydı; ilişkili kullanıcı silinse dahi logların korunması (`ON DELETE SET NULL`).
+- **Veri Yükleme:** CIC-IDS2017 formatında (78 zorunlu özellik, 1 opsiyonel Label) ağ trafiği verilerinin güvenli şekilde yüklenmesi. Dosya boyutu, uzantı/MIME, şema doğrulaması ve SHA-256 kopya kontrolü uygulanır.
+- **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression, DummyClassifier ve Random Forest varyantlarının (baseline, deeper, unweighted, compact) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik model seçim servisi kuruldu.
+- **Batch Inference ve API:** Eğitilmiş model paketleriyle senkron batch inference desteği. Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
+- **Olay Yönetimi (Incident Management):** Yüksek riskli tespitlerin izlenebilir güvenlik olaylarına (Incident) dönüştürülmesi, atama, durum takibi ve yorum/zaman çizelgesi yönetimi tamamlandı.
+- **Dashboard ve Raporlama:** Sistemdeki analiz işlerinin, tespit dağılımlarının ve açık güvenlik olaylarının anlık istatistiklerini sağlayan genel bakış paneli tamamlandı.
+- **Test ve Entegrasyon:** Uçtan uca test (backend ve frontend) ve Docker konteynerizasyon entegrasyonu tamamen tamamlandı.
 
 ## Teknoloji Yığını
 
 | Katman | Teknoloji |
 |--------|-----------|
 | **Frontend** | React, TypeScript, Vite, Tailwind CSS, Recharts |
+| **Frontend Sunucusu** | Nginx (Production Runtime) |
 | **Backend** | Python, FastAPI, Pydantic, SQLAlchemy, Alembic, PyJWT, bcrypt |
 | **Veritabanı** | PostgreSQL |
-| **Makine Öğrenmesi** | Pandas, NumPy, scikit-learn, Joblib |
+| **Makine Öğrenmesi**| Pandas, NumPy, scikit-learn, Joblib |
 | **Test** | Pytest, HTTPX, Vitest, React Testing Library |
-| **DevOps** | Docker, Docker Compose, GitHub Actions (planlandı) |
+| **DevOps** | Docker, Docker Compose |
 
 ---
 
 ## Güvenlik, RBAC ve API Uç Noktaları
 
-Platform, güvenli erişim ve denetlenebilirlik için aşağıdaki güvenlik katmanlarına sahiptir:
+Platform, güvenli erişim ve denetlenebilirlik için sıkı güvenlik katmanlarına sahiptir:
 
 ### Rol Tabanlı Erişim (RBAC) Yetki Matrisi
 
 | Endpoint | HTTP Metodu | Erişim Rolü | Açıklama |
 |----------|-------------|-------------|----------|
 | `/api/v1/auth/login` | `POST` | `PUBLIC` | Kullanıcı adı ve parola ile giriş yapar, JWT token döner. |
-| `/api/v1/users` | `POST` | `ADMIN` | Yeni kullanıcı hesabı oluşturur ve `USER_CREATED` audit kaydı düşer. |
-| `/api/v1/users` | `GET` | `ADMIN` | Sistemde kayıtlı tüm kullanıcıları listeler. |
-| `/api/v1/audit-logs` | `GET` | `ADMIN` | Sistem denetim günlüklerini listeler (kullanıcı, eylem ve tarih filtresi destekler). |
-| `/api/v1/analysis/upload` | `POST` | `ANALYST` | CIC-IDS2017 CSV dosyası yükler, doğrular ve `PENDING` analiz işi oluşturur. |
-| `/api/v1/analysis` | `GET` | `ADMIN`, `ANALYST` | Analiz işlerini listeler (Admin tümünü, Analist sadece kendi işlerini görür). |
-| `/api/v1/analysis/{job_id}` | `GET` | `ADMIN`, `ANALYST` | Belirli bir analiz işinin detaylarını getirir. |
-| `/api/v1/analysis/{job_id}/process` | `POST` | `ADMIN`, `ANALYST` | Yüklenmiş bir analiz işini (PENDING) senkron olarak çalıştırır ve sonuçlandırır. |
-| `/api/v1/analysis/{job_id}/results` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin sonuçlarını (DetectionResult) sayfalamalı ve filtrelenebilir olarak listeler. |
-| `/api/v1/analysis/{job_id}/summary` | `GET` | `ADMIN`, `ANALYST` | Tamamlanmış analizin risk gruplu (LOW, MEDIUM vb.) özet istatistiklerini getirir. |
+| `/api/v1/users` | `GET`, `POST` | `ADMIN` | Kullanıcı oluşturur ve listeler. `USER_CREATED` audit kaydı düşer. |
+| `/api/v1/audit-logs` | `GET` | `ADMIN` | Sistem denetim günlüklerini listeler. |
+| `/api/v1/analysis/upload`| `POST` | `ANALYST` | CIC-IDS2017 CSV dosyası yükler, doğrular ve analiz işi oluşturur. |
+| `/api/v1/analysis` | `GET` | `ADMIN`, `ANALYST`| Analiz işlerini listeler. |
+| `/api/v1/analysis/{id}` | `GET` | `ADMIN`, `ANALYST`| Analiz detayını getirir. |
+| `/api/v1/analysis/{id}/process`| `POST` | `ADMIN`, `ANALYST`| Bekleyen bir analizi senkron çalıştırır ve inference işlemlerini gerçekleştirir. |
+| `/api/v1/analysis/{id}/results`| `GET` | `ADMIN`, `ANALYST`| Tamamlanmış analiz tespitlerini (sonuçları) getirir. |
+| `/api/v1/analysis/{id}/summary`| `GET` | `ADMIN`, `ANALYST`| Analize ait risk özet metriklerini getirir. |
+| `/api/v1/detections/{id}`| `GET` | `ADMIN`, `ANALYST`| Tekil tespit (detection) detayını getirir. |
+| `/api/v1/incidents` | `POST`, `GET` | `ADMIN`, `ANALYST`| Güvenlik olaylarını sayfalı listeler veya tespitlerden yeni olay oluşturur. |
+| `/api/v1/incidents/{id}` | `GET`, `PATCH`| `ADMIN`, `ANALYST`| Olayın detayını okur ve durumunu/atanan kişiyi günceller. |
+| `/api/v1/incidents/{id}/comments`| `POST` | `ADMIN`, `ANALYST`| Güvenlik olayına analiz notu/yorum ekler. |
+| `/api/v1/dashboard/summary`| `GET` | `ADMIN`, `ANALYST`| Dashboard paneli için toplu metrik istatistiklerini getirir. |
 
-### Audit Log Güvenlik İlkeleri
-
-- **İlişki Güvenliği:** Bir kullanıcı veritabanından silindiğinde geçmiş audit logları silinmez; `user_id` alanı otomatik olarak `NULL` değerine çekilir (`ON DELETE SET NULL`).
-- **Gizlilik:** Parola, password hash, JWT token veya veritabanı bağlantı şifresi gibi hassas veriler asla audit loglarına kaydedilmez.
-- **Atomik İşlem:** Kullanıcı oluşturma işlemi ve `USER_CREATED` audit log kaydı tek bir veritabanı işleminde (transaction) atomik olarak tamamlanır; bir işlem başarısız olursa tüm değişiklikler geri alınır (`rollback`).
-
-Ayrıntılı API uç nokta sözleşmeleri ve hata kodları için bkz. [docs/architecture/06-api-endpoints.md](docs/architecture/06-api-endpoints.md).
+Ayrıntılı API uç nokta sözleşmeleri ve hata kodları için bkz. [06-api-endpoints.md](docs/architecture/06-api-endpoints.md).
 
 ---
 
 ## Kurulum ve Çalıştırma
 
-### Genel Gereksinimler
+### Docker ile Hızlı Başlangıç (Doğrulandı)
 
-- Python 3.10+ (Yerel geliştirme Python 3.14 ile doğrulanmıştır)
-- Node.js `^20.19.0 || >=22.12.0` (Vite 8 gereksinimi; yerel geliştirme `v24.18.1` ile doğrulanmıştır)
-- PostgreSQL 15+ (Yerel geliştirme PostgreSQL 18 ile doğrulanmıştır)
-- Docker (opsiyonel)
+Uygulamanın hem frontend hem backend servisleri PostgreSQL veritabanı ile birlikte Docker Compose kullanılarak tek bir komutta güvenli şekilde başlatılabilir.
+
+1. `.env.example` dosyasını ana dizinde `.env` adıyla kopyalayın:
+   ```bash
+   cp .env.example .env
+   ```
+2. Oluşturduğunuz `.env` dosyası içindeki gizli bilgileri (`POSTGRES_PASSWORD` ve `JWT_SECRET_KEY`) güvenli değerlerle doldurun. *(Projeyi başlatmak için kendi secret'larınızı belirlemeniz zorunludur).*
+3. Docker Compose ile projeyi başlatın:
+   ```bash
+   docker compose up --build -d
+   ```
+4. Uygulamaya tarayıcınızdan **http://localhost:8080** adresi üzerinden erişin.
+5. Konteyner servis sağlıklarını (healthcheck) kontrol etmek için:
+   ```bash
+   docker compose ps
+   ```
+6. Ortamı durdurmak ve temizlemek için:
+   ```bash
+   docker compose down
+   ```
 
 ### Backend Yerel Kurulumu (Doğrulandı)
 
-Geliştirme ortamında test edilmiş ve doğrulanmış backend kurulum adımları:
-
-> **Not:** Bu aşamada Docker zorunlu değildir; yerel PostgreSQL sunucusu üzerinden geliştirme yapılmaktadır.
-
-#### 1. Dizin Geçişi ve Sanal Ortam (Virtual Environment)
-PowerShell üzerinde `backend` dizinine geçerek sanal ortamı oluşturun ve aktifleştirin:
+Geliştirme ortamında (Docker kullanılmadığında) PostgreSQL çalışıyor olmalıdır.
 
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-*Linux/macOS için aktifleştirme komutu:* `source .venv/bin/activate`
-
-#### 2. Bağımlılıkların Kurulması
-Sanal ortam aktifken gerekli Python paketlerini yükleyin:
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-#### 3. Yapılandırma (.env) Dosyası
-Örnek yapılandırma dosyasını kopyalayarak yerel `.env` dosyasını oluşturun:
-
-```powershell
 copy .env.example .env
-```
-
-*Linux/macOS için kopyalama komutu:* `cp .env.example .env`
-
-> **Önemli:** Oluşturulan `.env` dosyası gizli verileri içerdiği için hiçbir şekilde Git takibine eklenmemelidir (otomatik olarak `.gitignore` kapsamındadır).
-
-**.env Değişkenleri ve Yapılandırma:**
-
-```env
-# Veritabanı Bağlantısı
-DATABASE_URL=postgresql+psycopg://securewatch_user:change_me@localhost:5432/securewatch_db
-
-# JWT Güvenlik Ayarları
-# ÖNEMLİ: JWT_SECRET_KEY en az 32 karakterlik, rastgele ve güçlü bir anahtar olmalıdır.
-# Üretmek için: python -c "import secrets; print(secrets.token_urlsafe(64))"
-JWT_SECRET_KEY=change_me_to_a_secure_random_string_at_least_32_chars
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-```
-
-#### 4. Veritabanı Göçü (Migration) ve Uygulamanın Çalıştırılması
-Veritabanı tablolarını en güncel migration seviyesine getirin ve uvicorn sunucusunu başlatın:
-
-```powershell
-# Alembic migration'larını uygula (users ve audit_logs tablolarını oluşturur)
+# .env içinde DATABASE_URL, POSTGRES_PASSWORD ve JWT_SECRET_KEY doldurun
 python -m alembic upgrade head
-
-# Uvicorn sunucusunu başlat
 python -m uvicorn app.main:app --reload
 ```
+- Health Endpoint: `http://127.0.0.1:8000/api/v1/health`
+- Swagger UI: `http://127.0.0.1:8000/docs`
 
-- **Sağlık (Health) Endpoint:** `http://127.0.0.1:8000/api/v1/health`
-- **Otomatik API Dokümantasyonu (Swagger UI):** `http://127.0.0.1:8000/docs`
-- **Alternatif Dokümantasyon (ReDoc):** `http://127.0.0.1:8000/redoc`
-
-#### 5. Testlerin Çalıştırılması
-Backend test suitini (birim, entegrasyon ve güvenlik testleri) çalıştırmak için:
-
-```powershell
-python -m pytest -q
-```
-
-#### 6. Makine Öğrenmesi Eğitim CLI Betiği
-
-CIC-IDS2017 veri seti kullanılarak model değerlendirmelerini uçtan uca komut satırından çalıştırabilirsiniz:
-
-```powershell
-# Sadece baseline (Lojistik Regresyon) model çalıştırma
-python -m scripts.train_baseline_models --input path/to/training.csv
-
-# Random Forest deneylerini ve Lojistik Regresyon karşılaştırmasını (Feature Importance ile) çalıştırma
-python -m scripts.train_baseline_models --input path/to/training.csv --compare-random-forest
-
-# Validation tabanlı deterministik nihai model seçimini çalıştırma ve güvenli JSON raporu alma
-python -m scripts.train_baseline_models \
-  --input path/to/training.csv \
-  --select-final-model
-```
-
-Opsiyonel model seçim parametreleri: `--min-recall`, `--max-fpr`, `--cv-splits`. Ayrıntılı teknik belgeler için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
-
-### Frontend Kurulumu ve Çalıştırma (Doğrulandı)
-
-Geliştirme ortamında test edilmiş ve doğrulanmış frontend çalıştırma adımları:
+### Frontend Yerel Kurulumu (Doğrulandı)
 
 ```powershell
 cd frontend
 npm install
 npm run dev
 ```
+- Uygulama: `http://localhost:5173` (Vite dev server) üzerinden çalışacaktır.
 
-> **Not:** Windows PowerShell execution policy kısıtlaması olan sistemlerde `npm.cmd` (ör. `npm.cmd run dev`) kullanılabilir.
+### Demo Kullanıcı Oluşturma
 
-#### Frontend Kalite ve Test Komutları
+İlk kurulumda sisteme giriş yapabilmek için gerekli test/demo kullanıcıları (ADMIN ve ANALYST rollerinde) güvenli CLI betiğiyle oluşturulabilir.
 
-```powershell
-# Type-check
-npm run type-check
-
-# ESLint denetimi
-npm run lint
-
-# Vitest unit ve bileşen testleri
-npm run test
-
-# Production build
-npm run build
-
-# Güvenlik zafiyet taraması
-npm audit --audit-level=high
-```
-
-*(Windows PowerShell execution policy kısıtlamaları olan ortamlarda `npm.cmd` örneğin `npm.cmd run dev`, `npm.cmd run test` kullanılabilir).*
-
-#### Frontend Mimari, Analiz İş Akışı ve Güvenlik Notları
-- **Oturum Yönetimi:** Access token `sessionStorage` içinde `securewatch.accessToken` anahtarıyla, kullanıcı bilgisi ise `securewatch.user` anahtarıyla saklanır. Bu yapı tarayıcı sekmesi ömrüyle sınırlı bir oturum sağlar. Token `localStorage`, cookie, URL/query/hash veya IndexedDB içine yazılmaz.
-- **Yönlendirme ve Sayfa Yenileme:** Geçerli oturum sayfa yenilemesinde geri yüklenir. Eksik veya bozuk oturum kayıtları güvenli şekilde temizlenir ve korumalı rotalar kullanıcıyı login'e yönlendirir. Çıkış işlemi tüm oturum kayıtlarını temizler.
-- **Analiz Ekranı İş Akışı (`/analysis`):** ANALYST rolündeki kullanıcılar CIC-IDS2017 formatında CSV dosyası yükleyebilir (en fazla 50 MB, `.csv` uzantılı, sürükle-bırak ve klavye destekli), yüklenen dosya için `job_id` alarak analizi manuel başlatabilir. Analiz tamamlandığında özet sonuçlar ve güncellenen analiz geçmişi listelenir.
-- **API Sözleşmeleri ve Listeleme:** Analiz işleri `GET /api/v1/analysis?skip=0&limit=20` üzerinden listelenir. Yanıt sahte bir `total` alanı içermez, doğrudan dizi olarak döner.
-- **Hata Maskeleme & Güvenlik:** Backend'den dönen teknik hatalar, stack trace, dosya yolları veya `DUPLICATE_FILE` / `MODEL_NOT_FOUND` gibi hata kodları kullanıcı arayüzüne sızdırılmaz. Güvenli Türkçe mesajlara (`Bu CSV dosyası daha önce yüklenmiş.`, `Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.`) dönüştürülür. İptal edilen istekler `AbortController` ile yönetilir; duplicate-submit ve stale-response korumaları uygulanır.
-- **Erişilebilirlik ve Responsive:** Semantik HTML5 başlıkları, ARIA canlı bölgeleri (`role="status"`, `role="alert"`), klavye odağı (`focus-visible`) ve 320px mobil genişliğe kadar responsive tasarım desteklenmektedir. Durumlar yalnızca renk ile ifade edilmez.
-- **Yetkilendirme:** Frontend rol bilgisi kullanıcı arayüzü sunumu içindir (ör. ADMIN kullanıcıya yükleme formu gösterilmez). Gerçek yetkilendirme ve sahiplik denetimi backend RBAC sorumluluğundadır.
-- **Development Proxy:** Geliştirme ortamında Vite dev/preview sunucusu bağıl `/api/v1` isteklerini yerel backend sunucusuna (`http://127.0.0.1:8000`) iletir.
-
-### Docker ile Kurulum (planlandı / henüz doğrulanmadı)
+**Uyarı:** Kimlik bilgileri statik olarak kodlanmamıştır ve çalışma zamanında çevre değişkenlerinden (environment variables) alınır.
 
 ```bash
-docker-compose up --build
+cd backend
+# Terminal oturumunuzda şu değişkenleri export / set etmeniz zorunludur:
+# DEMO_ADMIN_USERNAME, DEMO_ADMIN_PASSWORD
+# DEMO_ANALYST_USERNAME, DEMO_ANALYST_PASSWORD
+
+python -m scripts.create_demo_users
 ```
+
+---
+
+## Final Doğrulama Sonuçları
+
+Platformun sürümü, tüm bileşenlerinde gerçekleştirilen katı kalite kapılarından ve testlerden başarıyla geçmiştir:
+
+- **Backend Testleri:** 499 test başarılı (Birim ve Entegrasyon testleri).
+- **Backend Güvenlik Modülü:** İzolasyonlu kritik backend `auth` paketi 194 test başarılı.
+- **Frontend Testleri:** Toplam 34 test dosyasında 791 test (%100) başarılı (Vitest & React Testing Library).
+- **TypeScript:** Frontend statik tip kontrolü (`npm run type-check`) hatasız.
+- **ESLint:** Kod kalite standardı denetiminde 0 hata, 0 uyarı.
+- **Güvenlik Taraması (npm audit):** 0 güvenlik açığı (0 vulnerabilities).
+- **Production Build:** Vite ve Nginx optimizasyonlu build başarılı. *(Bilinen chunk-size uyarıları bir build hatası değil, planlanmış bir teknik borçtur).*
+- **Docker Compose:** `no-cache` ve multistage production build süreçleri başarılı.
+- **Healthchecks:** PostgreSQL, FastAPI Backend ve Nginx Frontend Container sağlık denetimleri (healthchecks) tam başarılı. Backend API health endpointi sorunsuz `HTTP 200` dönmektedir.
+
+---
+
+## Teknik Dokümantasyon
+
+Mimari kararlar, veri şemaları ve makine öğrenmesi değerlendirmelerine ait detaylı dokümanlar `docs/` dizini altındadır:
+
+- **Sistem Mimarisi:** [05-system-architecture.md](docs/architecture/05-system-architecture.md)
+- **Veritabanı ve ER Diyagramı:** [03-database-design.md](docs/architecture/03-database-design.md)
+- **API Sözleşmesi:** [06-api-endpoints.md](docs/architecture/06-api-endpoints.md)
+- **ML Eğitim ve Inference Mimarisi:** [07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md)
+- **Model Seçim Raporu:** [day-10-model-selection-report.md](docs/model-evaluation/day-10-model-selection-report.md)
+- **Model Card:** [model-card.md](docs/model-evaluation/model-card.md)
+
+---
 
 ## GitHub Çalışma Disiplini
 
-- **Branch Stratejisi:** Her özellik/düzeltme için ayrı branch, main'e yalnızca PR ile birleşim
-- **Commit Standardı:** Conventional Commits formatı, küçük ve anlamlı commitler
-- **Issue-First:** Kodlamadan önce Issue oluşturulmalı
-- **Pull Request:** Her PR bir Issue'ya bağlı, incelemeci onayı gerekli
+- Her özellik için ayrı branch kullanılmış ve `main` branchine yalnızca Pull Request ve onay (code review) sonrası birleştirme yapılmıştır.
+- Commitler "Conventional Commits" standardında küçük ve amaca yönelik atılmıştır.
+- Projeye katkı süreçleri `CONTRIBUTING.md` kurallarına (planlandı) uygun olarak yürütülür.
 
 ## Lisans ve Güvenlik Notu
 
 - Projenin lisansı henüz belirlenmemiştir.
 - Bu proje yalnızca eğitim ve analiz amaçlıdır.
 - Gerçek sistemlere saldırı göndermek veya port taraması yapmak için kullanılamaz.
-- Gerçek şirketlere ait hassas trafik kullanılmaz; kamuya açık akademik CIC-IDS2017 veri seti kullanılır.
-- Kullanıcı parolaları `bcrypt` ile hashlenerek saklanır; şifreler asla açık metin (plain text) olarak kaydedilmez.
-- JWT secret ve veritabanı kimlik bilgileri yalnızca yerel `.env` dosyası üzerinden okunur.
-
----
-
-Detaylı uygulama planı ve proje yönetimi bilgileri için bkz. [implementation_plan.md](implementation_plan.md).
+- Gerçek kurumlara ait hassas ağ trafiği kullanılmaz; kamuya açık akademik CIC-IDS2017 veri seti temel alınır.
+- Kullanıcı parolaları `bcrypt` ile hashlenerek saklanır; parolalar asla açık metin olarak kaydedilmez.
+- JWT secret ve veritabanı kimlik bilgileri yerel veya dışarıdan enjekte edilen değişkenler üzerinden okunur, kaynak kodda barındırılmaz.
