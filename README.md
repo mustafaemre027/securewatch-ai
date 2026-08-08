@@ -1,4 +1,12 @@
-# SecureWatch AI
+<p align="center">
+  <img
+    src="docs/assets/brand/securewatch-ai-logo-dark.png"
+    alt="SecureWatch AI"
+    width="620"
+  >
+</p>
+
+<h1 align="center">SecureWatch AI</h1>
 
 Yapay zekâ destekli ağ trafiği analizi ve saldırı tespit karar destek platformu.
 
@@ -17,8 +25,9 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Makine Öğrenmesi & Model Seçimi:** CIC-IDS2017 eğitim verisi hazırlama (77 sayısal özellik, ±inf/NaN temizliği, mükerrerlik eleme), scikit-learn ön işleme pipeline'ı ve sızıntı korumalı (leakage-safe) train/test ayrımı üzerine Logistic Regression ve dört Random Forest varyantının (`rf_baseline`, `rf_deeper`, `rf_unweighted`, `rf_compact`) karşılaştırma altyapısı geliştirildi. ROC-AUC ve PR-AUC/AP (Average Precision) gelişmiş olasılık metrikleri hesaplanarak, karar eşiğinin eğitim verisindeki Out-of-Fold (OOF) validation olasılıklarıyla seçildiği deterministik ve validation tabanlı model seçim servisi kuruldu. Model seçim raporu güvenli JSON olarak CLI'dan alınabilir. Ayrıntılar için bkz. [Mimari](docs/architecture/07-ml-training-and-inference.md), [Gün 10 Raporu](docs/model-evaluation/day-10-model-selection-report.md) ve [Model Card](docs/model-evaluation/model-card.md).
 - **Batch Inference ve API:** Eğitilmiş ve güvenilir model paketleriyle senkron batch inference desteği. Yüklenen CSV kayıtları için saldırı olasılığı, ikili saldırı kararı ve risk seviyesi üretimi. Analiz çalıştırma, sayfalanmış sonuç görüntüleme ve özet raporlama API'leri eklendi. Admin ve Analyst rolleri için sahiplik tabanlı erişim kontrolü uygulanır. Ayrıntılar için bkz. [docs/architecture/07-ml-training-and-inference.md](docs/architecture/07-ml-training-and-inference.md).
 - **Risk Skorlaması:** Karar eşiğinden bağımsız olarak olasılık değerlerini operasyonel önem aralıklarına (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) ayıran risk sınıflandırma politikası uygulandı.
-- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (planlandı).
-- **Dashboard:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (planlandı).
+- **Olay Yönetimi:** Şüpheli tespitlerin güvenlik olaylarına dönüştürülmesi ve yönetimi (implemented).
+- **Dashboard and Reporting:** Tamamlanan analizlerden üretilen güncel özet istatistikler ve grafikler (implemented).
+- **Test, Security and Integration:** in progress
 
 ## Teknoloji Yığını
 
@@ -196,8 +205,8 @@ npm audit --audit-level=high
 *(Windows PowerShell execution policy kısıtlamaları olan ortamlarda `npm.cmd` örneğin `npm.cmd run dev`, `npm.cmd run test` kullanılabilir).*
 
 #### Frontend Mimari, Analiz İş Akışı ve Güvenlik Notları
-- **Bellek İçi Oturum Yönetimi:** Access token yalnızca React state (`AuthProvider`) içinde tutulur. `localStorage`, `sessionStorage`, IndexedDB veya cookie gibi kalıcı depolama alanlarına yazılmaz.
-- **Yönlendirme ve Sayfa Yenileme:** Sayfa yenilendiğinde token bellekte tutulduğu için oturum sıfırlanır ve korumalı rotalar (`/`, `/analysis`) kullanıcıyı `/login` sayfasına yönlendirir.
+- **Oturum Yönetimi:** Access token `sessionStorage` içinde `securewatch.accessToken` anahtarıyla, kullanıcı bilgisi ise `securewatch.user` anahtarıyla saklanır. Bu yapı tarayıcı sekmesi ömrüyle sınırlı bir oturum sağlar. Token `localStorage`, cookie, URL/query/hash veya IndexedDB içine yazılmaz.
+- **Yönlendirme ve Sayfa Yenileme:** Geçerli oturum sayfa yenilemesinde geri yüklenir. Eksik veya bozuk oturum kayıtları güvenli şekilde temizlenir ve korumalı rotalar kullanıcıyı login'e yönlendirir. Çıkış işlemi tüm oturum kayıtlarını temizler.
 - **Analiz Ekranı İş Akışı (`/analysis`):** ANALYST rolündeki kullanıcılar CIC-IDS2017 formatında CSV dosyası yükleyebilir (en fazla 50 MB, `.csv` uzantılı, sürükle-bırak ve klavye destekli), yüklenen dosya için `job_id` alarak analizi manuel başlatabilir. Analiz tamamlandığında özet sonuçlar ve güncellenen analiz geçmişi listelenir.
 - **API Sözleşmeleri ve Listeleme:** Analiz işleri `GET /api/v1/analysis?skip=0&limit=20` üzerinden listelenir. Yanıt sahte bir `total` alanı içermez, doğrudan dizi olarak döner.
 - **Hata Maskeleme & Güvenlik:** Backend'den dönen teknik hatalar, stack trace, dosya yolları veya `DUPLICATE_FILE` / `MODEL_NOT_FOUND` gibi hata kodları kullanıcı arayüzüne sızdırılmaz. Güvenli Türkçe mesajlara (`Bu CSV dosyası daha önce yüklenmiş.`, `Analiz modeli şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.`) dönüştürülür. İptal edilen istekler `AbortController` ile yönetilir; duplicate-submit ve stale-response korumaları uygulanır.

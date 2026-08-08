@@ -50,10 +50,10 @@ export function LoginPage() {
       <div className="w-full max-w-[400px] bg-rich-navy border border-space-blue rounded-lg shadow-xl flex flex-col overflow-hidden">
 
         {/* Header Section */}
-        <div className="bg-space-blue/30 p-8 flex flex-col items-center border-b border-space-blue">
-          <SecureWatchBrand className="h-16 w-auto mb-4" />
-          <h1 className="text-xl font-semibold text-white">SecureWatch AI</h1>
-          <p className="text-sm text-gray-400 mt-1">Platform Girişi</p>
+        <div className="bg-deep-dark p-8 flex flex-col items-center border-b border-space-blue">
+          <SecureWatchBrand variant="dark" eager className="w-full max-w-[240px] sm:max-w-[280px] h-auto mb-3" />
+          <h1 className="sr-only">SecureWatch AI</h1>
+          <p className="text-sm font-medium text-slate-300">Platform Girişi</p>
         </div>
 
         {/* Form Section */}
@@ -104,20 +104,20 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isLoading || !username.trim() || !password}
-            className="mt-2 w-full bg-cyber-cyan hover:bg-ai-teal text-rich-navy font-semibold py-2.5 px-4 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[44px]"
+            className="mt-2 w-full bg-cyber-cyan hover:bg-ai-teal text-deep-dark font-bold py-2.5 px-4 rounded transition-all shadow-[0_0_10px_rgba(91,192,190,0.15)] hover:shadow-[0_0_15px_rgba(111,255,233,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center min-h-[44px]"
           >
             {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
           </button>
         </form>
 
         {/* Security Warning Section */}
-        <div className="bg-space-blue/30 p-4 border-t border-space-blue text-xs text-gray-400 text-center">
+        <div className="bg-deep-dark/50 p-4 border-t border-space-blue text-xs text-slate-400 text-center">
           Bu sisteme erişim yalnızca yetkili personelle sınırlandırılmıştır. Tüm işlemler kaydedilmektedir.
         </div>
       </div>
 
       {/* Prototype Footer */}
-      <div className="mt-8 text-xs text-gray-500 text-center max-w-[400px]">
+      <div className="mt-8 text-xs font-medium text-slate-400 text-center max-w-[400px]">
         SecureWatch AI v0.1.0-prototype | Akademik ağ trafiği karar destek prototipi
       </div>
     </div>

@@ -18,8 +18,8 @@ docs/assets/
 
 Projenin kurumsal kimliği ve tasarım diliyle ilişkili görsel varlıklar `docs/assets/brand/` dizininde saklanmaktadır. Detaylı bilgi için [brand/README.md](brand/README.md) dosyasını inceleyebilirsiniz.
 
-*   **Ana Logo ([securewatch-ai-logo.svg](brand/securewatch-ai-logo.svg)):** Siber güvenlik (kalkan) ve yapay zekâ ağını simgeleyen grafik ile "SecureWatch AI" metnini içeren yatay ana logodur.
-*   **Logo Simgesi ([securewatch-ai-mark.svg](brand/securewatch-ai-mark.svg)):** Logonun metinsiz, kare/yuvarlak alanlar (favicon, profil vb.) için optimize edilmiş simge versiyonudur.
+*   **Ana Logo ([securewatch-ai-logo-dark.png](brand/securewatch-ai-logo-dark.png)):** Siber güvenlik (kalkan) ve yapay zekâ ağını simgeleyen grafik ile "SecureWatch AI" metnini içeren yatay ana logodur.
+*   **İkon / Mark ([securewatch-ai-mark-dark.png](brand/securewatch-ai-mark-dark.png)):** Yalnızca kalkan ikonunu içeren, kare ve kompakt alanlar (favicon, dar header) için kullanılan varyanttır.
 *   **Renk Paleti Şeması ([color-palette.svg](brand/color-palette.svg)):** Tasarım sisteminde kullanılan ana renklerin dökümünü içeren şemadır.
 
 ---
