@@ -1,59 +1,80 @@
 # SecureWatch AI — Sistem Mimarisi (System Architecture)
 
-Bu belge, SecureWatch AI karar destek platformunun katmanlı mimari yapısını ve sistem bileşenleri arasındaki iletişim akışlarını ayrıntılandırır.
+Bu belge, SecureWatch AI karar destek platformunun üretim ortamında (Docker) çalışan katmanlı mimari yapısını ve sistem bileşenleri arasındaki iletişim akışlarını ayrıntılandırır.
 
 ## 1. Katmanlı Mimari Genel Bakış
-Uygulama; sürdürülebilirlik, ölçeklenebilirlik, test edilebilirlik ve sorumlulukların ayrılması (Separation of Concerns) ilkelerine uygun olarak **Katmanlı Mimari (Layered Architecture)** şablonuna göre tasarlanmıştır.
+Uygulama; sürdürülebilirlik, ölçeklenebilirlik ve sorumlulukların ayrılması ilkelerine uygun olarak tasarlanmıştır.
 
-## 2. Varlık-İlişki ve Katman Bağımlılıkları Diyagramı
-Aşağıdaki Mermaid diyagramı katmanları ve aralarındaki bağımlılık ilişkilerini göstermektedir:
+### Varlık-İlişki ve Katman Bağımlılıkları Diyagramı
 
 ```mermaid
 flowchart TD
-    FE[Sunum Katmanı - React Frontend] --> BE[API Katmanı - FastAPI API]
-    BE --> SVC[İş Mantığı ve Servis Katmanı - Service Layer]
-    SVC --> ML[Makine Öğrenmesi Katmanı - ML Pipeline]
-    SVC --> DA[Veri Erişim Katmanı - Data Access Layer / SQLAlchemy]
+    FE[Sunum Katmanı - React / Nginx] --> BE[API Katmanı - FastAPI]
+    BE --> SVC[Servis Katmanı - Service Layer]
+    SVC --> ML[ML Katmanı - Senkron Batch Inference]
+    SVC --> DA[Veri Erişim Katmanı - SQLAlchemy]
     DA --> DB[(Veritabanı Katmanı - PostgreSQL)]
 ```
 
 ### 1.1. Sunum Katmanı (Presentation Layer)
 Kullanıcının sistemle etkileşime girdiği web arayüzüdür.
 *   **React & TypeScript:** Güvenli, bileşen tabanlı, tip korumalı SPA (Single Page Application) mimarisi.
+*   **Vite & Nginx:** Geliştirme aşamasında Vite, üretim aşamasında ise yüksek performanslı Nginx web sunucusu ile statik dosyaların ve reverse-proxy yönlendirmelerinin yönetimi.
 *   **Tailwind CSS:** Hızlı ve modern UI geliştirme, responsive tasarım.
-*   **Recharts:** Dashboard üzerindeki görsel grafiklerin (saldırı dağılımları, risk eğilimleri vb.) dinamik çizimi.
-*   **Axios / Fetch Client:** Backend REST API uç noktalarıyla JWT tabanlı kimlik doğrulama başlıkları kullanarak asenkron iletişim sağlar.
+*   **Recharts:** Dashboard üzerindeki görsel metriklerin dinamik çizimi.
 
 ### 1.2. API Katmanı (Application / API Layer)
-Sunum katmanından gelen istekleri karşılayan ve işleyen backend giriş noktasıdır.
-*   **FastAPI:** Yüksek performanslı, asenkron (async/await destekli), otomatik OpenAPI/Swagger dokümantasyonu sunan Python web framework'ü.
+Sunum katmanından gelen istekleri karşılayan backend giriş noktasıdır.
+*   **FastAPI:** Yüksek performanslı, asenkron (async/await) Python web framework'ü.
 *   **Routers:** İstekleri mantıksal modüllere (Auth, Users, Analysis, Incidents, Dashboard) yönlendirir.
-*   **Dependency Injection (Bağımlılık Enjeksiyonu):** Veritabanı oturumlarını (`db_session`), kimlik doğrulama bağımlılıklarını (`get_current_user`) ve rol kontrollerini yönetir.
+*   **Dependency Injection:** Veritabanı oturumlarını (`db_session`), kimlik doğrulamayı (`get_current_user`) ve RBAC (rol tabanlı erişim) kontrollerini güvenle yönetir.
 
 ### 1.3. İş Mantığı ve Servis Katmanı (Service Layer)
-Tüm iş kurallarının işletildiği, hesaplamaların yapıldığı ve operasyonel akışların yönetildiği katmandır.
+Tüm iş kurallarının işletildiği, hesaplamaların yapıldığı operasyonel katmandır.
 *   **Auth Service:** Parola hashleme (bcrypt) ve JWT token üretme işlemlerini yönetir.
-*   **File Upload & Validation Service:** Yüklenen CSV dosyalarının boyutunu, SHA-256 hash'ini ve CIC-IDS2017 sütun formatı doğruluğunu kontrol eder.
-*   **Incident & Comment Service:** Tehditlerin olaya dönüştürülmesini, durum geçiş kurallarını ve yorum süreçlerini yönetir.
-*   **Audit Logger Service:** Veritabanı işlemlerinden bağımsız olarak, güvenlik denetimi için eylemleri log tablosuna yazar.
+*   **File Upload & Validation:** Yüklenen CSV dosyalarının boyutunu, SHA-256 hash'ini (mükerrerliği önlemek için) ve CIC-IDS2017 formatı doğruluğunu kontrol eder.
+*   **Incident Service:** Analistlerin tehditleri güvenlik olayına dönüştürmesini, atamaları ve yorumları yönetir.
 
 ### 1.4. Makine Öğrenmesi Katmanı (ML Layer)
-Ön işleme adımlarını ve batch tahmin işlemlerini yürüten katmandır.
-*   **Saved Pipeline (Joblib):** Çevrimdışı (offline) olarak eğitilen ve scikit-learn Pipeline nesnesi olarak kaydedilen modeli (Random Forest veya Logistic Regression) belleğe yükler.
-*   **Batch Predictor:** Yüklenen CSV verilerini, eğitilmiş pipeline ön işleme aşamasından (imputing, scaling) geçirerek `attack_probability` değerlerini üretir.
-*   **Risk Scorer:** Olasılık değerlerine göre risk skoru (0-100) ve provisional risk seviyelerini (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) atar.
+Ön işleme (preprocessing) adımlarını ve makine öğrenmesi tahminlerini senkron olarak yürüten katmandır.
+*   **Saved Pipeline (Joblib):** Önceden eğitilmiş sızıntı korumalı (leakage-safe) scikit-learn Pipeline nesnesini (ön işleme ve tahmin edici modeli) yükler.
+*   **Batch Predictor:** Yüklenen CSV verilerini pipeline üzerinden geçirerek `attack_probability` değerlerini senkron bir işlem olarak üretir.
+*   **Risk Scorer:** Olasılık değerlerine göre risk seviyelerini (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) atar.
 
 ### 1.5. Veri Erişim ve Veritabanı Katmanı (Data Access & Database)
-Verilerin kalıcı olarak saklandığı ve yönetildiği katmandır.
-*   **SQLAlchemy ORM:** Python sınıflarını ilişkisel veritabanı tablolarıyla eşleştirir, SQL sorgularını güvenli ve SQL-injection korumalı hale getirir.
-*   **Alembic:** Veritabanı şemasındaki değişikliklerin (migration) kontrollü ve sürüm geçmişi tutularak uygulanmasını sağlar.
-*   **PostgreSQL:** Güvenilir, yüksek performanslı ve JSONB veri tipi desteği sunan ilişkisel veritabanı yönetim sistemi.
+*   **SQLAlchemy ORM:** Python sınıflarını tablolarla eşleştirir, SQL-injection korumalı hale getirir.
+*   **Alembic:** Veritabanı şemasındaki değişikliklerin güvenle uygulanmasını sağlar.
+*   **PostgreSQL:** Kalıcı verilerin ve ilişkilerin saklandığı veritabanı motoru.
+
+---
+
+## 2. Docker Deployment ve Ağ Mimarisi
+
+Uygulama, üretim ortamı için Docker Compose ile konteynerize edilmiştir.
+
+```mermaid
+flowchart LR
+    Host[Host Makinesi (Tarayıcı)] -->|HTTP :8080| Nginx[Frontend Konteyneri - Nginx]
+
+    subgraph Docker Internal Network
+        Nginx -->|Reverse Proxy /api/*| FastAPI[Backend Konteyneri - FastAPI :8000]
+        FastAPI -->|TCP :5432| Postgres[(PostgreSQL Konteyneri)]
+    end
+
+    Uploads[(Uploads Volume)] --- FastAPI
+    PGData[(PostgreSQL Veri Volume)] --- Postgres
+```
+
+**Güvenlik ve İzolasyon Notları:**
+- Backend API (FastAPI) ve PostgreSQL veritabanı konteynerleri host makineye doğrudan açık değildir (portlar dışarıya bind edilmemiştir).
+- Kullanıcılar sisteme yalnızca Frontend (Nginx) konteynerinin dışa açık 8080 portu üzerinden erişir; API istekleri Nginx tarafından backend konteynerine internal network üzerinden proxy (reverse proxy) edilir.
+- Veritabanı verileri ve yüklenen pcap/csv dosyaları Docker named volume'leri ile kalıcı (persistent) hale getirilmiştir.
 
 ---
 
 ## 3. Bileşenler Arası İletişim Akışları
 
-Sistemdeki kritik operasyonel akışların katmanlar ve bileşenler arasındaki geçiş sırası aşağıda Mermaid şemasıyla gösterilmiştir:
+Sistemdeki analiz ve inference işlemleri **SENKRON** batch işleme prensibiyle çalışır. Harici bir worker kuyruğu (Celery, Redis vb.) bulunmamaktadır.
 
 ```mermaid
 sequenceDiagram
@@ -61,39 +82,33 @@ sequenceDiagram
     actor Analist as Güvenlik Analisti
     participant FE as React Frontend
     participant BE as FastAPI API
-    participant SVC as File/Inference Service
-    participant DA as Data Access Layer (SQLAlchemy)
+    participant SVC as Service Layer
     participant ML as ML Pipeline (Joblib)
+    participant DA as SQLAlchemy
     participant DB as PostgreSQL DB
 
-    Analist->>FE: CSV Dosyasını Seçer & Yükler
-    FE->>BE: POST /api/v1/analysis/upload (Multipart CSV)
-    Note over BE: SHA-256 & Şema Doğrulama
-    BE->>SVC: Analiz İşi Başlatma İsteği
-    SVC->>DA: AnalysisJob Oluştur (durum: 'PENDING')
-    DA->>DB: INSERT AnalysisJob
-    BE-->>FE: HTTP 202 Accepted (Job ID döner)
-    
-    Note over BE: Asenkron Arka Plan Görevi (Worker Abstraction) Başlar
-    BE->>SVC: Batch Inference İşlemini Tetikle
-    SVC->>DA: AnalysisJob Durumunu Güncelle ('PROCESSING')
-    DA->>DB: UPDATE AnalysisJob (status='PROCESSING')
-    SVC->>ML: Eğitilmiş Pipeline'ı Yükle & Veriyi Ön İşlemeden Geçir
-    ML-->>SVC: Tahmin Olasılıkları (attack_probability) üretir
-    SVC->>SVC: Risk Skorlarını & Seviyelerini Hesapla
-    SVC->>DA: Toplu Tahmin Sonuçları Ekle (DetectionResult)
-    DA->>DB: INSERT DetectionResults (Bulk)
-    SVC->>DA: AnalysisJob Durumunu Güncelle ('COMPLETED')
-    DA->>DB: UPDATE AnalysisJob (status='COMPLETED')
-    
-    Analist->>FE: Analiz Sonuçlarını Görüntüler
-    FE->>BE: GET /api/v1/analysis/{job_id}/results
-    BE->>SVC: Sonuçları Al
-    SVC->>DA: Sonuçları Sorgula
-    DA->>DB: SELECT DetectionResults
-    DB-->>DA: Kayıtlar
-    DA-->>SVC: Kayıt Listesi
-    SVC-->>BE: Kayıt Listesi
-    BE-->>FE: HTTP 200 OK (Sonuç Listesi)
-    FE-->>Analist: Tehditleri & Detayları Gösterir
+    Analist->>FE: CSV Yükler
+    FE->>BE: POST /api/v1/analysis/upload
+    BE->>SVC: SHA-256 & Format Doğrulama
+    SVC->>DA: AnalysisJob Oluştur ('PENDING')
+    DA->>DB: INSERT
+    BE-->>FE: HTTP 202 (Job ID)
+
+    Analist->>FE: Analizi Başlat Butonuna Tıklar
+    FE->>BE: POST /api/v1/analysis/{job_id}/process
+    BE->>SVC: Batch Inference Başlat (Senkron)
+    SVC->>DA: Durumu Güncelle ('PROCESSING')
+    SVC->>ML: Veriyi Yükle & Tahmin Et
+    ML-->>SVC: attack_probability (Tahmin Olasılıkları)
+    SVC->>SVC: Eşik ve Risk Seviyelerini Hesapla
+    SVC->>DA: Toplu Sonuçları Ekle (DetectionResult)
+    DA->>DB: Bulk INSERT
+    SVC->>DA: Durumu Güncelle ('COMPLETED')
+    BE-->>FE: HTTP 200 (Tamamlandı)
 ```
+
+## 4. Kapsam ve Mimari Sınırlar
+Sistem; tasarlanan ve uygulanan sınırları gereği aşağıdaki özellikleri **içermez**:
+- **Gerçek Zamanlı Ağ Dinleme:** Sistem aktif bir IDS/IPS (Intrusion Detection System / Intrusion Prevention System) değildir; paketleri canlı olarak koklamaz (sniffing/pcap parsing yapmaz). Yalnızca formatlanmış CIC-IDS2017 CSV dosyalarını analiz eder.
+- **Asenkron Message Queues (Celery/Redis vb.):** Dosya işleme (batch inference) süreleri kullanıcı kabulü dahilinde olduğundan işlemler senkron yürütülmektedir; arka planda görev dağıtan bir iş kuyruğu yapısı kullanılmamaktadır.
+- **Cloud/Orchestration:** Uygulama tekil node üzerinde Docker Compose ile çalışacak şekilde optimize edilmiştir, Kubernetes veya dağıtık mikroservis mimarisine parçalanmamıştır.
