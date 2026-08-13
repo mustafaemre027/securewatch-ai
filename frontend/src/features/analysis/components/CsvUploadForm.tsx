@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 import { useAuth } from '../../auth/useAuth';
 import { uploadAnalysisCsv } from '../api';
@@ -47,16 +47,16 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
 
   if (!isAuthenticated || !accessToken) {
     return (
-      <div className="p-4 bg-rich-navy border border-space-blue rounded-lg text-center" role="alert">
-        <p className="text-white">CSV yüklemek için geçerli bir oturum gereklidir.</p>
+      <div className="p-4 bg-[var(--color-semantic-danger-bg)] border border-[var(--color-semantic-danger)] rounded-lg text-center" role="alert">
+        <p className="text-[var(--color-semantic-danger)] font-medium">CSV yüklemek için geçerli bir oturum gereklidir.</p>
       </div>
     );
   }
 
   if (user?.role === 'ADMIN') {
     return (
-      <div className="p-4 bg-rich-navy border border-space-blue rounded-lg text-center" role="alert">
-        <p className="text-white">CSV yükleme işlemi yalnızca güvenlik analistleri tarafından gerçekleştirilebilir.</p>
+      <div className="p-4 bg-[var(--color-semantic-warning-bg)] border border-[var(--color-semantic-warning)] rounded-lg text-center" role="alert">
+        <p className="text-[var(--color-semantic-warning)] font-medium">CSV yükleme işlemi yalnızca güvenlik analistleri tarafından gerçekleştirilebilir.</p>
       </div>
     );
   }
@@ -82,7 +82,7 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
     }
 
     if (selectedFile.size > MAX_SIZE_BYTES) {
-      setValidationError('CSV dosyası en fazla 50 MB olabilir.');
+      setValidationError(`CSV dosyası en fazla ${MAX_SIZE_MB} MB olabilir.`);
       return false;
     }
 
@@ -202,137 +202,162 @@ export function CsvUploadForm({ onUploaded }: CsvUploadFormProps) {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-extrabold text-white mb-2">Ağ Trafiği Veri Yükleme</h2>
-        <p className="text-muted-blue">
-          Karar destek modelinin analiz etmesi için CIC-IDS2017 veri seti formatında bir CSV dosyası yükleyin.
-        </p>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div
-          className={`flex flex-col items-center justify-center p-10 bg-rich-navy border-2 border-dashed rounded-xl transition-colors ${isDragOver ? 'border-cyber-cyan bg-space-blue' : 'border-muted-blue'}`}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-          data-testid="dropzone"
-        >
-          <div className="text-muted-blue mb-4">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-cyber-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-          </div>
-          <p className="text-lg font-bold text-white mb-2 text-center">
-            Trafik CSV dosyasını buraya sürükleyin
-          </p>
-          <p className="text-sm text-muted-blue mb-6 text-center">
-            veya göz atmak için bilgisayarınızdan seçin
-          </p>
-
-          <label htmlFor="csv-file-input" className="sr-only">CSV dosyası seçin</label>
-          <input
-            id="csv-file-input"
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            ref={inputRef}
-            onChange={onInputChange}
-            disabled={isSubmitting}
-            aria-label="CSV dosyası seçin"
-            data-testid="file-input"
-          />
-
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-space-blue text-white rounded-lg hover:bg-muted-blue transition-colors disabled:opacity-50"
+        {/* DROPZONE */}
+        <div className="lg:col-span-7 flex flex-col h-full">
+          <div
+            className={`sw-panel flex flex-col items-center justify-center p-12 h-full rounded-xl transition-all duration-200 cursor-pointer ${
+              isDragOver
+                ? 'border-cyber-cyan bg-[var(--color-surface-hover)]'
+                : 'border-dashed hover:border-[var(--color-border-strong)]'
+            }`}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            onClick={() => { if (!isSubmitting) inputRef.current?.click(); }}
+            data-testid="dropzone"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (!isSubmitting) inputRef.current?.click();
+              }
+            }}
           >
-            Dosya Seç
-          </button>
-
-          <div className="mt-6 px-4 py-2 bg-deep-dark rounded-full">
-            <p className="text-xs font-semibold text-muted-blue text-center">
-              Maksimum dosya boyutu: 50MB | Sadece .csv uzantısı
-            </p>
-          </div>
-        </div>
-
-        <div className="p-6 bg-rich-navy border-2 border-space-blue rounded-xl flex flex-col">
-          <h2 className="text-lg font-bold text-white mb-4">Yüklenen Dosya Bilgileri</h2>
-
-          <div className="flex-1">
-            {file ? (
-              <div className="p-4 bg-deep-dark border border-space-blue rounded-lg mb-6 flex items-center">
-                <div className="w-10 h-12 bg-muted-blue rounded-md flex items-center justify-center mr-4 shrink-0">
-                  <span className="text-xs font-bold text-ai-teal">CSV</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-white truncate" title={file.name}>{file.name}</p>
-                  <p className="text-xs text-muted-blue mt-1">Boyut: {formatBytes(file.size)}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-deep-dark border border-space-blue rounded-lg mb-6 flex items-center justify-center min-h-[5rem]">
-                <p className="text-sm text-muted-blue">Henüz dosya seçilmedi</p>
-              </div>
-            )}
-
-            <div className="mb-6">
-              <h3 className="text-sm font-bold text-white mb-3">Şema Doğrulama Durumu</h3>
-              <ul className="space-y-3">
-                <li className="flex items-center text-sm text-white font-semibold">
-                  {file ? (
-                    <svg className="w-5 h-5 text-green-500 mr-2 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
-                  ) : (
-                    <div className="w-5 h-5 rounded-full border-2 border-muted-blue mr-2 shrink-0"></div>
-                  )}
-                  Dosya Yapısı ve Kodlama (UTF-8) Doğrulandı
-                </li>
-                <li className="flex items-center text-sm text-white font-semibold">
-                   {file ? (
-                    <svg className="w-5 h-5 text-green-500 mr-2 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
-                  ) : (
-                    <div className="w-5 h-5 rounded-full border-2 border-muted-blue mr-2 shrink-0"></div>
-                  )}
-                  Sütun Eşleşmesi ve Format Denetlendi
-                </li>
-              </ul>
+            <div className="mb-6 rounded-full p-4 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)]">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-[var(--color-accent-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
             </div>
 
-            {(validationError || apiError) && (
-              <div className="mb-4 p-3 bg-deep-dark border border-red-500/50 rounded-lg" role="alert">
-                <p className="text-sm text-red-400 font-semibold">{validationError || apiError}</p>
-              </div>
-            )}
+            <h3 className="text-xl font-bold text-[var(--color-text-primary)] mb-2 text-center">
+              Trafik CSV dosyasını buraya sürükleyin
+            </h3>
+            <p className="text-sm text-[var(--color-text-secondary)] mb-8 text-center max-w-sm">
+              Analiz motorumuzun işlemesi için CIC-IDS2017 formatına uygun veri setini seçin.
+            </p>
 
-            {successMessage && !validationError && !apiError && (
-              <div className="mb-4 p-3 bg-deep-dark border border-green-500/50 rounded-lg" role="status" aria-live="polite">
-                <p className="text-sm text-green-400 font-semibold">{successMessage}</p>
-              </div>
-            )}
-          </div>
+            <label htmlFor="csv-file-input" className="sr-only">CSV dosyası seçin</label>
+            <input
+              id="csv-file-input"
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              ref={inputRef}
+              onChange={onInputChange}
+              disabled={isSubmitting}
+              aria-label="CSV dosyası seçin"
+              data-testid="file-input"
+              onClick={(e) => e.stopPropagation()}
+            />
 
-          <form onSubmit={onSubmit} className="mt-auto">
             <button
-              type="submit"
-              disabled={!file || isSubmitting}
-              className="w-full py-3 bg-ai-teal text-deep-dark font-bold rounded-lg hover:bg-cyber-cyan transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                inputRef.current?.click();
+              }}
+              disabled={isSubmitting}
+              className="sw-button-secondary"
             >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-deep-dark" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Yükleniyor...
-                </>
-              ) : (
-                'Doğrulanmış Analizi Başlat ve Karar Desteği Üret'
-              )}
+              Dosya Seç
             </button>
-          </form>
+
+            <div className="mt-8 flex items-center justify-center gap-4">
+              <span className="sw-badge sw-badge-neutral text-xs">
+                Maksimum {MAX_SIZE_MB} MB
+              </span>
+              <span className="sw-badge sw-badge-neutral text-xs">
+                Sadece .csv
+              </span>
+            </div>
+          </div>
         </div>
+
+        {/* FEEDBACK & ACTION */}
+        <div className="lg:col-span-5 flex flex-col h-full">
+          <div className="sw-panel p-6 flex flex-col h-full rounded-xl">
+            <h3 className="text-sm font-bold text-[var(--color-text-primary)] uppercase tracking-wider mb-5">
+              Acquisition Status
+            </h3>
+
+            <div className="flex-1 flex flex-col">
+              {file ? (
+                <div className="mb-6 p-4 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] rounded-lg">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-12 h-12 bg-[var(--color-surface-elevated)] border border-[var(--color-border-default)] rounded-lg flex items-center justify-center shrink-0">
+                      <svg className="w-6 h-6 text-[var(--color-accent-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-[var(--color-text-primary)] truncate" title={file.name}>
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                        {formatBytes(file.size)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-[var(--color-border-subtle)]">
+                    <div className="flex items-center text-sm">
+                      <svg className="w-4 h-4 text-[var(--color-semantic-success)] mr-2 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-[var(--color-text-secondary)]">Dosya boyutu ve format doğrulandı</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <svg className="w-4 h-4 text-[var(--color-semantic-success)] mr-2 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-[var(--color-text-secondary)]">Sütun eşleşmesi (UTF-8) hazır</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] border-dashed rounded-lg mb-6 min-h-[12rem]">
+                  <p className="text-sm text-[var(--color-text-muted)] font-medium">Henüz dosya seçilmedi</p>
+                </div>
+              )}
+
+              {(validationError || apiError) && (
+                <div className="mb-4 p-4 bg-[var(--color-semantic-danger-bg)] border-l-4 border-[var(--color-semantic-danger)] rounded-r-lg" role="alert">
+                  <p className="text-sm text-[var(--color-semantic-danger)] font-medium">{validationError || apiError}</p>
+                </div>
+              )}
+
+              {successMessage && !validationError && !apiError && (
+                <div className="mb-4 p-4 bg-[var(--color-semantic-success-bg)] border-l-4 border-[var(--color-semantic-success)] rounded-r-lg" role="status" aria-live="polite">
+                  <p className="text-sm text-[var(--color-semantic-success)] font-medium">{successMessage}</p>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={onSubmit} className="mt-auto pt-4 border-t border-[var(--color-border-subtle)]">
+              <button
+                type="submit"
+                disabled={!file || isSubmitting}
+                className="sw-button-primary w-full justify-center py-3 text-sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Yükleniyor...
+                  </>
+                ) : (
+                  'Doğrulanmış Analizi Başlat ve Karar Desteği Üret'
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+
       </div>
     </div>
   );

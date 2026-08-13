@@ -46,79 +46,117 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-deep-dark p-4">
-      <div className="w-full max-w-[400px] bg-rich-navy border border-space-blue rounded-lg shadow-xl flex flex-col overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-6 lg:p-12">
+      <div className="w-full max-w-5xl sw-surface-elevated flex flex-col lg:flex-row overflow-hidden">
 
-        {/* Header Section */}
-        <div className="bg-deep-dark p-8 flex flex-col items-center border-b border-space-blue">
-          <SecureWatchBrand variant="dark" eager className="w-full max-w-[240px] sm:max-w-[280px] h-auto mb-3" />
-          <h1 className="sr-only">SecureWatch AI</h1>
-          <p className="text-sm font-medium text-slate-300">Platform Girişi</p>
-        </div>
+        {/* Left Panel: BRAND / PRODUCT CONTEXT (Desktop) / Compact (Mobile) */}
+        <div className="lg:w-1/2 flex flex-col justify-between p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-border-subtle bg-bg-base/30 relative">
 
-        {/* Form Section */}
-        <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-5">
-          {errorMsg && (
-            <div
-              role="alert"
-              className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded text-sm"
-            >
-              {errorMsg}
+          <div className="flex flex-col items-center lg:items-start text-center lg:text-left z-10">
+            <SecureWatchBrand variant="dark" eager className="w-full max-w-[200px] lg:max-w-[240px] h-auto mb-6" />
+            <h1 className="sr-only">SecureWatch AI</h1>
+
+            <p className="hidden lg:block text-lg text-text-secondary leading-relaxed mb-10 max-w-[90%]">
+              Yapay zekâ destekli ağ trafiği analizi ve saldırı tespit karar destek platformu.
+            </p>
+
+            {/* Capability Signals (Desktop only) */}
+            <div className="hidden lg:flex flex-col gap-3">
+              <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-surface-base border border-border-default shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-primary opacity-80"></div>
+                <span className="text-sm font-medium text-text-primary">AI Destekli Analiz</span>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-surface-base border border-border-default shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-semantic-warning)] opacity-80"></div>
+                <span className="text-sm font-medium text-text-primary">Risk Önceliklendirme</span>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-surface-base border border-border-default shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-semantic-success)] opacity-80"></div>
+                <span className="text-sm font-medium text-text-primary">Güvenli Olay Yönetimi</span>
+              </div>
             </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="username-input" className="text-sm font-medium text-gray-300">
-              Kullanıcı adı
-            </label>
-            <input
-              id="username-input"
-              type="text"
-              name="username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={isLoading}
-              required
-              className="bg-deep-dark border border-space-blue rounded px-3 py-2 text-white focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan transition-colors"
-            />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="password-input" className="text-sm font-medium text-gray-300">
-              Parola
-            </label>
-            <input
-              id="password-input"
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-              className="bg-deep-dark border border-space-blue rounded px-3 py-2 text-white focus:border-cyber-cyan focus:outline-none focus:ring-1 focus:ring-cyber-cyan transition-colors"
-            />
+          <div className="hidden lg:block z-10 mt-12 text-xs font-medium text-text-muted">
+            SecureWatch AI v0.1.0-prototype | Akademik ağ trafiği karar destek prototipi
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading || !username.trim() || !password}
-            className="mt-2 w-full bg-cyber-cyan hover:bg-ai-teal text-deep-dark font-bold py-2.5 px-4 rounded transition-all shadow-[0_0_10px_rgba(91,192,190,0.15)] hover:shadow-[0_0_15px_rgba(111,255,233,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center min-h-[44px]"
-          >
-            {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
-          </button>
-        </form>
-
-        {/* Security Warning Section */}
-        <div className="bg-deep-dark/50 p-4 border-t border-space-blue text-xs text-slate-400 text-center">
-          Bu sisteme erişim yalnızca yetkili personelle sınırlandırılmıştır. Tüm işlemler kaydedilmektedir.
+          {/* Ambient visual treatment */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[rgba(91,192,190,0.03)] to-transparent pointer-events-none"></div>
         </div>
-      </div>
 
-      {/* Prototype Footer */}
-      <div className="mt-8 text-xs font-medium text-slate-400 text-center max-w-[400px]">
-        SecureWatch AI v0.1.0-prototype | Akademik ağ trafiği karar destek prototipi
+        {/* Right Panel: AUTHENTICATION */}
+        <div className="lg:w-1/2 flex flex-col justify-center p-8 lg:p-12 bg-bg-base/50">
+
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-text-primary mb-2">Platform Girişi</h2>
+            <p className="text-sm text-text-secondary">Yetkili hesabınızla güvenli çalışma alanına erişin.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            {errorMsg && (
+              <div
+                role="alert"
+                className="bg-[var(--color-semantic-danger-bg)] border border-[var(--color-semantic-danger)]/30 text-[var(--color-semantic-danger)] px-4 py-3 rounded-lg text-sm flex items-start gap-2"
+              >
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="username-input" className="text-sm font-medium text-text-secondary">
+                Kullanıcı adı
+              </label>
+              <input
+                id="username-input"
+                type="text"
+                name="username"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isLoading}
+                required
+                className="sw-input w-full"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="password-input" className="text-sm font-medium text-text-secondary">
+                Parola
+              </label>
+              <input
+                id="password-input"
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+                className="sw-input w-full"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || !username.trim() || !password}
+              className="sw-button-primary mt-2 w-full min-h-[44px]"
+            >
+              {isLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+            </button>
+          </form>
+
+          {/* Security Notice */}
+          <div className="mt-8 border-t border-border-default pt-6 text-xs text-text-muted">
+            Bu sisteme erişim yalnızca yetkili personelle sınırlandırılmıştır. Tüm işlemler kaydedilmektedir.
+          </div>
+
+          {/* Mobile Footer */}
+          <div className="block lg:hidden mt-6 text-xs text-center font-medium text-text-muted">
+            SecureWatch AI v0.1.0-prototype
+          </div>
+        </div>
+
       </div>
     </div>
   );

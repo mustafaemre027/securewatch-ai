@@ -1,17 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../../auth/useAuth';
 import { processAnalysisJob } from '../api';
 import type { AnalysisUploadResponse, AnalysisProcessingResponse, AnalysisJobStatus } from '../types';
 import { ApiError } from '../../../api/types';
 
-export interface AnalysisExecutionPanelProps {
+interface AnalysisExecutionPanelProps {
   job: AnalysisUploadResponse;
-  onSuccess?: (response: AnalysisProcessingResponse) => void;
+  onSuccess?: (result: AnalysisProcessingResponse) => void;
   onReset?: () => void;
 }
 
 function formatBytes(bytes: number): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
+    return 'Bilinmiyor';
+  }
   if (bytes === 0) return '0 Byte';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -22,14 +25,14 @@ function formatBytes(bytes: number): string {
 function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExecutionPanelProps) {
   const { accessToken, isAuthenticated } = useAuth();
 
-  const [currentStatus, setCurrentStatus] = useState<AnalysisJobStatus>(job.status);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<AnalysisJobStatus>(job.status);
   const [recordsProcessed, setRecordsProcessed] = useState<number | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const isProcessingRef = useRef(false);
-  const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -46,18 +49,19 @@ function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExe
       setApiError('Oturumunuz geçersiz. Lütfen yeniden giriş yapın.');
       return;
     }
+    if (isProcessingRef.current) return;
 
-    if (isProcessingRef.current || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING' || currentStatus === 'FAILED') {
-      return;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
 
-    setApiError(null);
+    const currentController = new AbortController();
+    abortControllerRef.current = currentController;
+
     setIsProcessing(true);
     isProcessingRef.current = true;
     setCurrentStatus('PROCESSING');
-
-    abortControllerRef.current = new AbortController();
-    const currentController = abortControllerRef.current;
+    setApiError(null);
 
     try {
       const response = await processAnalysisJob(job.job_id, accessToken, currentController.signal);
@@ -144,95 +148,153 @@ function AnalysisExecutionPanelInternal({ job, onSuccess, onReset }: AnalysisExe
     }
   };
 
+  const statusConfig = {
+    PENDING: {
+      label: 'Bekliyor',
+      icon: (
+        <svg className="w-5 h-5 text-[var(--color-semantic-warning)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      bgClass: 'bg-[var(--color-semantic-warning-bg)]',
+      borderClass: 'border-[var(--color-semantic-warning)]',
+      textClass: 'text-[var(--color-semantic-warning)]',
+    },
+    PROCESSING: {
+      label: 'İşleniyor',
+      icon: (
+        <svg className="w-5 h-5 text-[var(--color-semantic-info)] animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      bgClass: 'bg-[var(--color-semantic-info-bg)]',
+      borderClass: 'border-[var(--color-semantic-info)]',
+      textClass: 'text-[var(--color-semantic-info)]',
+    },
+    COMPLETED: {
+      label: 'Tamamlandı',
+      icon: (
+        <svg className="w-5 h-5 text-[var(--color-semantic-success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      bgClass: 'bg-[var(--color-semantic-success-bg)]',
+      borderClass: 'border-[var(--color-semantic-success)]',
+      textClass: 'text-[var(--color-semantic-success)]',
+    },
+    FAILED: {
+      label: 'Başarısız',
+      icon: (
+        <svg className="w-5 h-5 text-[var(--color-semantic-danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      ),
+      bgClass: 'bg-[var(--color-semantic-danger-bg)]',
+      borderClass: 'border-[var(--color-semantic-danger)]',
+      textClass: 'text-[var(--color-semantic-danger)]',
+    },
+  };
+
+  const currentConfig = statusConfig[currentStatus] || statusConfig.PENDING;
+
   return (
     <div className="w-full" aria-busy={isProcessing}>
-      <div className="p-6 bg-rich-navy border-2 border-space-blue rounded-xl flex flex-col">
-        <h2 className="text-xl font-bold text-white mb-6">Analiz Yürütme Paneli</h2>
+      <div className="sw-panel p-8 rounded-xl flex flex-col">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-            <p className="text-xs font-bold text-muted-blue uppercase mb-1">İşlem Numarası (Job ID)</p>
-            <p className="text-sm font-semibold text-white">#{job.job_id}</p>
-          </div>
-
-          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg" role="status" aria-live="polite" aria-atomic="true">
-            <p className="text-xs font-bold text-muted-blue uppercase mb-1">Durum</p>
-            <div className="flex items-center">
-              {currentStatus === 'COMPLETED' && <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>}
-              {currentStatus === 'PROCESSING' && <span className="w-2 h-2 rounded-full bg-cyber-cyan animate-pulse mr-2"></span>}
-              {currentStatus === 'FAILED' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>}
-              {currentStatus === 'PENDING' && <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></span>}
-              <p className="text-sm font-bold text-white">
-                {currentStatus === 'PENDING' && 'Bekliyor'}
-                {currentStatus === 'PROCESSING' && 'İşleniyor'}
-                {currentStatus === 'COMPLETED' && <span className="text-green-400">Tamamlandı</span>}
-                {currentStatus === 'FAILED' && <span className="text-red-400">Başarısız</span>}
-              </p>
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 border-b border-[var(--color-border-subtle)] pb-8">
+          <div>
+            <h3 className="text-sm font-bold text-[var(--color-text-secondary)] uppercase tracking-wider mb-2">
+              Analiz Dosyası Hazır
+            </h3>
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)] break-all truncate max-w-xl" title={job.file_name}>
+              {job.file_name}
+            </h2>
+            <div className="flex items-center gap-4 mt-3">
+              <span className="sw-badge sw-badge-neutral text-xs">ID: <span>#{job.job_id}</span></span>
+              <span className="sw-badge sw-badge-neutral text-xs">{formatBytes(job.file_size)}</span>
             </div>
-            {currentStatus === 'COMPLETED' && recordsProcessed !== null && (
-              <p className="text-xs text-green-300 mt-2">İşlenen Kayıt Sayısı: {recordsProcessed}</p>
-            )}
-            {currentStatus === 'COMPLETED' && typeof job.job_id === 'number' && Number.isSafeInteger(job.job_id) && job.job_id > 0 && (
-              <div className="mt-3">
-                <Link
-                  to={`/analysis/${job.job_id}/results`}
-                  aria-label={`Analiz #${job.job_id} sonuçlarını görüntüle`}
-                  className="inline-block px-4 py-2 bg-ai-teal text-deep-dark text-sm font-bold rounded-lg hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rich-navy focus:ring-ai-teal truncate max-w-[200px] text-center"
-                >
-                  Sonuçları görüntüle
-                </Link>
-              </div>
-            )}
           </div>
 
-          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-            <p className="text-xs font-bold text-muted-blue uppercase mb-1">Dosya Adı</p>
-            <p className="text-sm font-semibold text-white truncate" title={job.file_name}>{job.file_name}</p>
-          </div>
-
-          <div className="p-4 bg-deep-dark border border-space-blue rounded-lg">
-            <p className="text-xs font-bold text-muted-blue uppercase mb-1">Dosya Boyutu</p>
-            <p className="text-sm font-semibold text-white">{formatBytes(job.file_size)}</p>
+          <div className="shrink-0 flex items-center gap-3 px-4 py-2 rounded-lg border bg-[var(--color-surface-base)] shadow-sm">
+            <span className="text-sm font-bold text-[var(--color-text-secondary)]">Durum:</span>
+            <div
+              className={`flex items-center gap-2 px-3 py-1 rounded-md border ${currentConfig.bgClass} ${currentConfig.borderClass}`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {currentConfig.icon}
+              <span className={`text-sm font-bold ${currentConfig.textClass}`}>
+                {currentConfig.label}
+              </span>
+              {currentStatus === 'COMPLETED' && recordsProcessed !== null && (
+                <span className="sr-only">İşlenen Kayıt Sayısı: {recordsProcessed}</span>
+              )}
+            </div>
           </div>
         </div>
 
         {apiError && (
-          <div className="mb-6 p-4 bg-deep-dark border border-red-500/50 rounded-lg" role="alert">
-            <p className="text-sm text-red-400 font-semibold">{apiError}</p>
+          <div className="mb-6 p-4 bg-[var(--color-semantic-danger-bg)] border-l-4 border-[var(--color-semantic-danger)] rounded-r-lg" role="alert">
+            <p className="text-sm font-semibold text-[var(--color-semantic-danger)]">{apiError}</p>
           </div>
         )}
 
-        <div className="mt-auto flex flex-col sm:flex-row gap-4">
-          <button
-            type="button"
-            onClick={handleProcess}
-            disabled={isProcessing || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING' || currentStatus === 'FAILED'}
-            className="flex-1 py-3 px-4 bg-ai-teal text-deep-dark font-bold rounded-lg hover:bg-cyber-cyan transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isProcessing ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-deep-dark" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                İşleniyor...
-              </>
-            ) : (
-              'Doğrulanmış Analizi Başlat'
-            )}
-          </button>
+        {currentStatus === 'COMPLETED' && recordsProcessed !== null && (
+          <div className="mb-8 p-6 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded-xl flex flex-col items-center justify-center">
+            <span className="text-[var(--color-text-secondary)] text-sm font-bold uppercase tracking-wider mb-2">İşlenen Kayıt</span>
+            <span className="text-4xl font-extrabold text-[var(--color-text-primary)]">
+              {new Intl.NumberFormat('tr-TR').format(recordsProcessed)}
+            </span>
+          </div>
+        )}
 
-          {onReset && (
+        <div className="mt-auto flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="flex-1 w-full sm:w-auto flex flex-col sm:flex-row gap-4 items-center">
             <button
               type="button"
-              onClick={onReset}
-              disabled={isProcessing}
-              className="py-3 px-6 bg-space-blue text-white font-bold rounded-lg hover:bg-muted-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleProcess}
+              disabled={isProcessing || currentStatus === 'COMPLETED' || currentStatus === 'PROCESSING' || currentStatus === 'FAILED'}
+              className="sw-button-primary w-full sm:w-auto justify-center py-3 px-8 text-sm"
             >
-              Yeni CSV Yükle
+              {isProcessing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Analiz İşleniyor...
+                </>
+              ) : (
+                'Doğrulanmış Analizi Başlat'
+              )}
             </button>
+
+            {currentStatus === 'COMPLETED' && typeof job.job_id === 'number' && Number.isSafeInteger(job.job_id) && job.job_id > 0 && (
+              <Link
+                to={`/analysis/${job.job_id}/results`}
+                aria-label={`Analiz #${job.job_id} sonuçlarını görüntüle`}
+                className="sw-button-secondary w-full sm:w-auto justify-center py-3 px-8 text-sm"
+              >
+                Sonuçları görüntüle
+              </Link>
+            )}
+          </div>
+
+          {onReset && (
+            <div className="w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onReset}
+                disabled={isProcessing}
+                className="sw-button-secondary w-full sm:w-auto justify-center py-3 px-6 text-sm opacity-80 hover:opacity-[1]"
+              >
+                Yeni CSV Yükle
+              </button>
+            </div>
           )}
         </div>
+
       </div>
     </div>
   );

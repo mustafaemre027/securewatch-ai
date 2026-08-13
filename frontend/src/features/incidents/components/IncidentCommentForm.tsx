@@ -120,24 +120,24 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
       onSubmit={handleSubmit} 
       aria-labelledby="comment-form-heading"
       aria-busy={isSubmitting}
-      className="flex flex-col gap-4 mt-6 pt-6 border-t border-space-blue/30"
+      className="flex flex-col gap-4 mt-6 pt-6 border-t border-[var(--color-border-subtle)]"
     >
-      <h3 id="comment-form-heading" className="text-lg font-medium text-white">Olaya Yorum Ekle</h3>
+      <h3 id="comment-form-heading" className="text-base font-bold text-[var(--color-text-primary)]">Olaya Yorum Ekle</h3>
       
       {formError && (
-        <div role="alert" className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded text-sm">
+        <div role="alert" className="bg-[var(--color-semantic-danger)]/10 border border-[var(--color-semantic-danger)]/20 text-[var(--color-semantic-danger)] px-4 py-3 rounded-lg text-sm font-medium">
           {formError}
         </div>
       )}
 
       {successMessage && (
-        <div role="status" aria-live="polite" className="bg-green-500/10 border border-green-500/50 text-green-200 px-4 py-3 rounded text-sm">
+        <div role="status" aria-live="polite" className="bg-[var(--color-semantic-success)]/10 border border-[var(--color-semantic-success)]/20 text-[var(--color-semantic-success)] px-4 py-3 rounded-lg text-sm font-medium">
           {successMessage}
         </div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="comment_text" className="text-sm font-medium text-slate-300">
+        <label htmlFor="comment_text" className="text-sm font-bold text-[var(--color-text-secondary)]">
           Yorum
         </label>
         <textarea
@@ -148,7 +148,7 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
           disabled={isSubmitting}
           required
           aria-describedby={formError ? 'comment-error' : undefined}
-          className="w-full min-h-32 resize-y rounded-lg border border-slate-600 bg-deep-dark px-4 py-3 text-slate-100 placeholder:text-slate-400 focus-visible:border-cyber-cyan focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyber-cyan/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full min-h-[120px] resize-y rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-base)] px-4 py-3 text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent-primary)] disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
           placeholder="Olay incelemesiyle ilgili notunuzu yazın."
         />
         {formError && <span id="comment-error" className="sr-only">{formError}</span>}
@@ -157,7 +157,7 @@ export const IncidentCommentForm: React.FC<IncidentCommentFormProps> = ({ incide
       <button 
         type="submit" 
         disabled={isSubmitting || !commentText.trim()}
-        className="self-start bg-cyber-cyan hover:bg-ai-teal text-deep-dark font-bold py-2 px-6 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[40px]"
+        className="self-start sm:w-auto w-full bg-[var(--color-accent-primary)] hover:opacity-90 text-[var(--color-surface-base)] font-bold py-2.5 px-6 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)] focus:ring-offset-2 focus:ring-offset-[var(--color-surface-elevated)]"
       >
         {isSubmitting ? 'Yorum Ekleniyor...' : 'Yorum Ekle'}
       </button>
