@@ -29,8 +29,8 @@ def create_new_user(
     new_user = user_service.create_user_with_audit(
         db=db,
         user_create=user_create,
-        created_by_user_id=current_user.id,
-        ip_address=ip_address,
+       created_by_user_id=current_user.id,
+            ip_address=ip_address,
     )
     return UserResponse.model_validate(new_user)
 

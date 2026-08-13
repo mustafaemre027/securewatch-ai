@@ -1,7 +1,9 @@
 import { ApiError } from './types';
 import type { ApiErrorDetail } from './types';
 
-const API_PREFIX = '/api/v1';
+// Vercel'deki ortam değişkenini okur, yoksa boş kalır (local için)
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_PREFIX = `${BASE_URL}/api/v1`;
 
 interface FetchOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
@@ -76,7 +78,7 @@ export async function apiClient<T>(
         };
       }
     } else if (!data) {
-       errorDetail.message = `HTTP Error ${response.status}: ${response.statusText}`;
+      errorDetail.message = `HTTP Error ${response.status}: ${response.statusText}`;
     }
 
     throw new ApiError(response.status, errorDetail);
