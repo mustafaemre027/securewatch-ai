@@ -145,39 +145,45 @@ export function AnalysisHistoryList() {
   };
 
   const renderStatus = (status: AnalysisJobStatus | string) => {
-    let label = 'Bilinmeyen';
-    let colorClass = 'bg-gray-500';
-    let textClass = 'text-gray-400';
-
     switch (status) {
-      case 'PENDING':
-        label = 'Bekliyor';
-        colorClass = 'bg-yellow-500';
-        textClass = 'text-yellow-400';
-        break;
-      case 'PROCESSING':
-        label = 'İşleniyor';
-        colorClass = 'bg-cyber-cyan animate-pulse';
-        textClass = 'text-cyan-400';
-        break;
       case 'COMPLETED':
-        label = 'Tamamlandı';
-        colorClass = 'bg-green-500';
-        textClass = 'text-green-400';
-        break;
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--color-semantic-success-bg)] border border-[var(--color-semantic-success)]">
+            <svg className="w-3 h-3 text-[var(--color-semantic-success)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+            <span className="text-xs font-bold text-[var(--color-semantic-success)]">Tamamlandı</span>
+          </div>
+        );
       case 'FAILED':
-        label = 'Başarısız';
-        colorClass = 'bg-red-500';
-        textClass = 'text-red-400';
-        break;
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--color-semantic-danger-bg)] border border-[var(--color-semantic-danger)]">
+            <svg className="w-3 h-3 text-[var(--color-semantic-danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+            <span className="text-xs font-bold text-[var(--color-semantic-danger)]">Başarısız</span>
+          </div>
+        );
+      case 'PROCESSING':
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--color-semantic-warning-bg)] border border-[var(--color-semantic-warning)]">
+             <svg className="animate-spin w-3 h-3 text-[var(--color-semantic-warning)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+             </svg>
+             <span className="text-xs font-bold text-[var(--color-semantic-warning)]">İşleniyor</span>
+          </div>
+        );
+      case 'PENDING':
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--color-semantic-info-bg)] border border-[var(--color-semantic-info)]">
+            <svg className="w-3 h-3 text-[var(--color-semantic-info)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span className="text-xs font-bold text-[var(--color-semantic-info)]">Bekliyor</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--color-surface-hover)] border border-[var(--color-border-default)]">
+            <span className="text-xs font-bold text-[var(--color-text-secondary)]">Bilinmeyen</span>
+          </div>
+        );
     }
-
-    return (
-      <div className="flex items-center">
-        <span className={`w-2 h-2 rounded-full mr-2 ${colorClass}`}></span>
-        <span className={`text-sm font-bold ${textClass}`}>{label}</span>
-      </div>
-    );
   };
 
   const currentPage = Math.floor(skip / PAGE_SIZE) + 1;
@@ -187,8 +193,8 @@ export function AnalysisHistoryList() {
 
   return (
     <div className="w-full flex flex-col space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-rich-navy p-4 rounded-xl border-2 border-space-blue">
-        <h2 className="text-xl font-bold text-white">Analiz Geçmişi</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--color-surface-elevated)] p-4 rounded-xl border border-[var(--color-border-subtle)]">
+        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Analiz Geçmişi</h2>
 
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <div className="flex-1 sm:flex-none flex items-center">
@@ -198,7 +204,7 @@ export function AnalysisHistoryList() {
               value={statusFilter}
               onChange={handleStatusChange}
               disabled={loading}
-              className="w-full bg-deep-dark border border-space-blue text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ai-teal disabled:opacity-50"
+              className="w-full bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-accent-primary)] disabled:opacity-50"
             >
               <option value="ALL">Tüm Durumlar</option>
               <option value="PENDING">Bekliyor</option>
@@ -211,7 +217,7 @@ export function AnalysisHistoryList() {
             onClick={handleRefresh}
             disabled={loading}
             aria-label="Listeyi Yenile"
-            className="p-2 bg-space-blue text-white rounded-lg hover:bg-muted-blue transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ai-teal"
+            className="p-2 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)]"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -220,26 +226,28 @@ export function AnalysisHistoryList() {
         </div>
       </div>
 
-      <div className="w-full" aria-busy={loading}>
+      <div className="w-full relative min-h-[12rem] flex flex-col" aria-busy={loading}>
         {error && (
-          <div className="p-4 bg-deep-dark border border-red-500/50 rounded-lg mb-4" role="alert">
-            <p className="text-sm text-red-400 font-semibold">{error}</p>
+          <div className="p-4 bg-[var(--color-semantic-danger-bg)] border-l-4 border-[var(--color-semantic-danger)] rounded-r-lg mb-4" role="alert">
+            <p className="text-sm text-[var(--color-semantic-danger)] font-medium">{error}</p>
           </div>
         )}
 
         {loading && !error && (
-          <div className="p-8 text-center" role="status" aria-live="polite">
-            <svg className="animate-spin h-8 w-8 text-ai-teal mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p className="text-sm font-semibold text-muted-blue">Analiz geçmişi yükleniyor...</p>
+          <div className="absolute inset-0 z-10 bg-[var(--color-bg-base)]/50 backdrop-blur-sm flex items-center justify-center rounded-xl" role="status" aria-live="polite">
+            <div className="flex flex-col items-center gap-2">
+              <svg className="animate-spin h-6 w-6 text-[var(--color-accent-primary)] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Analiz geçmişi yükleniyor...</p>
+            </div>
           </div>
         )}
 
         {isEmpty && (
-          <div className="p-8 text-center bg-deep-dark rounded-xl border border-space-blue">
-            <p className="text-muted-blue font-medium">
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] border-dashed rounded-xl">
+            <p className="text-[var(--color-text-muted)] text-sm font-medium">
               {statusFilter === 'ALL'
                 ? 'Henüz analiz kaydı bulunmuyor.'
                 : 'Seçili filtreye uygun kayıt bulunmuyor.'}
@@ -248,61 +256,102 @@ export function AnalysisHistoryList() {
         )}
 
         {!loading && !error && !isEmpty && (
-          <ul className="space-y-4" role="list">
-            {jobs.map(job => (
-              <li key={job.id} className="p-4 bg-rich-navy border border-space-blue rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:border-muted-blue transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-muted-blue uppercase">#{job.id}</span>
-                  </div>
-                  <p className="text-base font-semibold text-white truncate" title={job.file_name}>{job.file_name}</p>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-blue">
-                    <span>Oluşturulma: {formatDate(job.created_at)}</span>
-                    {job.completed_at && (
-                       <span>Tamamlanma: {formatDate(job.completed_at)}</span>
-                    )}
-                    <span>Boyut: {formatBytes(job.file_size)}</span>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 flex flex-col sm:flex-row items-end sm:items-center gap-3">
-                  <div className="bg-deep-dark p-3 rounded-lg border border-space-blue">
-                    {renderStatus(job.status)}
-                  </div>
-                  {job.status === 'COMPLETED' && typeof job.id === 'number' && Number.isSafeInteger(job.id) && job.id > 0 && (
-                    <Link
-                      to={`/analysis/${job.id}/results`}
-                      aria-label={`Analiz #${job.id} sonuçlarını görüntüle`}
-                      className="px-4 py-2 bg-ai-teal text-deep-dark text-sm font-bold rounded-lg hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rich-navy focus:ring-ai-teal truncate max-w-[200px] text-center"
-                    >
-                      Sonuçları görüntüle
-                    </Link>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="flex-1 flex flex-col">
+            <div className="w-full">
+              {/* Desktop Header */}
+              <div className="hidden lg:grid grid-cols-[80px_1fr_120px_160px_140px_160px] gap-4 px-4 py-3 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] rounded-t-xl text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                <span>Job ID</span>
+                <span>Dosya Adı</span>
+                <span>Boyut</span>
+                <span>Oluşturulma</span>
+                <span>Durum</span>
+                <span className="text-right">Aksiyon</span>
+              </div>
+
+              <ul className="flex flex-col w-full gap-4 lg:gap-0" role="list">
+                {jobs.map(job => (
+                  <li key={job.id} className="relative flex flex-col gap-2 lg:grid lg:grid-cols-[80px_1fr_120px_160px_140px_160px] lg:items-center lg:gap-4 p-4 lg:py-3 lg:px-4 bg-[var(--color-surface-elevated)] lg:bg-transparent border lg:border-x lg:border-b border-[var(--color-border-subtle)] lg:border-t-0 rounded-xl lg:rounded-none lg:last:rounded-b-xl hover:bg-[var(--color-surface-hover)] transition-colors group">
+
+                    {/* File Name */}
+                    <div className="order-1 lg:order-2 flex min-w-0 w-full">
+                      <span className="text-sm font-semibold text-[var(--color-text-primary)] lg:font-medium lg:truncate break-all line-clamp-2 lg:line-clamp-none" title={job.file_name}>
+                        {job.file_name}
+                      </span>
+                    </div>
+
+                    {/* Status */}
+                    <div className="order-2 lg:order-5 flex items-center justify-start">
+                      {renderStatus(job.status)}
+                    </div>
+
+                    {/* Job ID */}
+                    <div className="order-3 lg:order-1 flex items-center gap-2">
+                      <span className="lg:hidden text-xs font-semibold text-[var(--color-text-muted)] w-16">Job</span>
+                      <span className="text-xs lg:text-sm font-bold text-[var(--color-accent-primary)] lg:font-semibold lg:text-[var(--color-text-secondary)]">
+                        #{job.id}
+                      </span>
+                    </div>
+
+                    {/* Size */}
+                    <div className="order-4 lg:order-3 flex items-center gap-2">
+                      <span className="lg:hidden text-xs font-semibold text-[var(--color-text-muted)] w-16">Boyut</span>
+                      <span className="text-xs lg:text-sm text-[var(--color-text-secondary)]">
+                        {formatBytes(job.file_size)}
+                      </span>
+                    </div>
+
+                    {/* Date */}
+                    <div className="order-5 lg:order-4 flex items-center gap-2 lg:flex-col lg:items-start lg:gap-0 lg:min-w-0">
+                      <span className="lg:hidden text-xs font-semibold text-[var(--color-text-muted)] w-16">Tarih</span>
+                      <span className="text-xs lg:text-sm text-[var(--color-text-secondary)] truncate">
+                        {formatDate(job.created_at)}
+                      </span>
+                      {job.completed_at && (
+                        <span className="hidden lg:inline text-xs text-[var(--color-text-muted)] truncate">
+                          {formatDate(job.completed_at)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="order-6 flex justify-start lg:justify-end w-full lg:w-auto mt-2 lg:mt-0">
+                      {job.status === 'COMPLETED' && typeof job.id === 'number' && Number.isSafeInteger(job.id) && job.id > 0 && (
+                        <Link
+                          to={`/analysis/${job.id}/results`}
+                          aria-label={`Analiz #${job.id} sonuçlarını görüntüle`}
+                          className="w-full lg:w-auto text-center px-4 py-2 lg:px-3 lg:py-1 bg-[var(--color-accent-primary)] lg:bg-[var(--color-surface-base)] text-[var(--color-bg-base)] lg:text-[var(--color-text-primary)] border lg:border-[var(--color-border-subtle)] lg:hover:border-[var(--color-accent-primary)] rounded-lg text-sm lg:text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-primary)] lg:opacity-0 group-hover:opacity-[1]"
+                        >
+                          Sonuçları görüntüle
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
 
-        <div className="mt-6 flex items-center justify-between p-4 bg-deep-dark rounded-xl border border-space-blue">
-          <button
-            onClick={handlePrevPage}
-            disabled={isPrevDisabled}
-            className="px-4 py-2 bg-space-blue text-white text-sm font-bold rounded-lg hover:bg-muted-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Önceki
-          </button>
-
-          <span className="text-sm font-medium text-muted-blue">
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 py-3 border-t border-[var(--color-border-subtle)]">
+          <span className="text-xs font-medium text-[var(--color-text-secondary)] order-2 sm:order-1">
             Sayfa {currentPage}
           </span>
-
-          <button
-            onClick={handleNextPage}
-            disabled={isNextDisabled}
-            className="px-4 py-2 bg-space-blue text-white text-sm font-bold rounded-lg hover:bg-muted-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Sonraki
-          </button>
+          <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto">
+            <button
+              onClick={handlePrevPage}
+              disabled={isPrevDisabled}
+              className="flex-1 sm:flex-none justify-center px-4 py-2 sm:px-3 sm:py-1.5 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm sm:text-xs font-medium rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Önceki
+            </button>
+            <button
+              onClick={handleNextPage}
+              disabled={isNextDisabled}
+              className="flex-1 sm:flex-none justify-center px-4 py-2 sm:px-3 sm:py-1.5 bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm sm:text-xs font-medium rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sonraki
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -164,8 +164,8 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
   if (user.role !== 'ANALYST') {
     if (user.role === 'ADMIN') {
       return (
-        <div className="bg-deep-dark p-6 rounded-xl border border-space-blue mt-6">
-          <p className="text-slate-400">Yetkiniz yok. Yönetici hesapları olayları yalnızca salt okunur görüntüleyebilir.</p>
+        <div className="bg-[var(--color-surface-elevated)] p-5 md:p-6 rounded-xl border border-[var(--color-border-subtle)] mt-6">
+          <p className="text-[var(--color-text-secondary)] text-sm font-medium">Yetkiniz yok. Yönetici hesapları olayları yalnızca salt okunur görüntüleyebilir.</p>
         </div>
       );
     }
@@ -179,27 +179,27 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
   const isTerminal = incident.status === 'RESOLVED' || incident.status === 'FALSE_POSITIVE';
   
   return (
-    <div className="bg-deep-dark p-6 rounded-xl border border-space-blue mt-6" aria-busy={!!pendingAction}>
-      <h3 className="text-lg font-bold text-white mb-4">Olay İşlemleri</h3>
+    <div className="bg-[var(--color-surface-elevated)] p-5 md:p-6 rounded-xl border border-[var(--color-border-subtle)] mt-6" aria-busy={!!pendingAction}>
+      <h3 className="text-base font-bold text-[var(--color-text-primary)] mb-5">Olay İşlemleri</h3>
       
       {actionError && (
-        <div role="alert" className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">
+        <div role="alert" className="mb-4 p-3 bg-[var(--color-semantic-danger)]/10 border border-[var(--color-semantic-danger)]/20 rounded-lg text-[var(--color-semantic-danger)] text-sm font-medium">
           {actionError}
         </div>
       )}
       
       {successMessage && (
-        <div role="status" aria-live="polite" className="mb-4 p-3 bg-green-900/50 border border-green-500 rounded text-green-200 text-sm">
+        <div role="status" aria-live="polite" className="mb-4 p-3 bg-[var(--color-semantic-success)]/10 border border-[var(--color-semantic-success)]/20 rounded-lg text-[var(--color-semantic-success)] text-sm font-medium">
           {successMessage}
         </div>
       )}
       
       {isAssignedToOther && (
-        <p className="text-slate-400">Bu olay başka bir analiste atanmış.</p>
+        <p className="text-[var(--color-text-secondary)] text-sm mb-4">Bu olay başka bir analiste atanmış.</p>
       )}
       
       {isTerminal && (
-        <p className="text-slate-400">
+        <p className="text-[var(--color-text-secondary)] text-sm mb-4">
           {incident.status === 'RESOLVED' ? 'Bu olay çözümlenmiş ve kapatılmıştır.' : 'Bu olay yanlış pozitif olarak kapatılmıştır.'}
         </p>
       )}
@@ -209,7 +209,7 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
           <button 
             onClick={handleClaim} 
             disabled={!!pendingAction}
-            className="px-4 py-2 bg-space-blue text-white rounded font-medium hover:bg-space-blue/80 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-surface-hover)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg font-bold hover:bg-[var(--color-border-subtle)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--color-text-accent)]"
           >
             {pendingAction === 'CLAIM' ? 'Olay Atanıyor...' : 'Olayı Üzerime Al'}
           </button>
@@ -217,12 +217,12 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
       )}
       
       {isAssignedToMe && !isTerminal && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
           {incident.status === 'OPEN' && (
             <button 
               onClick={handleStart}
               disabled={!!pendingAction}
-              className="px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-semantic-info)] text-white rounded-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-semantic-info)]"
             >
               {pendingAction === 'START' ? 'İnceleme Başlatılıyor...' : 'İncelemeyi Başlat'}
             </button>
@@ -232,7 +232,7 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
             <button 
               onClick={(e) => handleOpenConfirm('RESOLVE', e)}
               disabled={!!pendingAction}
-              className="px-4 py-2 bg-green-600 text-white rounded font-medium hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-semantic-success)] text-white rounded-lg font-bold hover:opacity-90 transition-opacity disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-semantic-success)]"
             >
               {pendingAction === 'RESOLVE' ? 'Olay Kapatılıyor...' : 'Çözüldü Olarak İşaretle'}
             </button>
@@ -241,7 +241,7 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
           <button 
             onClick={(e) => handleOpenConfirm('FALSE_POSITIVE', e)}
             disabled={!!pendingAction}
-            className="px-4 py-2 bg-slate-600 text-white rounded font-medium hover:bg-slate-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-500"
+            className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-surface-hover)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] rounded-lg font-bold hover:bg-[var(--color-border-subtle)] transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-text-accent)]"
           >
             {pendingAction === 'FALSE_POSITIVE' ? 'Olay Kapatılıyor...' : 'Yanlış Pozitif Olarak İşaretle'}
           </button>
@@ -253,25 +253,25 @@ export const IncidentActionPanel: React.FC<IncidentActionPanelProps> = ({ incide
           role="alertdialog" 
           aria-modal="true"
           aria-labelledby="confirm-dialog-title"
-          className="mt-4 p-4 border border-yellow-500/50 bg-yellow-900/20 rounded-lg"
+          className="mt-5 p-5 border border-[var(--color-semantic-warning)]/30 bg-[var(--color-semantic-warning)]/10 rounded-xl"
         >
-          <h4 id="confirm-dialog-title" className="text-yellow-500 font-bold mb-2">
+          <h4 id="confirm-dialog-title" className="text-[var(--color-semantic-warning)] font-bold mb-2">
             İşlemi Onaylayın
           </h4>
-          <p className="text-slate-300 mb-4 text-sm">Bu işlem geri alınamaz.</p>
-          <div className="flex gap-3">
+          <p className="text-[var(--color-text-secondary)] mb-5 text-sm">Bu işlem geri alınamaz.</p>
+          <div className="flex flex-col sm:flex-row gap-3">
             <button 
               ref={confirmBtnRef}
               onClick={confirmationAction === 'RESOLVE' ? handleResolve : handleFalsePositive}
               disabled={!!pendingAction}
-              className="px-4 py-2 bg-red-600 text-white text-sm rounded font-medium hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-semantic-danger)] text-white text-sm font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-semantic-danger)]"
             >
               İşlemi Onayla
             </button>
             <button 
               onClick={handleCancelConfirmation}
               disabled={!!pendingAction}
-              className="px-4 py-2 bg-slate-700 text-white text-sm rounded font-medium hover:bg-slate-600 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-400"
+              className="w-full sm:w-auto px-5 py-2.5 bg-[var(--color-surface-base)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-sm font-bold rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--color-text-accent)]"
             >
               Vazgeç
             </button>
