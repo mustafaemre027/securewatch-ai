@@ -37,6 +37,7 @@ class Settings(BaseSettings):
         access_token_expire_minutes (int): JWT token expiry duration in minutes.
         upload_dir (Path): Storage directory path for uploaded CSV files.
         max_upload_size_bytes (int): Maximum allowed CSV upload size in bytes (default: 52428800 = 50MB).
+        frontend_origin (str): Allowed origin for CORS.
     """
     app_name: str = "SecureWatch AI"
     app_version: str = "0.1.0"
@@ -50,6 +51,7 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("../data/uploads")
     max_upload_size_bytes: int = 52428800
     model_package_path: Path = Path("app/ml_models")
+    frontend_origin: str = "http://localhost:5173"
 
     @field_validator("upload_dir", mode="before")
     @classmethod

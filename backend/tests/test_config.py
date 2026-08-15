@@ -150,3 +150,9 @@ def test_model_package_path_rejects_relative_escape_from_backend_dir() -> None:
         _make_settings(MODEL_PACKAGE_PATH="../escape/path")
     errors = exc_info.value.errors()
     assert any("escape" in str(e).lower() for e in errors)
+
+
+def test_frontend_origin_override() -> None:
+    """Test that FRONTEND_ORIGIN can override the default."""
+    settings = _make_settings(FRONTEND_ORIGIN="https://production.example.com")
+    assert settings.frontend_origin == "https://production.example.com"
