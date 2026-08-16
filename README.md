@@ -24,6 +24,51 @@ SecureWatch AI, ağ trafiği kayıtlarını makine öğrenmesi yöntemleriyle an
 - **Olay Yönetimi:** Yüksek riskli ve şüpheli tespitlerin birleştirilerek güvenlik olayı (Incident) dosyalarına dönüştürülmesi ve analistlere atanması.
 - **Dashboard ve İzleme:** Tüm analizlerin, tespitlerin ve olayların güncel durumunun özet metrikler ve grafikler üzerinden takip edilmesi.
 
+## Canlı Demo ve Yayın Durumu
+
+| Servis | Bağlantı |
+|---|---|
+| **Frontend** | [https://securewatch-ai-three.vercel.app](https://securewatch-ai-three.vercel.app/) |
+| **Backend Health** | [https://securewatch-ai-25yd.onrender.com/api/v1/health](https://securewatch-ai-25yd.onrender.com/api/v1/health) |
+| **Swagger UI** | [https://securewatch-ai-25yd.onrender.com/docs](https://securewatch-ai-25yd.onrender.com/docs) |
+
+### Dağıtım Topolojisi
+
+* **Vercel:** React/TypeScript/Vite tabanlı frontend uygulaması
+* **Render:** FastAPI backend servisi ve paketlenmiş demo çıkarım modeli
+* **Neon:** PostgreSQL üretim veritabanı
+
+### Doğrulanan Canlı Akış
+
+Aşağıdaki üretim akışı canlı ortamda manuel olarak doğrulanmıştır:
+
+* ANALYST hesabıyla kimlik doğrulama
+* CIC-IDS2017 uyumlu CSV yükleme
+* toplu çıkarım (batch inference)
+* tespit ve risk sonuçlarının görüntülenmesi
+* tespitin güvenlik olayına dönüştürülmesi
+* analistin olayı üzerine alması
+* olay yorumlarının eklenmesi
+* olayın çözüldü olarak kapatılması
+* ADMIN hesabıyla kimlik doğrulama
+* analiz, dashboard, olay, atama ve yorum kayıtlarının yönetici görünümünde doğrulanması
+
+### Rol Özeti
+
+* **ANALYST:** CSV dosyalarını yükler, analizleri başlatır, sonuçları inceler, tespitleri olaya dönüştürür, olayları üzerine alır, yorum ekler ve olayları kapatır.
+* **ADMIN:** Platform genelindeki analiz işlerini, dashboard metriklerini, olayları, atamaları ve yorumları izler.
+* CSV yükleme işlemi yalnızca ANALYST hesaplarına açıktır.
+
+### Canlı Demo Kısıtları
+
+> **ÖNEMLİ UYARI:** Bu uygulama akademik bir karar destek prototipidir; üretim ortamına uygun gerçek zamanlı bir IDS/IPS değildir.
+
+* Paketlenmiş model `local-qa-synthetic` olarak tanımlanmıştır ve yalnızca kontrollü demo/entegrasyon doğrulaması amacıyla kullanılmaktadır.
+* Model çıktıları gerçek üretim saldırı tespit başarımı olarak sunulmamalıdır.
+* Render Free, hareketsizlik sonrasında uykuya geçebilir; ilk istek yaklaşık 50 saniye veya daha uzun sürebilir.
+* Render Free yerel depolaması geçicidir. Yüklenen CSV dosyaları servis yeniden başlatıldığında, yeniden dağıtıldığında veya uykuya geçtiğinde silinebilir.
+* Mevcut demo yayınında CSV dosyası aynı aktif oturumda yüklenmeli ve hemen işlenmelidir.
+* Kullanıcı adları, parolalar, token’lar, veritabanı bağlantı dizeleri ve gizli ortam değerleri yayımlanmamalıdır.
 ## Uygulama Görüntüleri
 
 | Güvenlik Dashboard'u | Analiz Çalışma Alanı |
@@ -162,7 +207,7 @@ python -m scripts.create_demo_users
 
 Platformun sürümü, tüm bileşenlerinde gerçekleştirilen katı kalite kapılarından ve testlerden başarıyla geçmiştir:
 
-- **Backend Testleri:** 499 test başarılı (Birim ve Entegrasyon testleri).
+- **Backend Testleri:** 502 test başarılı (Birim ve Entegrasyon testleri).
 - **Backend Güvenlik Modülü:** İzolasyonlu kritik backend `auth` paketi 194 test başarılı.
 - **Frontend Testleri:** Toplam 34 test dosyasında 791 test (%100) başarılı (Vitest & React Testing Library).
 - **TypeScript:** Frontend statik tip kontrolü (`npm run type-check`) hatasız.
